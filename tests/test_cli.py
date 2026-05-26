@@ -1,7 +1,8 @@
-"""End-to-end CLI tests for the subcommands implemented in Phase 1."""
+"""End-to-end CLI tests for subcommands implemented through Phase 2."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -23,6 +24,37 @@ class TestRbmInfo:
         result = runner.invoke(rbm_app, ["info", str(tmp_path / "missing.rbm")])
         assert result.exit_code == 1
         assert "error" in result.output.lower()
+
+
+class TestRbmTree:
+    def test_prints_synthetic_areas_to_stdout(self, synthetic_rbm: Path) -> None:
+        result = runner.invoke(rbm_app, ["tree", str(synthetic_rbm)])
+        assert result.exit_code == 0, result.output
+        assert "5 areas" in result.output
+        for name in ("AREA_ALPHA", "AREA_BETA", "AREA_GAMMA", "AREA_DELTA", "AREA_OMEGA"):
+            assert name in result.output
+
+    def test_writes_json_when_out_given(
+        self, synthetic_rbm: Path, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "tree.json"
+        result = runner.invoke(rbm_app, ["tree", str(synthetic_rbm), "--out", str(out)])
+        assert result.exit_code == 0, result.output
+        assert out.exists()
+        document = json.loads(out.read_text(encoding="utf-8"))
+        assert document["meta"]["area_count"] == 5
+        long_names = [a["long_name"] for a in document["areas"]]
+        assert long_names == [
+            "AREA_ALPHA",
+            "AREA_BETA",
+            "AREA_GAMMA",
+            "AREA_DELTA",
+            "AREA_OMEGA",
+        ]
+
+    def test_missing_file_exits_nonzero(self, tmp_path: Path) -> None:
+        result = runner.invoke(rbm_app, ["tree", str(tmp_path / "missing.rbm")])
+        assert result.exit_code == 1
 
 
 class TestRbmDevDumpRecord:
@@ -49,10 +81,10 @@ class TestRbmDevDumpRecord:
 
 class TestRbmDevFollowChain:
     def test_stops_at_null_pointer(self, synthetic_rbm: Path) -> None:
-        # Record 1 in the synthetic fixture is fully zeroed, so following from
-        # record 1 with default offset 0 reads next=0 and stops.
+        # Records 3-15 in the synthetic fixture are zero-padded, so following
+        # from record 3 with default offset 0 reads next=0 and stops.
         result = runner.invoke(
-            rbm_dev_app, ["follow-chain", str(synthetic_rbm), "--from", "1"]
+            rbm_dev_app, ["follow-chain", str(synthetic_rbm), "--from", "3"]
         )
         assert result.exit_code == 0, result.output
         assert "visited 1 records" in result.output
