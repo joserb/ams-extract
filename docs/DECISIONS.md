@@ -71,3 +71,84 @@ Sobre `BUNGE CARTAGENA marzo 2.0.rbm` (1 857 595 904 bytes, 3 628 117 records):
 - Si en el futuro aparece un `.rbm` con indexación distinta (versión más
   antigua del formato, otro vendor), habrá que detectarlo y aislar la lógica
   de indexación en `RbmReader`.
+
+---
+
+## ADR-0002 — Áreas: dos punteros en el header y heurística "stop after first gap"
+
+- **Fecha**: 2026-05-27
+- **Estado**: aceptada (Fase 2)
+
+### Contexto
+
+PLAN §4.3 (basado en Eka) describe las áreas como **una cadena enlazada**
+arrancando en el puntero del header. En `BUNGE` esperábamos `area_chain_first_record = 70 → 71 → 72 → …` con los nombres distribuidos por una lista de records.
+
+La realidad observada es diferente:
+
+- **Record 70 (apuntado por 0xDC)**: layout "simple list". 5 nombres de área
+  en slots 0..4 (FULL-FAT, PARQUE TANQUES, OBSOLETOS, SERVICIOS, OSMOSIS).
+  Los slots 5..11 están vacíos. Los slots 12 y 13 contienen listas concatenadas de **códigos cortos** de 4 chars (`"CI  EXT DEP MAR NAV PAS PEL PRE"`,
+  `"REF CAL FULLPTANOBS SRV OSM"`).
+- **Record 69 (apuntado por 0xE4 — un segundo puntero en el header)**:
+  layout "prefixed list". Un preámbulo binario en 0x00..0xBF (timestamp +
+  tag `gits` + tabla de u32) y 10 nombres de área en slots 6..15
+  (CONTRA INCENDIOS, EXTRACCION, …, CALDERAS).
+- **Records 71..77**: vacíos con tag `gdwn` — no son continuación de la
+  cadena. El "siguiente puntero" clásico no existe entre records de área.
+
+Total real verificado contra la UI de AMS (capturas del usuario):
+**15 áreas** = 10 (record 69) + 5 (record 70). El PLAN decía "14 áreas"
+basado en información imprecisa; el dato correcto es 15.
+
+### Decisión
+
+1. **El header tiene DOS punteros a áreas, no uno**: el primario en `0xDC`
+   y el secundario en `0xE4`. El walker (`walk_areas`) sigue ambos.
+   Records ya visitados se dedupean por número.
+2. **No hay cadena enlazada entre records de área**. Cada record contiene
+   un set autocontenido de nombres de área.
+3. **Heurística de detección de slots** (en `_iter_area_slots`):
+   - Recorrer los 16 slots de 32 bytes del record en orden.
+   - Antes de encontrar el primer nombre, saltarse los slots que no parecen
+     nombres (esto absorbe el preámbulo binario del layout "prefixed list").
+   - Tras emitir el primer nombre, parar en el primer slot que **no** parece
+     nombre (esto evita capturar las listas de códigos cortos de los slots
+     12-13 del layout "simple list" como áreas falsas).
+4. **Aceptar cp1252 en el filtro de nombres**: el filtro acepta cualquier
+   byte ``>= 0x20`` excepto DEL. Esto fue necesario para detectar
+   `IMPULSIÓN DE MAR` (contiene `0xD3 = 'Ó'` en cp1252).
+5. **Códigos cortos derivados, no extraídos**: aunque sabemos que la base
+   almacena los códigos cortos en los slots 12-13 del record 70, el formato
+   exacto (4-char fixed width concatenado) no permite emparejarlos
+   trivialmente con los nombres del record 69. Phase 2 deriva `short_code`
+   sanitizando el `long_name`; Phase 2b o posterior podrá leer los códigos
+   nativos si es necesario.
+
+### Cómo se validó
+
+- Sobre `BUNGE`: `rbm tree` produce exactamente las 15 áreas visibles en
+  el árbol de AMS Suite Machinery Health Manager (verificado por screenshot
+  del navegador AMS).
+- Test de integración `test_real_file_yields_fifteen_areas` compara la
+  lista completa palabra por palabra.
+
+### Alternativas consideradas
+
+- **Seguir una cadena enlazada clásica** desde 0xDC con `--at-offset` a
+  determinar. Descartada porque records 71..77 son `gdwn` vacíos, no
+  continuación.
+- **Asumir layout único** (solo "simple list"). Descartada porque dejaría
+  fuera 10 de 15 áreas.
+- **Hardcodear "salta slots 12-13" sin heurística general**. Descartada por
+  ser frágil ante otros `.rbm` con otra distribución.
+
+### Consecuencias
+
+- Cualquier `.rbm` que use una cadena enlazada real entre records de área
+  romperá el walker. Si aparece, se detectaría rápido: el conteo de áreas
+  sería claramente menor de lo esperado.
+- La heurística "parar en el primer gap tras emitir un nombre" puede
+  truncar la lista si hay un nombre legítimamente seguido de un slot vacío
+  (poco probable en la práctica). Si se observa, hay que añadir una regla
+  más estricta para los gaps internos.

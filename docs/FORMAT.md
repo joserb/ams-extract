@@ -43,13 +43,59 @@ area_chain_first_record. El resto se queda como bytes crudos accesibles via
 
 ## 3. Jerarquía (Áreas → Equipos → Puntos)
 
-Pendiente (Fase 2). Hipótesis a verificar:
+### 3.1 Áreas (Fase 2)
 
-- El record apuntado por `area_chain_first_record` contiene una lista de
-  nombres de área en slots de 32 bytes (verificado: `BUNGE` record 70 base-0
-  contiene 5 nombres: `FULL-FAT`, `PARQUE TANQUES`, `OBSOLETOS`, `SERVICIOS`,
-  `OSMOSIS`). Cómo se enlaza al siguiente record de áreas y cómo se
-  alcanzan los equipos por área queda por descubrir.
+El header de la base no usa una cadena enlazada para las áreas; tiene **dos
+punteros independientes** a records que contienen nombres:
+
+- `0xDC` → record con _layout "simple list"_.
+- `0xE4` → record con _layout "prefixed list"_.
+
+Ver ADR-0002 en `docs/DECISIONS.md` para el razonamiento.
+
+#### Layout "simple list" (record 70 en BUNGE)
+
+| Offset | Tamaño | Campo |
+|---|---|---|
+| `0x000` | 32 | nombre de área 1 (cp1252, space-padded) |
+| `0x020` | 32 | nombre de área 2 |
+| `0x040` | 32 | nombre de área 3 |
+| `0x060` | 32 | nombre de área 4 |
+| `0x080` | 32 | nombre de área 5 |
+| `0x0A0` | 192 | padding (espacios) — fin de la lista de nombres |
+| `0x180` | 32 | concatenación de códigos cortos (4 chars cada uno, hasta 8) |
+| `0x1A0` | 32 | concatenación de códigos cortos (continúa) |
+| `0x1C0` | 64 | padding |
+
+#### Layout "prefixed list" (record 69 en BUNGE)
+
+| Offset | Tamaño | Campo |
+|---|---|---|
+| `0x00` | 4 | u32 LE — timestamp candidato |
+| `0x04` | 4 | version marker (e.g. `02 00 0e 00`) |
+| `0x08` | 4 | tag `gits` (ASCII) |
+| `0x0C` | 4 | reservado |
+| `0x10` | 52 | tabla de u32 LE — punteros aún sin interpretar |
+| `0x44` | 124 | mezcla de bytes / floats / flags |
+| `0xC0` | 32 | nombre de área 1 |
+| `0xE0` | 32 | nombre de área 2 |
+| ... | ... | hasta 10 nombres consecutivos |
+| `0x1E0` | 32 | nombre de área 10 (último slot) |
+
+Parser: `ams_extract.tree.walk_areas()` lee ambos punteros, recorre cada
+record con la heurística descrita en ADR-0002 y devuelve `list[Area]`.
+
+### 3.2 Equipos y Puntos
+
+Pendiente (Fase 2b). Pistas observadas:
+
+- La captura de la UI de AMS muestra que cada área contiene una mezcla de
+  **plantillas** (DEP-M, DEP-M+T3, IBL-REACC S1 en DEP) y **equipos reales**
+  (AG-100, CF-4900, PM-100, …). Hay que distinguirlas o documentar que se
+  exportan ambas.
+- La tabla de u32 LE del layout "prefixed list" (offsets `0x10`-`0x44` en
+  record 69 de BUNGE) podría contener los punteros a las cadenas de
+  equipos por área. Hipótesis a validar leyendo esos records.
 
 ## 4. Tags de 4 chars
 
