@@ -220,6 +220,8 @@ __marimo__/
 # ams-extract — project data and outputs (never commit binary databases or exports)
 *.rbm
 *.RBM
+# Exception: synthetic test fixtures are tiny and need to be committed.
+!tests/fixtures/*.rbm
 dataset/
 samples/
 .rbm-cache/
