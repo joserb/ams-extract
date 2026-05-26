@@ -40,6 +40,12 @@ DB_TAG_LENGTH = 4
 VERSION_MARKER_OFFSET = 0x04
 VERSION_MARKER_LENGTH = 4
 AREA_CHAIN_POINTER_OFFSET = 0xDC
+AREA_CHAIN_SECONDARY_POINTER_OFFSET = 0xE4
+"""Secondary area-chain record pointer.
+
+In BUNGE this targets record 69, which holds the "prefixed-list" area record
+with 9 of the 14 areas. May be 0 in databases that only use the primary chain.
+"""
 
 
 @dataclass(frozen=True, slots=True)
