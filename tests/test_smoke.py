@@ -30,7 +30,8 @@ def test_rbm_dev_help_lists_dev_subcommands() -> None:
         assert command in result.output
 
 
-def test_rbm_info_stub_runs() -> None:
-    result = runner.invoke(rbm_app, ["info", "nonexistent.rbm"])
+def test_rbm_tree_stub_runs() -> None:
+    # tree, extract, export, scan are still Phase 0 stubs in Phase 1.
+    result = runner.invoke(rbm_app, ["tree", "nonexistent.rbm"])
     assert result.exit_code == 0
     assert "not implemented" in result.output

@@ -7,8 +7,11 @@ from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.table import Table
 
 from ams_extract.logging_setup import LogFormat, LogLevel, configure_logging
+from ams_extract.reader import RbmFileError, RbmReader
+from ams_extract.records.header import parse_header
 
 app = typer.Typer(
     name="rbm",
@@ -24,6 +27,12 @@ def _not_implemented(command: str) -> None:
     """Emit a user-visible 'not implemented yet' notice and exit cleanly."""
     _console.print(f"[yellow]rbm {command}[/yellow]: not implemented yet (Phase 0 stub).")
     raise typer.Exit(code=0)
+
+
+def _abort(message: str) -> typer.Exit:
+    """Print an error message in red and return a non-zero ``typer.Exit``."""
+    _console.print(f"[red]error:[/red] {message}")
+    return typer.Exit(code=1)
 
 
 @app.callback()
@@ -51,8 +60,39 @@ def info(
     file: Annotated[Path, typer.Argument(help="Path to a .rbm database file.")],
 ) -> None:
     """Print signature, version, size and quick counts for FILE."""
-    _ = file
-    _not_implemented("info")
+    if not file.exists():
+        raise _abort(f"file not found: {file}")
+    try:
+        with RbmReader(file) as reader:
+            header = parse_header(reader)
+            record_count = reader.record_count
+            size = reader.size
+    except RbmFileError as exc:
+        raise _abort(str(exc)) from exc
+
+    table = Table(title=f"rbm info — {file.name}", show_header=False, box=None)
+    table.add_column(style="bold cyan")
+    table.add_column()
+    table.add_row("path", str(file))
+    table.add_row("size", f"{size:,} bytes")
+    table.add_row("records", f"{record_count:,}")
+    table.add_row("signature", header.signature)
+    table.add_row("db_tag", header.db_tag)
+    table.add_row("version_marker", header.version_marker.hex(" "))
+    table.add_row("guid", header.guid.hex())
+    table.add_row("description", header.description or "(empty)")
+    ts = header.timestamp
+    table.add_row(
+        "timestamp",
+        f"{ts.isoformat()} (raw=0x{header.timestamp_raw:08x})"
+        if ts is not None
+        else f"(unparseable; raw=0x{header.timestamp_raw:08x})",
+    )
+    table.add_row(
+        "area_chain_first_record",
+        str(header.area_chain_first_record),
+    )
+    _console.print(table)
 
 
 @app.command("tree")
