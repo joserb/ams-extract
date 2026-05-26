@@ -25,7 +25,7 @@ class TestParseHeaderSynthetic:
     def test_description(self, synthetic_rbm: Path) -> None:
         with RbmReader(synthetic_rbm) as reader:
             header = parse_header(reader)
-        assert header.description == "SYNTHETIC FIXTURE - PHASE 1"
+        assert header.description == "SYNTHETIC FIXTURE - PHASES 0-2"
 
     def test_db_tag(self, synthetic_rbm: Path) -> None:
         with RbmReader(synthetic_rbm) as reader:
