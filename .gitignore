@@ -216,3 +216,13 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ams-extract — project data and outputs (never commit binary databases or exports)
+*.rbm
+*.RBM
+dataset/
+samples/
+.rbm-cache/
+
+# uv
+.venv/
