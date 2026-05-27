@@ -1,29 +1,42 @@
 """Serialize the area / equipment / point hierarchy to JSON.
 
-Phase 2 emits the schema below with equipment lists empty pending the
-Phase 2b walker. Consumers can detect partial output via
-``meta.phase == "phase-2-areas-only"``.
+Phase 2b emits the schema below with the full Áreas → Equipos → Puntos
+hierarchy. Consumers can detect schema generation via
+``meta.schema_version`` and ``meta.phase``.
 
 Schema (informal)::
 
     {
       "meta": {
-        "schema_version": 1,
-        "phase": "phase-2-areas-only",
+        "schema_version": 2,
+        "phase": "phase-2b-complete",
         "source": "<path of the input .rbm>",
         "signature": "MT4.00",
         "description": "Preditec",
         "area_count": 15,
-        "equipment_count": 0,
-        "point_count": 0
+        "equipment_count": ...,
+        "point_count": ...
       },
       "areas": [
         {
           "record_num": 69,
-          "slot_index": 6,
+          "slot_index": 0,
           "long_name": "CONTRA INCENDIOS",
           "short_code": "CONTRA_INCENDIOS",
-          "equipment": []
+          "equipment": [
+            {
+              "record_num": 300,
+              "long_name": "Bomba Centrifuga PM-0CI/1",
+              "short_code": "Bomba_Centrifuga_PM_0CI_1",
+              "points": [
+                {"record_num": 301,
+                 "long_name": "MOTOR LOA HORIZONTAL",
+                 "short_code": "MOTOR_LOA_HORIZONTAL"},
+                ...
+              ]
+            },
+            ...
+          ]
         },
         ...
       ]
@@ -41,8 +54,8 @@ from ams_extract.models import Area, Equipment, Point
 from ams_extract.reader import RbmReader
 from ams_extract.records.header import parse_header
 
-SCHEMA_VERSION = 1
-PHASE_LABEL = "phase-2-areas-only"
+SCHEMA_VERSION = 2
+PHASE_LABEL = "phase-2b-complete"
 
 
 def _point_to_dict(point: Point) -> dict[str, Any]:

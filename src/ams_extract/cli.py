@@ -13,7 +13,7 @@ from ams_extract.export.json_tree import build_tree_document, write_tree_json
 from ams_extract.logging_setup import LogFormat, LogLevel, configure_logging
 from ams_extract.reader import RbmFileError, RbmReader
 from ams_extract.records.header import parse_header
-from ams_extract.tree import walk_areas
+from ams_extract.tree import walk_hierarchy
 
 app = typer.Typer(
     name="rbm",
@@ -105,35 +105,37 @@ def tree(
         typer.Option("--out", help="Write the hierarchy JSON to this path."),
     ] = None,
 ) -> None:
-    """Export the Areas / Equipment / Points hierarchy as JSON.
-
-    Phase 2: areas only; equipment lists are empty pending the Phase 2b walker.
-    """
+    """Export the Areas / Equipment / Points hierarchy as JSON."""
     if not file.exists():
         raise _abort(f"file not found: {file}")
     try:
         with RbmReader(file) as reader:
-            areas = walk_areas(reader)
+            areas = walk_hierarchy(reader)
             document = build_tree_document(reader, areas, source_path=file)
     except RbmFileError as exc:
         raise _abort(str(exc)) from exc
 
+    meta = document["meta"]
     if out is None:
         _console.print(
-            f"[bold]{document['meta']['area_count']} areas[/bold] "
-            f"(equipment / points walker pending — Phase 2b)"
+            f"[bold]{meta['area_count']} areas[/bold]  "
+            f"{meta['equipment_count']} equipment  "
+            f"{meta['point_count']} points"
         )
         for area_dict in document["areas"]:
             _console.print(
                 f"  rec={area_dict['record_num']:>3} "
                 f"slot={area_dict['slot_index']:>2}  "
-                f"{area_dict['short_code']:<24} {area_dict['long_name']}"
+                f"{area_dict['short_code']:<24} {area_dict['long_name']} "
+                f"[dim]({len(area_dict['equipment'])} equipment)[/dim]"
             )
     else:
         write_tree_json(document, out)
         _console.print(
             f"wrote [bold]{out}[/bold]  "
-            f"({document['meta']['area_count']} areas)"
+            f"({meta['area_count']} areas, "
+            f"{meta['equipment_count']} equipment, "
+            f"{meta['point_count']} points)"
         )
 
 
