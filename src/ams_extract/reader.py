@@ -112,3 +112,20 @@ class RbmReader:
         tb: TracebackType | None,
     ) -> None:
         self.close()
+
+
+def decode_inner_pointer(stored: int) -> int | None:
+    """Convert a record-internal pointer to a zero-based record number.
+
+    Pointer tables inside ``gdts`` / ``gicm`` / ``gdcm`` / ``gipm`` records
+    store record numbers offset by ``+1`` so the value ``0`` can be used as
+    the end-of-list / null sentinel (see ADR-0003). ``decode_inner_pointer``
+    returns ``None`` for ``0`` and ``stored - 1`` otherwise.
+
+    Header pointers (offsets ``0xDC`` and ``0xE4`` of record 0) are
+    zero-based directly (see ADR-0001) and must not be passed through this
+    helper.
+    """
+    if stored == 0:
+        return None
+    return stored - 1
