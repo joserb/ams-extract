@@ -4,8 +4,8 @@
 > (ficheros `.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM Windows XP
 > ni del software AMS original.
 
-Versión del documento: 0.3 (tras Fase 0/1/2 — añadidos hallazgos verificados)
-Última actualización: 2026-05-27 (final de sesión)
+Versión del documento: 0.4 (tras Fase 2b — jerarquía completa funcionando)
+Última actualización: 2026-05-28
 
 Repo: `git@github.com:joserb/ams-extract.git` (privado)
 
@@ -15,17 +15,19 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 
 | Fase | Estado | Branch | Notas |
 |---|---|---|---|
-| 0 — Bootstrap | ✅ completada | `phase-00-bootstrap` | uv + pyproject + structlog + stubs CLI, todo verde |
-| 1 — Reader + header | ✅ completada | `phase-01-reader-and-header` | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
-| 2 — Jerarquía + CI | 🟡 parcial — solo áreas | `phase-02-hierarchy-and-ci` | 15 áreas verificadas; CI matrix listo; equipos/puntos diferidos a 2b |
-| 2b — Equipos y Puntos | ⏳ pendiente | _por crear_ | Próxima sesión. Ver §5 Fase 2b y §12 "Para retomar" |
-| 3 — Sample reader FFT | ⏳ pendiente | _por crear_ | |
+| 0 — Bootstrap | ✅ completada | `phase-00-bootstrap` (merged) | uv + pyproject + structlog + stubs CLI, todo verde |
+| 1 — Reader + header | ✅ completada | `phase-01-reader-and-header` (merged) | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
+| 2a — Áreas + CI | ✅ completada | `phase-02-hierarchy-and-ci` (merged) | 15 áreas verificadas; CI matrix listo; ADR-0002 |
+| 2b — Equipos y Puntos | ✅ completada | `phase-02b-equipment-points` | 15 áreas, 252 equipos, 3795 puntos, 869 PEAKVUE; `rbm-dev scan --tags`; ADR-0003 |
+| 3 — Sample reader FFT | ⏳ pendiente | _por crear_ | Empezar por records `vcps` / `vcfw` (53% / 36% de BUNGE) |
 | 4 — Verificación visual | ⏳ pendiente | _por crear_ | |
 | 5 — Waveforms | ⏳ pendiente | _por crear_ | |
 | 6 — Export masivo | ⏳ pendiente | _por crear_ | |
 | 7 — Refinamientos | ⏳ pendiente | _por crear_ | |
 
-Branches sin mergear a `master` aún — el merge se hace cuando se acepte el conjunto.
+Las fases 0/1/2a están ya en `master`. Fase 2b vive en
+`phase-02b-equipment-points`, lista para mergear si la verificación visual
+final no exige cambios.
 
 ---
 
@@ -579,39 +581,55 @@ Entregables completados:
 cuadra con la UI de AMS (15, no 14 como decía el plan original; documentado en
 ADR-0002). CI estructurada para correr en push/PR a master.
 
-### Fase 2b — Equipos y Puntos (≈ 1-2 sesiones) ⏳ PENDIENTE
+### Fase 2b — Equipos y Puntos (≈ 1 sesión) ✅ COMPLETADA
+
+> Branch: `phase-02b-equipment-points`. 8 commits. ADR-0003 (cadena
+> `gdts → gicm → gdcm → gipm → vdpm` + convención "+1 encoded" para
+> punteros internos). El recuento de PEAKVUE quedó en 869, dentro del
+> ±5% del objetivo ~895 fijado en la DoD.
 
 **Objetivo**: completar el walker top-down hasta el nivel de Point.
 
-Hipótesis a verificar primero (con `rbm-dev dump-record`):
+Hipótesis verificada primero con `rbm-dev dump-record`: la tabla de u32
+LE en `0x10-0x4F` del record prefix-list (record 69) son los punteros a
+records de equipos por área — **una entrada por área en orden walker**,
+no 13 sino **15**, todas válidas y todas con tag `gdts`. La numeración
+recordada en la sesión previa (`298, 4853, 336467, …`) estaba
+ligeramente desviada; los valores correctos quedaron en ADR-0003.
 
-- La tabla de u32 LE en `0x10-0x44` del record "prefixed list" (record 69 en
-  BUNGE) son los punteros a records de equipos por área. 13 valores
-  monótonos detectados: `298, 4853, 336467, 390654, 400612, 476104, 479522,
-  504709, 819656, 967257, 1012745, 1025192, 1032888`. 13 ≠ 15 áreas, así que:
-  - ¿son 13 áreas con equipos + 2 sin equipos?
-  - ¿el record 70 ("simple list") tiene su propia tabla de punteros que aún
-    no hemos buscado?
-  - ¿algunos punteros son a otra cosa (templates, alarmas)?
-- Abrir record 298, 4853, etc. con `rbm-dev dump-record` para identificar
-  el tag y la estructura.
+Entregables completados:
 
-Entregables esperados:
+- Parser de Equipment (`records/equipment.py`) — gdts → gicm → gdcm,
+  con seguimiento de la lista enlazada `gicm.0x0C` y detección de
+  ciclos para áreas con > 12 equipos.
+- Parser de Point (`records/point.py`) — gipm → vdpm, con tabla de
+  punteros en `gipm.0x1C0` (16 slots, terminada por 0) y long_name en
+  `vdpm.0x18` (32 bytes cp1252 padded).
+- `models.py` con `Equipment` y `Point` completamente poblados
+  (record_num, long_name, short_code derivado).
+- `walk_hierarchy()` recursivo con logging WARN-no-abort por record
+  problemático y cycle-detection en la cadena de gicm.
+- `rbm tree --out tree.json` emite jerarquía completa con
+  `schema_version=2`, `phase="phase-2b-complete"`.
+- `rbm-dev scan --tags` cuenta frecuencias de los 4-char tags;
+  resultado de BUNGE ya inventariado en `docs/FORMAT.md` §4.
+- Tests: unit (`tests/test_equipment.py`, `tests/test_point.py`,
+  ampliaciones de `test_area.py`, `test_cli.py`) + 5 nuevos
+  integration tests (`test_integration_tree.py`).
 
-- Parser de Equipment con su cadena de Points (lista enlazada o array, por verificar).
-- Parser de Point con sus campos básicos (long_name, short_code, tipo).
-- Distinción entre **templates** (DEP-M, IBL-REACC S1) y equipos reales —
-  preguntar al usuario o detectar por flag/tag/posición.
-- Walker recursivo top-down completo (`walk_hierarchy`) con detección de ciclos.
-- `rbm tree --out tree.json` ahora emite equipment/points poblados.
-- Test de integración: contar puntos PEAKVUE en BUNGE (objetivo: ~895 según PLAN,
-  a revisar contra la UI).
-- Subcomando auxiliar `rbm-dev scan --tags` para listar todos los tags de 4-chars
-  del fichero (será útil para Fase 3 y para validar la jerarquía).
+**Definition of done cumplida**: `tree.json` se genera con 15 áreas,
+252 equipos, 3795 puntos. PEAKVUE-named points = 869, dentro del ±5%
+del objetivo. El schema reporta `phase="phase-2b-complete"`. CI sigue
+verde.
 
-**Definition of done**: `tree.json` con jerarquía completa Áreas → Equipos →
-Puntos; conteos cuadran con AMS (±5%); JSON valida contra un schema actualizado
-(`phase="phase-2b-complete"`).
+**Aplazado a otra iteración** (no bloqueante):
+
+- Distinguir plantillas (DEP-M, IBL-REACC S1, …) de equipos reales. Como
+  las plantillas no están enlazadas desde la jerarquía de áreas, el
+  walker ya las omite por construcción. Si en algún momento se quieren
+  exportar, habría que escanear records `vdpm` no alcanzados (Fase 7).
+- Significado de los i32 signed deltas en `gicm.0x60+` y `vdpm.0x10+`.
+  Pendiente cuando estorbe.
 
 ### Fase 2 — Sanity checks finales (post-2b)
 
@@ -823,52 +841,56 @@ Resumen de lo cerrado en la conversación previa:
 
 ## 12. Para retomar la próxima sesión
 
-Última pausa: final de 2026-05-27 tras completar Fase 2a.
+Última pausa: 2026-05-28 tras completar Fase 2b.
 
 ### Estado del repo
 
-- Branch actual: `phase-02-hierarchy-and-ci` (no mergeada a `master`).
-- Working tree limpio tras commitear el plan actualizado.
-- Tests verdes: 70 unit + 6 integración (con `RBM_TEST_FILE` definido).
-- CI lista pero **aún no se ha empujado al remoto** — habrá que `git push -u origin`
-  de cada branch cuando se quiera ver CI en acción.
+- Branch actual: `phase-02b-equipment-points` (no mergeada a `master`,
+  no pusheada a `origin`).
+- Working tree limpio tras commitear documentación.
+- Tests verdes: 92 unit + 11 integración (con `RBM_TEST_FILE` definido).
+- CI configurada en `.github/workflows/ci.yml` pero `origin` aún no
+  conoce las branches — `git push -u origin <branch>` cuando se quiera
+  empezar a usar.
 
 ### Primer paso al volver
 
-1. Crear branch desde el HEAD actual:
+Opción A — **mergear 2b y empezar Fase 3**:
 
-   ```bash
-   git checkout phase-02-hierarchy-and-ci
-   git checkout -b phase-02b-equipment-points
-   ```
+```bash
+git checkout master
+git merge --ff-only phase-02b-equipment-points
+git checkout -b phase-03-sample-reader-fft
+```
 
-2. Verificar la hipótesis "tabla de u32 en record 69 son punteros a equipos":
+Opción B — **verificación visual de 2b primero** (recomendada si hay
+tiempo para sentarse delante de AMS): cargar `tree.json` y comparar
+visualmente la lista de equipos por área contra capturas de AMS. Si
+todo cuadra, ir a opción A.
 
-   ```bash
-   uv run rbm-dev dump-record "AMS databases/BUNGE CARTAGENA marzo 2.0.rbm" --rec 298
-   uv run rbm-dev dump-record "AMS databases/BUNGE CARTAGENA marzo 2.0.rbm" --rec 4853
-   # ... etc. para los 13 valores listados en §4.6
-   ```
+Para Fase 3:
 
-   Si los records contienen tags como `stdg`/`gdts`/`mcdg`/`gdcm` (intermedios)
-   o nombres de equipo en slots de 32 bytes, la hipótesis es correcta y se
-   puede pasar a parsearlos.
+1. Empezar por los records con tag `vcps` (53% del fichero,
+   probablemente los samples FFT individuales) y `vcfw` (36%, posibles
+   waveforms).
+2. Coger un punto conocido (e.g. la primera bomba de CONTRA INCENDIOS,
+   record `vdpm` 301) y buscar cómo se enlaza con sus samples. La pista
+   está en `vdpm.0x38+`, todavía no parseado.
+3. Validar contra screenshots de AMS para el mismo punto + timestamp.
 
-3. Si la hipótesis falla, atacar el problema desde la UI: el usuario puede
-   confirmar visualmente la lista de equipos de un área pequeña (p.ej. CONTRA
-   INCENDIOS o CALDERAS) y se busca esa lista en el binario para localizar el
-   record.
+### Preguntas abiertas
 
-### Preguntas abiertas para el usuario
+Ninguna bloqueante para Fase 2b. Lo que sigue queda registrado pero no
+es prerequisito:
 
-1. ¿Cuántos equipos tiene cada área en AMS? La de DEP que ya vimos tiene
-   ~28; las demás se pueden contar de las capturas.
-2. ¿Las "plantillas" (DEP-M, DEP-M+T3, IBL-REACC S1) se quieren extraer o no?
-   Iconos distintos en la UI — probablemente sí, marcadas con un flag.
-3. ¿El conteo de 895 puntos PEAKVUE viene de un reporte AMS exportable o es
-   estimación? Sería el principal test de la Fase 2b.
-4. ¿Hay alguna área de la captura que esté **vacía** (sin equipos)? Si sí,
-   eso explicaría por qué hay 13 punteros en la tabla del record 69 vs 15 áreas.
+1. **Plantillas (DEP-M, IBL-REACC S1, …)**: hoy se ignoran porque no
+   están enlazadas desde áreas. ¿Se quieren extraer? Si sí, Fase 7
+   debería escanear los ~2300 `vdpm` no alcanzados y agruparlos.
+2. **i32 signed deltas en gicm.0x60+**: aún sin función conocida. No
+   bloquea nada pero quedaría bien entenderlos.
+3. **Tags poco frecuentes** (`gina`, `gddr`, `odla`, `pdla`, `gdnp`,
+   `pdpa`, `gshr`, `gdpn`, `gdnl` …): pendientes de mapear cuando se
+   crucen en alguna fase.
 
 ### Atajos útiles ya implementados
 

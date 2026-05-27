@@ -152,3 +152,117 @@ basado en información imprecisa; el dato correcto es 15.
   truncar la lista si hay un nombre legítimamente seguido de un slot vacío
   (poco probable en la práctica). Si se observa, hay que añadir una regla
   más estricta para los gaps internos.
+
+---
+
+## ADR-0003 — Cadena Area→Equipo→Punto y punteros internos "+1 encoded"
+
+- **Fecha**: 2026-05-28
+- **Estado**: aceptada (Fase 2b)
+
+### Contexto
+
+El PLAN.md original (§4.3) describía la jerarquía como
+`Area → gdts → Equipment → gdcm → gipm → mpdo`, basándose en la
+documentación de Eka. La realidad encontrada en `BUNGE` resultó tener
+una capa intermedia adicional (`gicm`), una convención distinta para
+los punteros internos a los de la cabecera, y encadenamiento por
+linked-list para áreas con más de 12 equipos. Conviene fijar el modelo
+en una única ADR antes de que la implementación se ramifique.
+
+### Decisión
+
+**Cadena canónica** desde una `Area` hasta un `Point`:
+
+```
+Area
+  └─ gdts record           (uno por área; localizado vía la tabla de
+                            punteros del record "prefix-list" de áreas,
+                            offset 0x10..0x4F, decode_inner_pointer)
+       └─ gicm record      (chunks de hasta 12 equipos; primero en
+                            gdts.0x18; lista enlazada vía gicm.0x0C
+                            para áreas con > 12 equipos)
+            └─ gdcm record (uno por equipo; punteros en gicm.0x10..0x3F;
+                            nombre del equipo en slot de 28 bytes en
+                            gicm.0xB0 + i*28)
+                 └─ gipm record  (uno por equipo; gdcm.0x14)
+                      └─ vdpm record   (uno por punto; tabla de punteros
+                                        en gipm.0x1C0..0x1FF,
+                                        decode_inner_pointer)
+                          → long_name en vdpm.0x18 (32 bytes cp1252
+                            padded)
+```
+
+**Convención de punteros**:
+
+- Los **dos punteros de cabecera** (offsets `0xDC` y `0xE4` del record 0)
+  son **base-0** directos. ADR-0001 ya lo había fijado.
+- **Todos los punteros que viven dentro de records tipados** (gdts, gicm,
+  gdcm, gipm, vdpm, y la propia tabla 0x10 del area prefix-list) se
+  almacenan con un offset de **+1** sobre el número de record base-0,
+  reservando `0` como sentinela de fin-de-lista / puntero nulo. El helper
+  `ams_extract.reader.decode_inner_pointer` aplica la conversión.
+
+**Encadenamiento de gicm**: una `gicm` apunta a la siguiente del chunk
+vía u32 LE en offset `0x0C` (mismo encoding "+1", `0` = última). El
+walker recorre la lista, dedupando records ya visitados para tolerar
+ficheros corruptos.
+
+### Cómo se validó
+
+Sobre `BUNGE CARTAGENA marzo 2.0.rbm` (3 628 117 records):
+
+1. **Pointer #0 en rec 69 = 298** → record 297 base-1 → tag `gdts` ✓
+   (record 297 base-0 está vacío; base-1 acierta).
+2. **gdts 297 offset 0x18 = 1533** → record 1532 base-1 → tag `gicm`,
+   con 4 nombres "Bomba Centrifuga PM-0CI/{1,2,3,JO}" — exactamente los
+   equipos esperados para CONTRA INCENDIOS.
+3. **gicm 1532 offsets 0x10..0x1C** → 4 punteros (+1 encoded) →
+   records 300, 1534, 2766, 3998 base-0 → todos `gdcm` ✓.
+4. **gdcm 300 offset 0x14 = 432** → record 431 base-0 → `gipm`. Su tabla
+   0x1C0+ contiene 15 punteros (terminados por 0), apuntando todos a
+   records con tag `vdpm` cuyo offset 0x18 contiene nombres como
+   "MOTOR LOA HORIZONTAL", "BOMBA LA VERTICAL PEAKVUE", … los puntos
+   típicos de una bomba centrífuga.
+5. **gicm chain**: EXTRACCION tiene 36 equipos. Su primer gicm (record
+   4949) tiene 12 nombres y `0x0C = 134319` → siguiente gicm. La cadena
+   acaba en `0x0C = 0`. El campo `0x1C` del gdts (259105 base-1)
+   coincide con el ÚLTIMO gicm de la cadena, lo que confirma la
+   interpretación "first / last" para gdts 0x18 / 0x1C.
+6. **Recuento sobre BUNGE**: `walk_hierarchy` entrega 15 áreas,
+   252 equipos, 3795 puntos totales, **869 puntos con "PEAKVUE" en el
+   nombre** — dentro del ±5% de la cifra "~895 PEAKVUE" que aparecía en
+   el plan original (DoD de Fase 2b cumplida).
+7. **`rbm-dev scan --tags` sobre BUNGE**: aparecen 6141 records `vdpm`
+   en disco, pero el walker sólo alcanza 3795. La diferencia (~2346)
+   corresponde a plantillas de análisis (DEP-M, IBL-REACC S1…) y a
+   versiones históricas de puntos editados, no a fallo del walker.
+
+### Alternativas consideradas
+
+- **Una única convención de indexación (base-0 o base-1) para todo el
+  fichero**: descartada empíricamente — la combinación
+  (cabecera base-0, internos +1-encoded) es la que pasa todos los
+  smoke-tests contra `BUNGE`. Forzar una sola convención implicaría
+  asumir que el encoding "+1" es realmente "base-1 sin sentinela", lo
+  que rompería en gicm/gipm donde el `0` SÍ es sentinela.
+- **Modelar `Equipment.record_num = gicm_record + slot_index`**:
+  descartada por inestable — cambia si el gicm se rebalancea. Usamos el
+  `gdcm_record` como identidad estable del equipo.
+- **Filtrar plantillas del output**: aplazada — requiere detectar el
+  marker que distingue equipo real de plantilla (todavía no
+  identificado). Fase 2b emite todo lo alcanzable desde la jerarquía de
+  áreas; las plantillas, al no estar enlazadas vía un área, no llegan al
+  output.
+
+### Consecuencias
+
+- El walker es robusto a áreas con cualquier número de equipos sin
+  cambios al schema.
+- Cualquier nuevo tipo de record cuyas tablas internas usen el mismo
+  encoding +1 puede reutilizar `decode_inner_pointer` sin duplicar
+  lógica.
+- Si en el futuro descubrimos otro caso donde un puntero interno NO usa
+  el +1 (por ejemplo, un offset en bytes en vez de record_num), habrá
+  que aislarlo y nombrarlo aparte para no contaminar la convención
+  actual.
