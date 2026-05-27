@@ -4,10 +4,28 @@
 > (ficheros `.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM Windows XP
 > ni del software AMS original.
 
-Versión del documento: 0.2 (decisiones consolidadas tras revisión)
-Última actualización: 2026-05-27
+Versión del documento: 0.3 (tras Fase 0/1/2 — añadidos hallazgos verificados)
+Última actualización: 2026-05-27 (final de sesión)
 
 Repo: `git@github.com:joserb/ams-extract.git` (privado)
+
+---
+
+## Estado actual del proyecto
+
+| Fase | Estado | Branch | Notas |
+|---|---|---|---|
+| 0 — Bootstrap | ✅ completada | `phase-00-bootstrap` | uv + pyproject + structlog + stubs CLI, todo verde |
+| 1 — Reader + header | ✅ completada | `phase-01-reader-and-header` | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
+| 2 — Jerarquía + CI | 🟡 parcial — solo áreas | `phase-02-hierarchy-and-ci` | 15 áreas verificadas; CI matrix listo; equipos/puntos diferidos a 2b |
+| 2b — Equipos y Puntos | ⏳ pendiente | _por crear_ | Próxima sesión. Ver §5 Fase 2b y §12 "Para retomar" |
+| 3 — Sample reader FFT | ⏳ pendiente | _por crear_ | |
+| 4 — Verificación visual | ⏳ pendiente | _por crear_ | |
+| 5 — Waveforms | ⏳ pendiente | _por crear_ | |
+| 6 — Export masivo | ⏳ pendiente | _por crear_ | |
+| 7 — Refinamientos | ⏳ pendiente | _por crear_ | |
+
+Branches sin mergear a `master` aún — el merge se hace cuando se acepte el conjunto.
 
 ---
 
@@ -351,63 +369,82 @@ fatal de I/O. Flag `--strict` opcional para CI y tests.
 Esta sección es **viviente**: se actualiza a medida que descubrimos detalles. La versión
 canónica vivirá en `docs/FORMAT.md` una vez creado; este resumen sirve para arrancar.
 
-### 4.1 Estructura general
+> La spec viva está en `docs/FORMAT.md`. Las decisiones que justifican cada
+> elección viven en `docs/DECISIONS.md` (ADR-0001 indexación, ADR-0002 áreas).
+> Esta sección queda como puntos de partida y *gaps* aún abiertos.
+
+### 4.1 Estructura general — VERIFICADO
 
 - Fichero compuesto por **registros de 512 bytes exactos**. Tamaño total siempre múltiplo
   de 512 (verificado: 1 857 595 904 / 512 = 3 628 117 records sin resto).
-- Cada registro se direcciona por número entero. Pendiente de confirmar
-  experimentalmente si la indexación es base-0 (offset = `n * 512`) o base-1
-  (offset = `(n-1) * 512`). Eka Siswanto describe base-1 pero su ejemplo numérico encaja
-  con base-0. **Resolveremos en Fase 1** leyendo el primer puntero conocido del header
-  y validando contra el contenido en el offset resultante.
+- **Indexación base-0**: `offset = n × 512`, `n ∈ [0, record_count)`.
+  Decidido y validado experimentalmente en Fase 1 — ver ADR-0001.
 - El registro 0 contiene la cabecera global.
 
-### 4.2 Cabecera (registro 0) — observado
+### 4.2 Cabecera (registro 0) — VERIFICADO en Fase 1
+
+Layout confirmado contra `BUNGE CARTAGENA marzo 2.0.rbm` (extracto):
+
+| Offset | Tamaño | Campo | Ejemplo en BUNGE |
+|---|---|---|---|
+| `0x00` | 4 | `header_marker` (¿checksum?) | `76 05 9f 3c` |
+| `0x04` | 4 | `version_marker` | `01 00 0e 00` |
+| `0x08` | 4 | tag ASCII `gddh` | `gddh` |
+| `0x0C` | 16 | GUID / hash | `99304471db1ac447a20c3d117cc774cb` |
+| `0x1C` | 6 | firma ASCII `MT4.00` | `MT4.00` |
+| `0x2C` | 4 | u32 LE — timestamp candidato | `0x612f1c6b` = 2021-09-01 06:23:39 UTC |
+| `0x58` | 40 | descripción (cp1252, space-padded) | `Preditec` |
+| `0xDC` | 4 | u32 LE — puntero primario a record de áreas (layout "simple list") | `70` |
+| `0xE4` | 4 | u32 LE — puntero secundario a record de áreas (layout "prefixed list") | `69` |
+
+Notar: hay un **segundo puntero** a áreas en `0xE4`, sorpresa de Fase 2. El layout
+"prefixed list" que vive en el record secundario contiene un preámbulo binario con
+tag `gits` + tabla de u32 que probablemente apunta a las cadenas de equipos
+(hipótesis para Fase 2b — §5 abajo).
+
+### 4.3 Jerarquía — REVISADA tras Fase 2
 
 ```
-offset  bytes               significado tentativo
-0x00    76 05 9f 3c         ?? (¿checksum del header?)
-0x04    01 00 0e 00         ?? (¿versión 1.14?)
-0x08    67 64 64 68 ...     20 bytes — ¿hash / GUID DB?
-0x1C    "MT4.00"            firma de versión
-0x22    08 02 00 00         ?
-0x28    00 00 00 00         ?
-0x2C    6b 1c 2f 61         posible timestamp (LE u32) — verificar
-0x30    0f 00 29 00         ?
-0x40-0x7F  "Preditec   ..."  descripción de la base (nombre integrador)
-0x80    01 00 + "CARGA PORCENTA[J]REA   EQUIPO" — etiquetas de campos
-0xD8+   array de uint32 LE con punteros (record numbers) a la primera cadena de áreas
+Database (record 0 — gddh)
+  ├── [0xDC] Area record "simple list"   (record 70 en BUNGE: 5 áreas)
+  └── [0xE4] Area record "prefixed list" (record 69 en BUNGE: 10 áreas + prefijo binario)
+       └── ¿punteros a equipos en la tabla u32 LE de 0x10-0x44?  ← Fase 2b
+            └── Equipment records
+                 └── ¿punteros a puntos?                          ← Fase 2b
+                      └── Point records (incl. mezcla con templates)
+                           └── dcod / odcd  (rango de samples)    ← Fase 3
+                                └── tddo / oddt  (sample FFT)     ← Fase 3
 ```
 
-A confirmar/refinar en Fase 1.
+NB: **no hay cadena enlazada entre records de área** (los records 71-77 en BUNGE
+son `gdwn` vacíos, no continuación). La hipótesis de Eka "cadena con hasta 22
+areas por record + chain pointer" no aplica a las versiones MT4.00 que tenemos.
 
-### 4.3 Jerarquía (según Eka + lo que vemos)
+Captura de AMS confirmada (15 áreas):
+CONTRA INCENDIOS, EXTRACCION, DEPURADORA, IMPULSIÓN DE MAR, NAVES, PASILLO DE
+BOMBAS, PELETIZACION, PREPARACION, REFINERIA, CALDERAS, FULL-FAT, PARQUE
+TANQUES, OBSOLETOS, SERVICIOS, OSMOSIS.
 
-```
-Database (record 0)
-  └─ Area records             (lista de hasta 22 areas por record, con cadena al siguiente)
-       └─ stdg / gdts          (registro intermedio: punteros a equipos del área)
-            └─ Equipment records
-                 └─ mcdg / gdcm  (registro intermedio: punteros a puntos del equipo)
-                      └─ mpig / gipm  (puntos del equipo)
-                           └─ mpdo / opdm  (descripción individual del punto)
-                                └─ dcod / odcd  (record_num_start, record_num_end de samples)
-                                     └─ tddo / oddt  (sample: timestamp, descripción, array float32)
-```
-
-Convención: los nombres de tag de 4 chars se leen **al revés** porque la documentación
-de Eka los presenta tanto en orden lógico como en orden de bytes en disco. La
-implementación adoptará un convenio único (probablemente el orden tal y como aparece en
-disco) y lo mantendrá consistente con tests.
+Convención: los nombres de tag de 4 chars se leen **tal cual aparecen en disco**
+(orden de bytes). `gddh`, `gits`, `gdwn`, `rdlg` ya observados; mapeo completo
+en Fase 4.
 
 ### 4.4 Tags de 4 chars observados en el fichero real
 
-Detectados en el dump:
+Detectados en los dumps de Fases 1-2:
 
+- `gddh` — cabecera (record 0, offset 0x08). _Confirmado en Fase 1._
+- `gits` — record de áreas "prefixed list" (record 69 en BUNGE, offset 0x08).
+  Encabeza la tabla de u32 que probablemente contiene los punteros a equipos.
+  _Confirmado en Fase 2._
+- `gdwn` — records vacíos contiguos al de áreas (71-77 en BUNGE). Función
+  desconocida; podrían ser slots reservados / templates.
+- `rdlg` — observado en record 78 con flotantes y banderas pequeñas. Posiblemente
+  configuración de log/registro.
 - `pdla`, `pdsh` — relacionados con puntos (`pdla` = "point data, long"?
-  `pdsh` = "point data, short"?).
-- `vcfw`, `vcps`, `vcpsh` — relacionados con FFT/sample data (`vc` = "vibration channel"?).
-- `gddh` — aparece en cabecera (offset 0x08).
+  `pdsh` = "point data, short"?). _Observados en dumps tempranos, sin verificar._
+- `vcfw`, `vcps`, `vcpsh` — relacionados con FFT/sample data
+  (`vc` = "vibration channel"?). _Observados en dumps tempranos, sin verificar._
 
 Mapearemos exhaustivamente en Fase 4 con `rbm-dev scan --tags`.
 
@@ -429,12 +466,39 @@ A verificar para nuestros datos:
 
 ### 4.6 Incógnitas y zonas oscuras
 
-- Indexación base-0 vs base-1 (resolver en Fase 1).
-- Encoding exacto en cada campo (cp1252 confirmado mayormente).
-- Estructura interna del `oddt` para distinguir tipos de muestra.
-- Cómo se almacenan las bandas de alarma ("FALLO ELECTRIC", "HOLGURAS"…).
-- Plantillas de análisis ("REDUCTORA 50-150 rpm (S)") — ¿records aparte o duplicadas?
-- Field Notes / Notepad Observations — sabidamente problemático.
+Resueltas:
+
+- ~~Indexación base-0 vs base-1~~. **Base-0** confirmado en Fase 1 (ADR-0001).
+- ~~Encoding~~. **cp1252** confirmado en Fase 1-2; fallback cp850 → latin-1 implementado.
+- ~~Estructura de la cabecera del header~~. Layout verificado en Fase 1.
+- ~~Cómo se enlazan las áreas~~. **No hay cadena**: dos punteros en el header
+  (0xDC y 0xE4). Documentado en ADR-0002.
+
+Abiertas:
+
+- **Cadena Área → Equipo**: hipótesis principal — la tabla de u32 LE en
+  `0x10-0x44` del record "prefixed list" (record 69 en BUNGE) contiene
+  punteros a records de equipos por área. 13 valores observados que crecen
+  monótonamente: `298, 4853, 336467, 390654, 400612, 476104, 479522, 504709,
+  819656, 967257, 1012745, 1025192, 1032888`. Hay que abrir cada uno con
+  `rbm-dev dump-record` para verificar. **Trabajo de Fase 2b.**
+- **Códigos cortos nativos** (CI, EXT, DEP, MAR…): viven en record 70 slots
+  12-13 como concatenación de 4-char fixed-width. No emparejados aún con sus
+  áreas. Phase 2 los deriva sanitizando el long_name. Fase 2b puede leerlos
+  nativos si emerge la necesidad (p.ej. para coincidir con paths de export).
+- **Plantillas vs equipos reales**: la UI de AMS muestra mezcla
+  (DEP-M / DEP-M+T3 / IBL-REACC S1 al inicio de la lista de DEP). ¿Se
+  distinguen por un flag en el record, por número de record, por tag, o por
+  posición en la cadena? **Pregunta de Fase 2b.**
+- **Estructura del record de Punto**: el árbol AMS muestra que un punto tiene
+  sub-elementos: "Valores Globales", "Mp Wave", bandas con nombre
+  (SUBSINCRONO, DESEQUILIBRIO, DESALINEACION, HOLGURAS, 11-40 X RPM, 1-20 KHz),
+  lista de timestamps de FFT y waveform. Probablemente todo eso está en el
+  record del punto + records hijos. **Fase 2b/3.**
+- **Estructura interna del `oddt`** para distinguir tipos de muestra. _Fase 3._
+- **Cómo se almacenan las bandas de alarma** ("FALLO ELECTRIC", "HOLGURAS"…).
+  _Fase 3-7._
+- **Field Notes / Notepad Observations** — sabidamente problemático. _Fase 7._
 
 ## 5. Hoja de ruta por fases
 
@@ -442,7 +506,9 @@ Cada fase es atómica: deja el proyecto en estado verde (tests pasando, `rbm --h
 funciona) y entrega valor incremental. Pensadas para ejecutarse como tareas agénticas
 independientes desde la CLI.
 
-### Fase 0 — Bootstrap (≈ 0.5 sesión)
+### Fase 0 — Bootstrap (≈ 0.5 sesión) ✅ COMPLETADA
+
+> Branch: `phase-00-bootstrap`. 6 commits, 1561 inserciones. Todo verde.
 
 **Objetivo**: esqueleto del proyecto compilando y con tooling listo.
 
@@ -463,7 +529,11 @@ Entregables:
 **Definition of done**: `uv run pytest` pasa; `uv run rbm --help` y `uv run rbm-dev --help`
 muestran los subcomandos; `uv run ruff check .` y `uv run pyright src/` pasan limpios.
 
-### Fase 1 — Reader y header (≈ 1 sesión)
+### Fase 1 — Reader y header (≈ 1 sesión) ✅ COMPLETADA
+
+> Branch: `phase-01-reader-and-header`. 7 commits. ADR-0001 (base-0).
+> `rbm info` extrae correctamente firma, descripción "Preditec", timestamp
+> 2021-09-01 06:23:39 UTC y puntero a record 70.
 
 **Objetivo**: leer registros y entender la cabecera.
 
@@ -483,23 +553,75 @@ Entregables:
 firma, versión y descripción ("Preditec"). El primer puntero del header apunta a un
 registro cuyo contenido es plausiblemente la primera cadena de áreas.
 
-### Fase 2 — Jerarquía + CI (≈ 1-2 sesiones)
+### Fase 2a — Áreas + CI (≈ 1 sesión) ✅ COMPLETADA
 
-**Objetivo**: walker top-down hasta el nivel de Point, y CI verde.
+> Branch: `phase-02-hierarchy-and-ci`. 9 commits. ADR-0002 (dos punteros de
+> áreas + heurística de detección). CI matrix Linux/macOS/Windows configurado.
+> `rbm tree` produce JSON con las 15 áreas verificadas contra captura de AMS.
 
-Entregables:
+**Objetivo**: extraer la lista de áreas y dejar la CI verde.
 
-- Parsers de Area, Equipment, Point (cadenas enlazadas).
-- Walker recursivo con detección de ciclos / records inválidos.
-- `models.py` poblado.
-- `naming.py` con sanitización determinista.
-- Subcomando `rbm tree FILE --out tree.json`.
-- Sanity check vs lo que sabemos: 14 áreas, ~895 puntos PEAKVUE, decenas de plantillas.
-- **GitHub Actions** con matrix Linux/macOS/Windows, Python 3.13: ruff + pyright + pytest.
+Entregables completados:
 
-**Definition of done**: `tree.json` se genera y abre; conteos de áreas/equipos/puntos
-cuadran con lo observado (±5%). El JSON valida contra un schema simple. CI pasa en
-todas las plataformas.
+- Parser de Area (`records/area.py`) con soporte para los dos layouts observados:
+  "simple list" (record 70) y "prefixed list" (record 69).
+- Walker `walk_areas` (`tree.py`) que combina ambos punteros del header, dedupea
+  records compartidos y devuelve la lista canónicamente ordenada.
+- `models.py` con `Area`/`Equipment`/`Point` (los dos últimos como placeholders
+  para Fase 2b).
+- `naming.py` con `NameSanitizer` determinista + sufijos numéricos en colisión.
+- Subcomando `rbm tree FILE [--out tree.json]` operativo.
+- Export JSON con schema versionado (`schema_version=1`, `phase="phase-2-areas-only"`)
+  para que consumidores detecten que equipos/puntos están vacíos.
+- **GitHub Actions** con matrix Linux/macOS/Windows × Python 3.13: ruff + pyright + pytest.
+
+**Definition of done cumplida**: `tree.json` se genera; el conteo de áreas
+cuadra con la UI de AMS (15, no 14 como decía el plan original; documentado en
+ADR-0002). CI estructurada para correr en push/PR a master.
+
+### Fase 2b — Equipos y Puntos (≈ 1-2 sesiones) ⏳ PENDIENTE
+
+**Objetivo**: completar el walker top-down hasta el nivel de Point.
+
+Hipótesis a verificar primero (con `rbm-dev dump-record`):
+
+- La tabla de u32 LE en `0x10-0x44` del record "prefixed list" (record 69 en
+  BUNGE) son los punteros a records de equipos por área. 13 valores
+  monótonos detectados: `298, 4853, 336467, 390654, 400612, 476104, 479522,
+  504709, 819656, 967257, 1012745, 1025192, 1032888`. 13 ≠ 15 áreas, así que:
+  - ¿son 13 áreas con equipos + 2 sin equipos?
+  - ¿el record 70 ("simple list") tiene su propia tabla de punteros que aún
+    no hemos buscado?
+  - ¿algunos punteros son a otra cosa (templates, alarmas)?
+- Abrir record 298, 4853, etc. con `rbm-dev dump-record` para identificar
+  el tag y la estructura.
+
+Entregables esperados:
+
+- Parser de Equipment con su cadena de Points (lista enlazada o array, por verificar).
+- Parser de Point con sus campos básicos (long_name, short_code, tipo).
+- Distinción entre **templates** (DEP-M, IBL-REACC S1) y equipos reales —
+  preguntar al usuario o detectar por flag/tag/posición.
+- Walker recursivo top-down completo (`walk_hierarchy`) con detección de ciclos.
+- `rbm tree --out tree.json` ahora emite equipment/points poblados.
+- Test de integración: contar puntos PEAKVUE en BUNGE (objetivo: ~895 según PLAN,
+  a revisar contra la UI).
+- Subcomando auxiliar `rbm-dev scan --tags` para listar todos los tags de 4-chars
+  del fichero (será útil para Fase 3 y para validar la jerarquía).
+
+**Definition of done**: `tree.json` con jerarquía completa Áreas → Equipos →
+Puntos; conteos cuadran con AMS (±5%); JSON valida contra un schema actualizado
+(`phase="phase-2b-complete"`).
+
+### Fase 2 — Sanity checks finales (post-2b)
+
+Una vez completada 2b, validar contra AMS (capturas del usuario):
+
+- Cada área tiene la lista correcta de equipos.
+- DEP tiene exactamente la lista vista en captura 2 (DEP-M, DEP-M+T3,
+  IBL-REACC S1, AG-100, CF-4900, CF-5900, PM-100, PM-100B, PM-101, ...).
+- AG-100 (en DEP) tiene los puntos vistos en captura 3 (M1H, M1V, M1P, M1F,
+  M2V, M2P, M2A, R1H, R1V, R1F, R1P, R1A, ...).
 
 ### Fase 3 — Sample reader FFT (≈ 2-3 sesiones)
 
@@ -696,6 +818,65 @@ Resumen de lo cerrado en la conversación previa:
   https://www.emerson.com/documents/automation/manuals-guides-ams-machinery-manager-v5-61-en-39478.pdf
 - TWave T8 Explorer (ecosistema destino).
   https://www.twave.io/en/blog/t8-explorer-en
+
+---
+
+## 12. Para retomar la próxima sesión
+
+Última pausa: final de 2026-05-27 tras completar Fase 2a.
+
+### Estado del repo
+
+- Branch actual: `phase-02-hierarchy-and-ci` (no mergeada a `master`).
+- Working tree limpio tras commitear el plan actualizado.
+- Tests verdes: 70 unit + 6 integración (con `RBM_TEST_FILE` definido).
+- CI lista pero **aún no se ha empujado al remoto** — habrá que `git push -u origin`
+  de cada branch cuando se quiera ver CI en acción.
+
+### Primer paso al volver
+
+1. Crear branch desde el HEAD actual:
+
+   ```bash
+   git checkout phase-02-hierarchy-and-ci
+   git checkout -b phase-02b-equipment-points
+   ```
+
+2. Verificar la hipótesis "tabla de u32 en record 69 son punteros a equipos":
+
+   ```bash
+   uv run rbm-dev dump-record "AMS databases/BUNGE CARTAGENA marzo 2.0.rbm" --rec 298
+   uv run rbm-dev dump-record "AMS databases/BUNGE CARTAGENA marzo 2.0.rbm" --rec 4853
+   # ... etc. para los 13 valores listados en §4.6
+   ```
+
+   Si los records contienen tags como `stdg`/`gdts`/`mcdg`/`gdcm` (intermedios)
+   o nombres de equipo en slots de 32 bytes, la hipótesis es correcta y se
+   puede pasar a parsearlos.
+
+3. Si la hipótesis falla, atacar el problema desde la UI: el usuario puede
+   confirmar visualmente la lista de equipos de un área pequeña (p.ej. CONTRA
+   INCENDIOS o CALDERAS) y se busca esa lista en el binario para localizar el
+   record.
+
+### Preguntas abiertas para el usuario
+
+1. ¿Cuántos equipos tiene cada área en AMS? La de DEP que ya vimos tiene
+   ~28; las demás se pueden contar de las capturas.
+2. ¿Las "plantillas" (DEP-M, DEP-M+T3, IBL-REACC S1) se quieren extraer o no?
+   Iconos distintos en la UI — probablemente sí, marcadas con un flag.
+3. ¿El conteo de 895 puntos PEAKVUE viene de un reporte AMS exportable o es
+   estimación? Sería el principal test de la Fase 2b.
+4. ¿Hay alguna área de la captura que esté **vacía** (sin equipos)? Si sí,
+   eso explicaría por qué hay 13 punteros en la tabla del record 69 vs 15 áreas.
+
+### Atajos útiles ya implementados
+
+- Ver árbol rápido: `uv run rbm tree "AMS databases/BUNGE CARTAGENA marzo 2.0.rbm"`.
+- Volcar hex de un record: `uv run rbm-dev dump-record FILE --rec N`.
+- Seguir cadena enlazada: `uv run rbm-dev follow-chain FILE --from N --at-offset M`.
+- Regenerar fixture: `uv run python scripts/make_synthetic_fixture.py` y commitear.
+- Tests de integración: `RBM_TEST_FILE="..." uv run pytest -m integration`.
 
 ---
 
