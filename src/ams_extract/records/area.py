@@ -19,17 +19,30 @@ amount of garbage that occasionally appears in unused slots.
 
 from __future__ import annotations
 
+import struct
 from collections.abc import Iterator
 from dataclasses import dataclass
 
 from ams_extract.encoding import decode_string
-from ams_extract.reader import RECORD_SIZE, RbmReader
+from ams_extract.reader import RECORD_SIZE, RbmReader, decode_inner_pointer
 
 SLOT_SIZE = 32
 """Width of a single area-name slot, in bytes."""
 
 SLOTS_PER_RECORD = RECORD_SIZE // SLOT_SIZE
 """Maximum number of 32-byte slots that fit in a 512-byte record."""
+
+PREFIXED_LIST_TAG = b"gits"
+"""Tag at offset 0x08 identifying a prefix-list area record."""
+
+GDTS_POINTER_TABLE_OFFSET = 0x10
+"""Start of the area→gdts pointer table inside a prefix-list area record."""
+
+GDTS_POINTER_TABLE_MAX_ENTRIES = 20
+"""Slot count of the gdts pointer table (0x10..0x60 in the prefix-list record).
+
+Entries past the last real area are zero-padded (end-of-list sentinel).
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,3 +98,34 @@ def _iter_area_slots(record: bytes, record_num: int) -> Iterator[AreaSlot]:
             )
         elif found_any:
             return
+
+
+def is_prefixed_list_record(reader: RbmReader, record_num: int) -> bool:
+    """Return True if record ``record_num`` is a prefix-list area record.
+
+    The prefix-list layout is identified by the ``gits`` tag at offset 0x08.
+    """
+    record = reader.read_record(record_num)
+    return bytes(record[0x08:0x0C]) == PREFIXED_LIST_TAG
+
+
+def parse_gdts_pointer_table(reader: RbmReader, record_num: int) -> list[int]:
+    """Return the area→gdts pointer table from a prefix-list area record.
+
+    Reads up to :data:`GDTS_POINTER_TABLE_MAX_ENTRIES` u32 LE values from
+    offset :data:`GDTS_POINTER_TABLE_OFFSET` and stops at the first
+    end-of-list sentinel (``0``). Each returned value is the zero-based
+    record number of a ``gdts`` record (the area's equipment-chain head),
+    obtained by applying :func:`~ams_extract.reader.decode_inner_pointer`.
+    """
+    record = reader.read_record(record_num)
+    pointers: list[int] = []
+    for i in range(GDTS_POINTER_TABLE_MAX_ENTRIES):
+        (stored,) = struct.unpack_from(
+            "<I", record, GDTS_POINTER_TABLE_OFFSET + i * 4
+        )
+        decoded = decode_inner_pointer(stored)
+        if decoded is None:
+            break
+        pointers.append(decoded)
+    return pointers

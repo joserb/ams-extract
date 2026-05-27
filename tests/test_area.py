@@ -9,7 +9,9 @@ from ams_extract.records.area import (
     SLOT_SIZE,
     SLOTS_PER_RECORD,
     _looks_like_name,
+    is_prefixed_list_record,
     parse_area_record,
+    parse_gdts_pointer_table,
 )
 
 
@@ -69,3 +71,24 @@ class TestParseAreaRecord:
     def test_slot_geometry_invariants(self) -> None:
         assert SLOT_SIZE == 32
         assert SLOTS_PER_RECORD * SLOT_SIZE == RECORD_SIZE
+
+
+class TestIsPrefixedListRecord:
+    def test_record_2_in_fixture_is_prefixed_list(self, synthetic_rbm: Path) -> None:
+        with RbmReader(synthetic_rbm) as reader:
+            assert is_prefixed_list_record(reader, 2) is True
+
+    def test_record_1_in_fixture_is_simple_list(self, synthetic_rbm: Path) -> None:
+        with RbmReader(synthetic_rbm) as reader:
+            assert is_prefixed_list_record(reader, 1) is False
+
+
+class TestParseGdtsPointerTable:
+    def test_returns_decoded_zero_based_record_numbers(
+        self, synthetic_rbm: Path
+    ) -> None:
+        # The synthetic prefix-list record stores two "+1" pointers
+        # (100 and 200) — decoded to base-0 records 99 and 199.
+        with RbmReader(synthetic_rbm) as reader:
+            pointers = parse_gdts_pointer_table(reader, 2)
+        assert pointers == [99, 199]
