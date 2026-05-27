@@ -2,14 +2,30 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 from typing import Annotated
 
 import typer
 from rich.console import Console
+from rich.progress import (
+    BarColumn,
+    Progress,
+    TaskProgressColumn,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
+from rich.table import Table
 
 from ams_extract.logging_setup import LogFormat, LogLevel, configure_logging
 from ams_extract.reader import RECORD_SIZE, RbmFileError, RbmReader
+
+TAG_OFFSET = 0x08
+"""Offset of the 4-char record tag inside every typed record."""
+
+SCAN_CHUNK_SIZE = 100_000
+"""Records scanned per progress-bar update. Tunable, not load-bearing."""
 
 app = typer.Typer(
     name="rbm-dev",
@@ -19,12 +35,6 @@ app = typer.Typer(
 )
 
 _console = Console()
-
-
-def _not_implemented(command: str) -> None:
-    """Emit a user-visible 'not implemented yet' notice and exit cleanly."""
-    _console.print(f"[yellow]rbm-dev {command}[/yellow]: not implemented yet (Phase 0 stub).")
-    raise typer.Exit(code=0)
 
 
 def _abort(message: str) -> typer.Exit:
@@ -64,6 +74,37 @@ def root(
     _ = strict
 
 
+def _scan_tag_frequencies(reader: RbmReader) -> Counter[bytes]:
+    """Return a :class:`Counter` of the 4-byte tag values at offset 0x08."""
+    counter: Counter[bytes] = Counter()
+    record_count = reader.record_count
+    with Progress(
+        TextColumn("[bold blue]scanning tags"),
+        BarColumn(),
+        TaskProgressColumn(),
+        TextColumn("{task.completed:,}/{task.total:,} records"),
+        TimeElapsedColumn(),
+        TimeRemainingColumn(),
+        console=_console,
+        transient=True,
+    ) as progress:
+        task = progress.add_task("scan", total=record_count)
+        for start in range(0, record_count, SCAN_CHUNK_SIZE):
+            stop = min(start + SCAN_CHUNK_SIZE, record_count)
+            for rec_num in range(start, stop):
+                tag = reader.read_record(rec_num)[TAG_OFFSET : TAG_OFFSET + 4]
+                counter[bytes(tag)] += 1
+            progress.update(task, advance=stop - start)
+    return counter
+
+
+def _format_tag(tag: bytes) -> str:
+    """Return a printable rendering of a 4-byte tag value."""
+    if all(0x20 <= b < 0x7F for b in tag):
+        return tag.decode("ascii")
+    return tag.hex()
+
+
 @app.command("scan")
 def scan(
     file: Annotated[Path, typer.Argument(help="Path to a .rbm database file.")],
@@ -71,10 +112,54 @@ def scan(
         bool,
         typer.Option("--tags", help="Report 4-char tag frequencies across the file."),
     ] = False,
+    top: Annotated[
+        int,
+        typer.Option(
+            "--top",
+            help="Show only the N most frequent tags; 0 means all tags.",
+        ),
+    ] = 0,
 ) -> None:
-    """Walk the file bottom-up and report aggregate statistics."""
-    _ = file, tags
-    _not_implemented("scan")
+    """Walk the file bottom-up and report aggregate statistics.
+
+    With ``--tags``: tabulate the frequency of the 4-char tag at offset
+    0x08 of every record. Useful for discovering new record types and for
+    sanity-checking the hierarchy walker (e.g. how many ``gicm`` vs
+    ``vdpm`` records exist in a database).
+    """
+    if not file.exists():
+        raise _abort(f"file not found: {file}")
+    if not tags:
+        _console.print(
+            "[yellow]rbm-dev scan[/yellow]: pass --tags to compute tag "
+            "frequencies; no other scan mode is implemented yet."
+        )
+        raise typer.Exit(code=0)
+
+    try:
+        with RbmReader(file) as reader:
+            counter = _scan_tag_frequencies(reader)
+            total = reader.record_count
+    except RbmFileError as exc:
+        raise _abort(str(exc)) from exc
+
+    distinct = len(counter)
+    table = Table(
+        title=f"tag frequencies — {file.name} ({total:,} records, "
+        f"{distinct} distinct tags)",
+        header_style="bold cyan",
+    )
+    table.add_column("tag", justify="left")
+    table.add_column("count", justify="right")
+    table.add_column("%", justify="right")
+    items = counter.most_common(top if top > 0 else None)
+    for tag, count in items:
+        table.add_row(
+            _format_tag(tag),
+            f"{count:,}",
+            f"{100 * count / total:5.2f}",
+        )
+    _console.print(table)
 
 
 @app.command("dump-record")

@@ -133,3 +133,34 @@ class TestRbmDevFollowChain:
         assert result.exit_code == 0, result.output
         assert "max-steps" in result.output
         assert "visited 2 records" in result.output
+
+
+class TestRbmDevScan:
+    def test_tag_frequencies_on_synthetic_fixture(
+        self, synthetic_rbm: Path
+    ) -> None:
+        # The synthetic fixture has 16 records; the only record carrying a
+        # meaningful tag is record 0 (gddh) and record 2 (gits).
+        result = runner.invoke(
+            rbm_dev_app, ["scan", str(synthetic_rbm), "--tags"]
+        )
+        assert result.exit_code == 0, result.output
+        assert "gddh" in result.output
+        assert "gits" in result.output
+        # Most records (13/16) hold padding only — the dominant "tag" should
+        # be 4 NUL bytes, rendered as its hex repr.
+        assert "00000000" in result.output
+
+    def test_no_tags_flag_exits_zero_with_notice(
+        self, synthetic_rbm: Path
+    ) -> None:
+        result = runner.invoke(rbm_dev_app, ["scan", str(synthetic_rbm)])
+        assert result.exit_code == 0
+        assert "--tags" in result.output
+
+    def test_missing_file_errors(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            rbm_dev_app,
+            ["scan", str(tmp_path / "missing.rbm"), "--tags"],
+        )
+        assert result.exit_code == 1
