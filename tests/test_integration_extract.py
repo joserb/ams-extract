@@ -1,0 +1,116 @@
+"""Integration test for ``rbm extract`` against the real BUNGE database.
+
+Gated on ``RBM_TEST_FILE``. The target is M1H (MOTOR LOA HORIZONTAL)
+of MECLADOR AGITADOR AG-100 in DEPURADORA, whose 5 FFT timestamps and
+acquisition parameters (Fmax=1000 Hz, n_lines=1600, units=plg/segs)
+were verified against AMS screenshots during sub-fase 3a.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+import pyarrow.parquet as pq
+import pytest
+from typer.testing import CliRunner
+
+from ams_extract.cli import app as rbm_app
+
+pytestmark = pytest.mark.integration
+
+runner = CliRunner()
+
+# M1H gold timestamps in chronological order (oldest → newest). The CLI
+# emits in the same order, so index 0 is the oldest spectrum.
+M1H_GOLD_TIMESTAMPS = [
+    "20191015_144437",
+    "20191112_155739",
+    "20191212_140700",
+    "20200121_113020",
+    "20200219_100250",
+]
+
+
+def test_extract_three_m1h_spectra_writes_parquet_and_png(
+    real_rbm: Path, tmp_path: Path
+) -> None:
+    out_dir = tmp_path / "samples"
+    result = runner.invoke(
+        rbm_app,
+        [
+            "extract",
+            str(real_rbm),
+            "--point", "MOTOR LOA HORIZONTAL",
+            "--equipment", "AG-100",
+            "--limit", "3",
+            "--out", str(out_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    parquet_files = sorted(out_dir.glob("*.parquet"))
+    png_files = sorted(out_dir.glob("*.png"))
+    assert len(parquet_files) == 3
+    assert len(png_files) == 3
+
+    # Filenames embed the chronological index + UTC timestamp; the first
+    # three written are the three oldest spectra of M1H.
+    for path, expected_ts in zip(parquet_files, M1H_GOLD_TIMESTAMPS[:3], strict=True):
+        assert expected_ts in path.name, (
+            f"expected timestamp {expected_ts} in {path.name}"
+        )
+
+
+def test_extract_parquet_payload_is_plausible(
+    real_rbm: Path, tmp_path: Path
+) -> None:
+    out_dir = tmp_path / "samples"
+    result = runner.invoke(
+        rbm_app,
+        [
+            "extract",
+            str(real_rbm),
+            "--point", "MOTOR LOA HORIZONTAL",
+            "--equipment", "AG-100",
+            "--limit", "1",
+            "--out", str(out_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    parquet = next(out_dir.glob("*.parquet"))
+    table = pq.read_table(parquet)
+    row = table.to_pylist()[0]
+
+    assert row["sample_type"] == "FFT"
+    assert row["fmax_hz"] == pytest.approx(1000.0)
+    assert row["n_lines"] == 1600
+    assert row["units"] == "plg/segs"
+    assert row["carga_pct"] == pytest.approx(100.0)
+
+    amplitude = np.array(row["amplitude"], dtype=np.float32)
+    assert amplitude.shape == (1586,)
+    assert np.isfinite(amplitude).all()
+    assert amplitude.std() > 0.0, "spectrum is constant; data was not actually decoded"
+    assert (amplitude > 0).any(), "no positive amplitudes; suspicious"
+
+
+def test_extract_errors_when_point_is_ambiguous(
+    real_rbm: Path, tmp_path: Path
+) -> None:
+    # "MOTOR LOA HORIZONTAL" matches many points across the hierarchy;
+    # without --equipment the CLI should refuse to pick one and exit 2.
+    out_dir = tmp_path / "samples"
+    result = runner.invoke(
+        rbm_app,
+        [
+            "extract",
+            str(real_rbm),
+            "--point", "MOTOR LOA HORIZONTAL",
+            "--limit", "1",
+            "--out", str(out_dir),
+        ],
+    )
+    assert result.exit_code == 2
+    assert "ambiguous" in result.output

@@ -30,8 +30,9 @@ def test_rbm_dev_help_lists_dev_subcommands() -> None:
         assert command in result.output
 
 
-def test_rbm_extract_stub_runs() -> None:
-    # extract, export, and the rbm-dev scan command remain Phase 0 stubs.
+def test_rbm_extract_errors_on_missing_file() -> None:
+    # extract is implemented in sub-fase 3b; it now aborts cleanly on a
+    # missing file instead of returning the Phase 0 stub message.
     result = runner.invoke(rbm_app, ["extract", "nonexistent.rbm", "--point", "X"])
-    assert result.exit_code == 0
-    assert "not implemented" in result.output
+    assert result.exit_code == 1
+    assert "file not found" in result.output

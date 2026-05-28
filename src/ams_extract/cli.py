@@ -10,10 +10,14 @@ from rich.console import Console
 from rich.table import Table
 
 from ams_extract.export.json_tree import build_tree_document, write_tree_json
+from ams_extract.export.parquet_samples import write_spectrum_parquet
+from ams_extract.export.spectrum_plot import render_spectrum_png
 from ams_extract.logging_setup import LogFormat, LogLevel, configure_logging
+from ams_extract.models import Point
+from ams_extract.naming import NameSanitizer
 from ams_extract.reader import RbmFileError, RbmReader
 from ams_extract.records.header import parse_header
-from ams_extract.tree import walk_hierarchy
+from ams_extract.tree import walk_hierarchy, walk_spectra
 
 app = typer.Typer(
     name="rbm",
@@ -139,19 +143,96 @@ def tree(
         )
 
 
+def _find_points_by_name(
+    reader: RbmReader, target: str, equipment_filter: str | None
+) -> list[tuple[Point, str]]:
+    """Return every point matching ``target`` (exact long_name).
+
+    If ``equipment_filter`` is set, restrict to points whose equipment's
+    ``long_name`` contains the filter substring (case-insensitive).
+    Returns a list of ``(point, equipment_short_code)`` so the caller
+    can disambiguate when more than one match remains.
+    """
+    target_norm = target.strip()
+    eq_needle = equipment_filter.strip().lower() if equipment_filter else None
+    matches: list[tuple[Point, str]] = []
+    for area in walk_hierarchy(reader):
+        for eq in area.equipment:
+            if eq_needle is not None and eq_needle not in eq.long_name.lower():
+                continue
+            for pt in eq.points:
+                if pt.long_name == target_norm:
+                    matches.append((pt, eq.short_code))
+    return matches
+
+
 @app.command("extract")
 def extract(
     file: Annotated[Path, typer.Argument(help="Path to a .rbm database file.")],
     point: Annotated[str, typer.Option("--point", help="Long name of the target point.")],
+    equipment: Annotated[
+        str | None,
+        typer.Option(
+            "--equipment",
+            help="Substring filter on equipment long_name to disambiguate.",
+        ),
+    ] = None,
     limit: Annotated[int, typer.Option("--limit", help="Maximum number of samples.")] = 3,
     out: Annotated[
         Path,
         typer.Option("--out", help="Directory where Parquet + PNG outputs are written."),
     ] = Path("samples"),
 ) -> None:
-    """Extract a few samples from a single point as Parquet + PNG."""
-    _ = file, point, limit, out
-    _not_implemented("extract")
+    """Extract a few FFT spectra from a single point as Parquet + PNG."""
+    if not file.exists():
+        raise _abort(f"file not found: {file}")
+    if limit < 1:
+        raise _abort(f"--limit must be >= 1, got {limit}")
+
+    try:
+        with RbmReader(file) as reader:
+            located = _find_points_by_name(reader, point, equipment)
+            if not located:
+                hint = f" under equipment matching {equipment!r}" if equipment else ""
+                raise _abort(f"point not found in hierarchy{hint}: {point!r}")
+            if len(located) > 1:
+                _console.print(
+                    f"[yellow]ambiguous:[/yellow] {len(located)} points named "
+                    f"{point!r} found. Disambiguate with --equipment. Candidates:"
+                )
+                for pt, eq_short in located:
+                    _console.print(f"  - equipment={eq_short}  point_rec={pt.record_num}")
+                raise typer.Exit(code=2)
+            target, equipment_short = located[0]
+
+            sanitizer = NameSanitizer()
+            point_slug = sanitizer.sanitize(target.long_name)
+            written: list[Path] = []
+            for idx, spectrum in enumerate(walk_spectra(reader, target)):
+                if idx >= limit:
+                    break
+                base = (
+                    out
+                    / f"{equipment_short}__{point_slug}__{idx:02d}_"
+                    f"{spectrum.timestamp_utc.strftime('%Y%m%d_%H%M%S')}"
+                )
+                parquet_path = base.with_suffix(".parquet")
+                png_path = base.with_suffix(".png")
+                write_spectrum_parquet(spectrum, target, parquet_path)
+                render_spectrum_png(spectrum, target, png_path)
+                written.extend([parquet_path, png_path])
+    except RbmFileError as exc:
+        raise _abort(str(exc)) from exc
+
+    if not written:
+        _console.print(
+            f"[yellow]no FFT spectra found for point[/yellow] {target.long_name!r}"
+        )
+        return
+    _console.print(
+        f"wrote [bold]{len(written) // 2}[/bold] spectra "
+        f"(parquet + png) for [bold]{target.long_name}[/bold] under {out}"
+    )
 
 
 @app.command("export")
