@@ -307,27 +307,40 @@ afinar).
 | `0x14` | 4 | u32 LE (+1 encoded) — **siguiente `vcps`** en la misma cadena (`0` = fin) |
 | `0x18`–`0x1FF` | 488 | **122 × float32 LE** — amplitudes consecutivas del espectro |
 
-### 5.5 Pendientes (Fase 3b / 3c)
+### 5.5 Pendientes (Fase 3c / 5 / 7)
 
-- **Escalado de amplitudes**: las amplitudes crudas tienen magnitud
-  ≈ 0–0.02 mientras AMS muestra picos hasta ~5 mm/seg. Posiblemente
-  haga falta una conversión `plg/seg → mm/seg` (×25.4) y/o un factor
-  de escala adicional almacenado en `vdpm` o `vdps`.
+- **Amplitud absoluta — discrepancia estructural confirmada
+  (2026-05-29)**. Cotejando contra la "Lista de Picos" de AMS para M1H
+  19-feb-2020 (24 picos con sus amplitudes en mm/Seg), los ratios
+  AMS/decoded *no* son constantes: van de 15.7 (100 Hz, donde casi
+  cuadran) a 2332 (885 Hz), pasando por 1500 a 14.68 Hz (el pico mayor
+  según AMS, prácticamente ausente en nuestro decode). Las hipótesis
+  simples — escalado constante, integración acel→velocidad, decimación
+  de pares (re/im), sqrt(re²+im²) — fallan todas. La forma cualitativa
+  (picos en las freqs correctas, unidades textuales correctas) sí
+  coincide; la magnitud no. Inspección de los dos `vddt` que `pdcd`
+  apunta (0x3C → rec 336987, 0x40 → rec 336992) revela series
+  temporales [timestamp + floats] que van de 2013 a 2020 — pintan a
+  tendencias de bandas (Valores Globales / SUBSINCRONO / etc.), no
+  a complemento del espectro. **Hipótesis viva**: AMS reconstruye el
+  espectro desde la *waveform* al display time, y el `vcps` que
+  almacenamos es un preview comprimido o un envelope detector
+  pre-procesado. Verificable cuando Fase 5 (waveforms) esté lista y
+  podamos comparar la FFT de la waveform extraída contra la lista de
+  picos de AMS.
 - **Padding 1586 vs 1600**: cómo se reconcilian los 14 bins que faltan
   para llegar a `n_lines = 1600`. ¿Padding implícito? ¿Bin 0 = DC
-  reservado? ¿Otro slot que no estoy leyendo?
-- **`vcfw` (waveform)**: layout análogo esperado, con cadena más corta
-  (≈ 9 records = 1098 floats ≈ 1024 muestras temporales). El puntero
-  `vdpm.0x3C → vcps 131328` que originalmente confundimos con FFT es,
-  probablemente, el head de waveform de algún punto vecino —
-  pendiente verificar contra `pdcd.0x04 → vcfw`.
-- **`vddt` (pdcd.0x3C, 0x40)**: tipos adicionales (Overall, PeakVue, Mp
-  Wave…). Las cadenas FFT cubren sólo 5 timestamps; los 4 timestamps
-  de waveform y los demás canales (Valores Globales, bandas con
-  nombre) probablemente cuelgan de los otros punteros del `pdcd`.
+  reservado? ¿Otro slot que no estoy leyendo? Sin urgencia hasta que
+  la deuda de calibración esté resuelta.
+- **`vcfw` (waveform)**: layout análogo al de `vcps` esperado, cadena
+  más corta (~9 records = 1098 floats ≈ 1024 muestras temporales).
+  Fase 5 lo aborda directamente.
+- **`vddt` (pdcd.0x3C, 0x40)**: tras inspección no es complemento del
+  espectro sino series temporales de tendencias. Mapeo completo
+  aplazado a Fase 7 si queremos exponer "Valores Globales" o bandas
+  con nombre.
 - **Significado preciso de los i32 deltas en `vcps.0x0C`/`0x10` y
-  `vdps.0x0C`/`0x10`**. No bloquean Fase 3b si los ignoramos en la
-  lectura.
+  `vdps.0x0C`/`0x10`**. No bloquea ninguna fase activa.
 
 ## 6. Encoding y strings
 
