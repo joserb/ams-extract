@@ -27,6 +27,7 @@ dependencies = [
     "numpy>=2.0",
     "pyarrow>=17.0",
     "structlog>=24.1",
+    "matplotlib>=3.9",
 ]
 
 [project.scripts]
