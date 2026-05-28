@@ -20,7 +20,7 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 | 1 — Reader + header | ✅ completada | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
 | 2a — Áreas + CI | ✅ completada | 15 áreas verificadas; CI matrix listo; ADR-0002 |
 | 2b — Equipos y Puntos | ✅ completada | 15 áreas, 347 equipos, 5203 puntos, 1198 PEAKVUE (tras el fix gicm 20-slot del 2026-05-28); `rbm-dev scan --tags`; ADR-0003 |
-| 3 — Sample reader FFT | 🚧 en curso | Sub-3a ✅ (vdpm→pdcd→vdps→vcps mapeado contra M1H de AG-100, FORMAT §5); sub-3b pendiente (parser + `rbm extract`) |
+| 3 — Sample reader FFT | ✅ completada (FFT) | Sub-3a ✅ + sub-3b ✅: `rbm extract --point NAME --equipment SUBSTR --limit N` emite Parquet + PNG; 5 espectros de M1H con timestamps y picos coincidentes con AMS. Escalado de amplitud (mm/seg) pendiente para refinamiento. |
 | 4 — Verificación visual | ⏳ pendiente | Requiere humano frente a AMS en VM |
 | 5 — Waveforms | ⏳ pendiente | Análogo a Fase 3 con `vcfw` |
 | 6 — Export masivo | ⏳ pendiente | `rbm export` con paralelización por equipo |
@@ -663,24 +663,35 @@ Sub-fase 3a (reconocimiento) — ✅ completada 2026-05-28:
 - Documentado en `FORMAT.md §5`. Pendiente para 3b: `vcfw` waveform,
   `vddt` (otros tipos), escalado de amplitudes.
 
-Sub-fase 3b (implementación):
+Sub-fase 3b (implementación) — ✅ completada 2026-05-29:
 
-- Parser en `records/sample_index.py` y `records/sample.py` con los tags
-  reales que emerjan en 3a.
-- Discriminación de tipo: por ahora "FFT" o "OTROS" (con log). El resto
-  se aborda en Fase 5.
-- Decodificación de timestamp + descripción + array float32.
-- `walk_samples(point)` en `tree.py` que devuelve lista lazy de `Sample`.
-- Subcomando `rbm extract FILE --point NAME --limit 3 --out samples/`
-  que produce:
-  - `samples/{point}_{idx}.parquet` (esquema unificado).
-  - `samples/{point}_{idx}.png` (matplotlib, log-y, ejes etiquetados).
-- Tests: ampliar fixture sintético con ≥2 samples FFT + integración con
-  asserts de plausibilidad (no NaN, no infinitos, no constante,
-  longitudes coherentes con `n_lines`).
+- Parsers en `records/sample_index.py` (`pdcd`) y `records/sample.py`
+  (`vdps`, `vcps`) con unit tests sobre fixtures sintéticos.
+- `walk_spectra(reader, point)` en `tree.py` con política WARN-no-abort.
+- `models.Spectrum` (frozen dataclass) con metadata + amplitude np.ndarray.
+- Subcomando `rbm extract FILE --point NAME --equipment SUBSTR --limit N
+  --out DIR` que emite `{eq}__{point}__{idx}_{ts}.parquet` + `.png`.
+  El flag `--equipment` resuelve la ambigüedad cuando el long_name del
+  punto se repite en múltiples equipos (caso típico de "MOTOR LOA
+  HORIZONTAL").
+- `export/parquet_samples.py` con una fila por espectro (schema
+  alineado con PLAN §3.5), `export/spectrum_plot.py` con PNG
+  matplotlib eje lineal.
+- Tests: 11 unit + 3 integración (timestamps cuadran con gold,
+  amplitude shape=1586, ambigüedad falla con exit 2).
 
-**Definition of done**: extraemos 3 espectros de un punto BUNGE conocido, se grafican,
-la forma del espectro tiene picos plausibles (no es ruido blanco ni constante).
+**Definition of done cumplida**: extraemos los 5 espectros de M1H de
+AG-100 con timestamps idénticos al gold de AMS y picos coincidentes
+en frecuencia (25 Hz fundamental, 50/100 Hz armónicos, picos a 540 y
+840 Hz como en el screenshot de AMS).
+
+**Aplazado a refinamientos** (no bloquea Fase 4):
+
+- Escalado de amplitudes: hoy emitimos los floats crudos de `vcps`
+  (units = "plg/segs" como string). El eje Y de AMS muestra mm/seg.
+  Falta el factor de conversión completo (probablemente vive en
+  algún offset todavía sin parsear del `vdps` o del template `ESTÁNDAR`).
+- Padding 14 bins (1586 vs 1600): sin afectar la forma del espectro.
 
 ### Fase 4 — Verificación visual contra AMS (≈ 0.5 sesión)
 
