@@ -27,6 +27,8 @@ GIPM_MAX_POINTS = (RECORD_SIZE - GIPM_POINTERS_OFFSET) // 4
 VDPM_TAG = b"vdpm"
 VDPM_NAME_OFFSET = 0x18
 VDPM_NAME_LENGTH = 32
+VDPM_PDCD_POINTER_OFFSET = 0x10
+"""Offset of the +1-encoded pointer to the point's ``pdcd`` sample index."""
 
 TAG_OFFSET = 0x08
 
@@ -92,3 +94,18 @@ def parse_vdpm_point(reader: RbmReader, vdpm_record: int) -> PointRecord:
         long_name=decode_string(name_bytes),
         slot_index=0,
     )
+
+
+def parse_vdpm_pdcd_pointer(reader: RbmReader, vdpm_record: int) -> int | None:
+    """Return the ``pdcd`` record this point's samples are indexed under.
+
+    Returns ``None`` if the pointer is null (the point has no sample
+    index — exceptional, but observed for placeholder/template points).
+
+    Raises:
+        PointChainError: If the record's tag is not ``vdpm``.
+    """
+    record = reader.read_record(vdpm_record)
+    _check_tag(record, VDPM_TAG, vdpm_record)
+    (stored,) = struct.unpack_from("<I", record, VDPM_PDCD_POINTER_OFFSET)
+    return decode_inner_pointer(stored)
