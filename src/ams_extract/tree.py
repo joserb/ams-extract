@@ -13,9 +13,11 @@ output.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
+
 import structlog
 
-from ams_extract.models import Area, Equipment, Point
+from ams_extract.models import Area, Equipment, Point, Spectrum
 from ams_extract.naming import NameSanitizer
 from ams_extract.reader import RbmReader
 from ams_extract.records.area import (
@@ -37,7 +39,17 @@ from ams_extract.records.header import (
 from ams_extract.records.point import (
     PointChainError,
     parse_gipm_point_records,
+    parse_vdpm_pdcd_pointer,
     parse_vdpm_point,
+)
+from ams_extract.records.sample import (
+    SampleChainError,
+    read_vcps_amplitudes,
+    walk_vdps_chain,
+)
+from ams_extract.records.sample_index import (
+    SampleIndexError,
+    parse_pdcd_links,
 )
 
 _log = structlog.get_logger(__name__)
@@ -276,3 +288,90 @@ def walk_hierarchy(reader: RbmReader) -> list[Area]:
             )
         )
     return populated
+
+
+def walk_spectra(reader: RbmReader, point: Point) -> Iterator[Spectrum]:
+    """Yield every FFT spectrum recorded for ``point``, oldest first.
+
+    Walks ``vdpm.0x10 → pdcd → 0x44 → vdps → (chain via 0x14)`` and, for
+    each ``vdps``, reads its full ``vcps`` data chain into a numpy array.
+    Per-spectrum failures are logged and the walk continues; a missing
+    pdcd or first-vdps yields zero spectra.
+    """
+    try:
+        pdcd_record = parse_vdpm_pdcd_pointer(reader, point.record_num)
+    except PointChainError as exc:
+        _log.warning(
+            "vdpm_pdcd_pointer_parse_failed",
+            point=point.long_name,
+            vdpm_record=point.record_num,
+            error=str(exc),
+        )
+        return
+    if pdcd_record is None:
+        _log.info(
+            "point_has_no_sample_index",
+            point=point.long_name,
+            vdpm_record=point.record_num,
+        )
+        return
+
+    try:
+        links = parse_pdcd_links(reader, pdcd_record)
+    except SampleIndexError as exc:
+        _log.warning(
+            "pdcd_parse_failed",
+            point=point.long_name,
+            pdcd_record=pdcd_record,
+            error=str(exc),
+        )
+        return
+
+    if links.fft_first_vdps is None:
+        _log.info(
+            "point_has_no_fft_chain",
+            point=point.long_name,
+            pdcd_record=pdcd_record,
+        )
+        return
+
+    try:
+        descriptors = list(walk_vdps_chain(reader, links.fft_first_vdps))
+    except SampleChainError as exc:
+        _log.warning(
+            "vdps_chain_failed",
+            point=point.long_name,
+            first_vdps=links.fft_first_vdps,
+            error=str(exc),
+        )
+        return
+
+    for desc in descriptors:
+        if desc.first_vcps is None:
+            _log.warning(
+                "vdps_missing_vcps_chain",
+                point=point.long_name,
+                vdps_record=desc.record_num,
+            )
+            continue
+        try:
+            amplitude = read_vcps_amplitudes(reader, desc.first_vcps)
+        except SampleChainError as exc:
+            _log.warning(
+                "vcps_chain_failed",
+                point=point.long_name,
+                vdps_record=desc.record_num,
+                first_vcps=desc.first_vcps,
+                error=str(exc),
+            )
+            continue
+        yield Spectrum(
+            record_num=desc.record_num,
+            point_record_num=point.record_num,
+            timestamp_utc=desc.timestamp_utc,
+            fmax_hz=desc.fmax_hz,
+            n_lines=desc.n_lines,
+            units=desc.units,
+            carga_pct=desc.carga_pct,
+            amplitude=amplitude,
+        )

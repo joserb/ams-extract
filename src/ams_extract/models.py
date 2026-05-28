@@ -4,11 +4,19 @@ Frozen, slotted dataclasses for memory efficiency and immutability.
 ``Equipment`` and ``Point`` were placeholders in Phase 2a; Phase 2b
 populates them from the equipment- and point-record chains discovered in
 ADR-0003 (``gdts`` → ``gicm`` → ``gdcm`` → ``gipm`` → ``vdpm``).
+``Spectrum`` is added in sub-fase 3b for FFT samples reached through the
+``vdpm.0x10 → pdcd → vdps → vcps`` chain.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import datetime
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import numpy as np
+    from numpy.typing import NDArray
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,3 +75,33 @@ class Area:
     long_name: str
     short_code: str
     equipment: tuple[Equipment, ...] = field(default_factory=tuple)
+
+
+@dataclass(frozen=True, slots=True)
+class Spectrum:
+    """One FFT spectrum measured at a point.
+
+    Reached through ``vdpm.0x10 → pdcd → 0x44 → vdps → 0x18 → vcps``.
+    The amplitude array length is ``122 * <vcps chain length>`` —
+    typically ~1586 in BUNGE for the nominal ``n_lines = 1600``;
+    reconciliation of those 14 trailing bins is still open (FORMAT §5.5).
+
+    Attributes:
+        record_num: Zero-based record number of the ``vdps`` descriptor.
+        point_record_num: Record number of the parent ``vdpm`` (point).
+        timestamp_utc: Sample timestamp as decoded from ``vdps.0x24``.
+        fmax_hz: Nominal Fmax in Hz, from ``vdps.0x20``.
+        n_lines: Nominal FFT bin count, from ``vdps.0x50``.
+        units: Units string as stored in ``vdps.0x78`` (e.g. ``"plg/segs"``).
+        carga_pct: CARGA % field, from ``vdps.0x2C``.
+        amplitude: Raw float32 amplitude buffer from the ``vcps`` chain.
+    """
+
+    record_num: int
+    point_record_num: int
+    timestamp_utc: datetime
+    fmax_hz: float
+    n_lines: int
+    units: str
+    carga_pct: float
+    amplitude: NDArray[np.float32]
