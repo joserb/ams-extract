@@ -4,9 +4,9 @@
 > (ficheros `.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM Windows XP
 > ni del software AMS original.
 
-Versión del documento: 0.5 (housekeeping post-2b — tags reales de samples
-en Fase 3, flujo single-dev sin branches)
-Última actualización: 2026-05-28
+Versión del documento: 0.6 (post sub-3b + Fase 4 parcial + sub-5a;
+deuda de calibración FFT registrada)
+Última actualización: 2026-05-29
 
 Repo: `git@github.com:joserb/ams-extract.git` (privado)
 
@@ -20,15 +20,16 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 | 1 — Reader + header | ✅ completada | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
 | 2a — Áreas + CI | ✅ completada | 15 áreas verificadas; CI matrix listo; ADR-0002 |
 | 2b — Equipos y Puntos | ✅ completada | 15 áreas, 347 equipos, 5203 puntos, 1198 PEAKVUE (tras el fix gicm 20-slot del 2026-05-28); `rbm-dev scan --tags`; ADR-0003 |
-| 3 — Sample reader FFT | ✅ completada (FFT) | Sub-3a ✅ + sub-3b ✅: `rbm extract --point NAME --equipment SUBSTR --limit N` emite Parquet + PNG; 5 espectros de M1H con timestamps y picos coincidentes con AMS. Escalado de amplitud (mm/seg) pendiente para refinamiento. |
-| 4 — Verificación visual | ⏳ pendiente | Requiere humano frente a AMS en VM |
-| 5 — Waveforms | 🚧 en curso | Sub-5a ✅ cadena `pdcd → 0x5C → vdfw → 0x18 → vcfw` mapeada contra M1H (Pc, Pk, n_samples, sample_rate cuadran con AMS). Sub-5b pendiente (parser + extract). |
+| 3 — Sample reader FFT | ✅ completada estructural | Sub-3a + sub-3b: `rbm extract --point NAME --equipment SUBSTR --limit N` emite Parquet + PNG; timestamps y posiciones de picos coinciden con AMS. Calibración absoluta de amplitudes pendiente (§5.6). |
+| 4 — Verificación visual | ✅ parcial | 7/15 áreas visualmente verificadas; FFT con frecuencias y waveform con Pc/Pk dentro del 2% del gold de AMS. Hallazgo: calibración FFT no resoluble vía waveform (memoria del proyecto). |
+| 5 — Waveforms | 🚧 sub-5a ✅ / sub-5b pendiente | Cadena `pdcd → 0x5C → vdfw → 0x18 → vcfw` mapeada y validada contra M1H. Implementación reusa toda la maquinaria de sub-3b. |
 | 6 — Export masivo | ⏳ pendiente | `rbm export` con paralelización por equipo |
-| 7 — Refinamientos | ⏳ pendiente | Plantillas, field notes, bandas de alarma |
+| 7 — Refinamientos | ⏳ pendiente | Plantillas, field notes, bandas de alarma, `vddt`, short codes nativos |
 
-Todas las fases 0–2b están mergeadas en `master` y pusheadas a
-`origin/master`. Trabajo continúa directo sobre master (no se abren
-branches `phase-NN-*` salvo experimento arriesgado).
+Todas las fases hasta sub-5a están en `master` (sub-5a por commitear
+en esta misma sesión). Origin pendiente de push manual. Trabajo
+continúa directo sobre master (no se abren `phase-NN-*` branches
+salvo experimento arriesgado).
 
 ---
 
@@ -693,25 +694,60 @@ en frecuencia (25 Hz fundamental, 50/100 Hz armónicos, picos a 540 y
   algún offset todavía sin parsear del `vdps` o del template `ESTÁNDAR`).
 - Padding 14 bins (1586 vs 1600): sin afectar la forma del espectro.
 
-### Fase 4 — Verificación visual contra AMS (≈ 0.5 sesión)
+### Fase 4 — Verificación visual contra AMS (≈ 0.5 sesión) — ✅ completada parcial 2026-05-29
 
 **Objetivo**: validar (con humano en el loop) que lo extraído coincide con lo que vería
 un analista en AMS.
 
-Entregables:
+Verificaciones realizadas contra capturas de AMS de M1H (MOTOR LOA
+HORIZONTAL de AG-100 en DEPURADORA):
 
-- Protocolo de verificación en `docs/VERIFICATION.md`.
-- Humano abre en la VM el mismo punto + timestamp en AMS y toma screenshot.
-- `scripts/compare_with_screenshot.py` pone lado a lado el PNG extraído y el screenshot.
-- Iteración sobre Fase 3 si hay discrepancias (escalado, ejes, ordenación).
+- **Jerarquía**: 7 de 15 áreas comparadas nombre-a-nombre con AMS
+  (CONTRA INCENDIOS, IMPULSIÓN DE MAR, NAVES, PASILLO DE BOMBAS,
+  PELETIZACION, DEPURADORA, CALDERAS). 4/5 match perfecto incluyendo
+  orden; CALDERAS tiene un swap A↔B en PM-6904 porque AMS ordena
+  alfabéticamente y nosotros por chain-order — confirmado como
+  decisión consciente (ver memoria del proyecto). 8 áreas grandes
+  pendientes de verificación visual pero con conteos locked en tests.
+- **FFT M1H 2020-02-19**: frecuencias de picos cuadran (los 24 picos
+  de la "Lista de Picos" de AMS están en los bins correctos de
+  nuestro `rbm extract`), units textuales correctas ("plg/segs"),
+  timestamps idénticos. **Amplitudes en una representación distinta**:
+  ratios AMS/decoded entre 16 y 2330, no constantes; deuda abierta
+  registrada en `FORMAT.md §5.6`.
+- **Waveform M1H 2020-02-19**: Pc(+) 0.482 vs AMS 0.483 (0.2% error),
+  Pk(-) -0.500 vs -0.510 (2%), sample_rate y units exactos.
 
-**Definition of done**: al menos 2 espectros de 2 puntos distintos coinciden visualmente
-con AMS dentro de tolerancia razonable.
+**Definition of done**: parcialmente cumplida (extracción
+estructuralmente correcta para FFT y waveform; calibración absoluta
+de amplitudes FFT pendiente).
 
-### Fase 5 — Waveforms (≈ 1-2 sesiones)
+### Fase 5 — Waveforms (≈ 1-2 sesiones) — 🚧 sub-5a completada 2026-05-29
 
-Análogo a Fase 3 pero para waveforms. Identificación del tag y desambiguación.
-Generación de PNGs en eje temporal (no frecuencia). Mismo esquema unificado en Parquet.
+Sub-fase 5a (reconocimiento) — ✅:
+
+- Cadena verificada: `pdcd.0x5C → vdfw → 0x18 → vcfw chain`. Dos
+  punteros nuevos en `pdcd` (0x5C / 0x60) que sub-3a había pasado
+  por alto al limitar el sweep a 0x00-0x4C.
+- `vdfw` (descriptor por waveform): timestamp `0x34`, n_samples `0x2C`,
+  sample_period `0x24`, RPM `0x38`, CARGA `0x3C`, units `0x6C`.
+- `vcfw` (datos): 244 int16 LE por record en 0x18, chain via 0x14.
+- Para M1H 19-feb-2020: 488 muestras (de 512 nominales) a 2560 Hz,
+  Pc/Pk cuadran con AMS dentro del 2%. Documentado en `FORMAT.md §5.5`.
+
+Sub-fase 5b (implementación) — pendiente:
+
+- `records/waveform.py` con parsers `parse_vdfw_descriptor` y
+  `read_vcfw_samples` (análogo a `sample.py`).
+- `models.Waveform` (frozen dataclass) con timestamp, n_samples,
+  sample_rate, units, samples `np.ndarray`.
+- `walk_waveforms(reader, point)` en `tree.py` (paralelo a
+  `walk_spectra`).
+- Extender `rbm extract` con flag `--type fft|waveform|both` (default
+  `both`) o detectarlo por extensión. Filename pattern análogo:
+  `{eq}__{point}__waveform_{idx}_{ts}.parquet|.png`.
+- Tests unit (sintéticos) + integración (M1H 5 waveforms con
+  timestamps + Pc/Pk dentro del 2% del gold).
 
 ### Fase 6 — Export masivo (≈ 1 sesión)
 
@@ -880,59 +916,64 @@ Resumen de lo cerrado en la conversación previa:
 
 ## 12. Para retomar la próxima sesión
 
-Última pausa: 2026-05-28 tras housekeeping post-2b (fix de logging
-test-isolation incluido).
+Última pausa: 2026-05-29 tras sub-fase 5a (reconocimiento waveforms).
+15 commits por delante de `origin/master` esperando push manual.
 
 ### Estado del repo
 
-- `master` es el branch de trabajo. Todas las fases 0–2b están
-  mergeadas y pusheadas a `origin/master`. CI matrix corriendo en cada
-  push/PR. Convención: trabajar directo sobre master, sin
-  `phase-NN-*` branches (sólo abrir branch para experimentos
-  arriesgados que puedan dejar la suite roja durante varios commits).
+- `master` es el branch de trabajo. Todas las fases 0–3b están
+  mergeadas; sub-5a (docs only) también. CI matrix corre en push/PR.
+  Convención: trabajar directo sobre master, sin `phase-NN-*` branches
+  salvo experimentos arriesgados.
 - Working tree limpio.
-- Tests verdes: 93 unit + 11 integración (con `RBM_TEST_FILE`
-  definido) = 104 total.
+- Tests verdes: 105 unit + 17 integración (con `RBM_TEST_FILE`
+  definido) = 122 total. Ruff + pyright limpios.
 - `rbm tree FILE --out tree.json` genera la jerarquía completa
-  (`schema_version=2`, `phase="phase-2b-complete"`).
+  (`schema_version=3`, `phase="phase-2b-equipment-count-fix"`).
+- `rbm extract FILE --point NAME [--equipment SUBSTR] --limit N --out DIR`
+  emite Parquet + PNG por espectro FFT.
 
 ### Primer paso al volver
 
-Sub-fase 3a (reconocimiento, sin código todavía):
+Opción A (recomendada) — **Sub-fase 5b**: implementación de parsers y
+extract para waveforms. Reusa toda la maquinaria de sub-3b. Entregables:
 
-1. Generar `tree.json` y elegir punto piloto. Sugerencia: primer
-   equipo de CONTRA INCENDIOS (los integration tests ya validan que
-   esa área tiene 4 bombas). De ese equipo, su primer `Point` con su
-   `record_num`.
-2. `uv run rbm-dev dump-record FILE --rec N` sobre ese `vdpm` y
-   descifrar `0x38+`: ¿puntero a sample chain? ¿record índice
-   intermedio (algún tag tipo `gsmp` / `gdsc`)? ¿array de punteros a
-   `vcps`?
-3. Seguir el enlace y volcar 2-3 `vcps` + 2-3 `vcfw` para mapear su
-   layout (tag, timestamp, descripción, unidades, Fmax, n_lines,
-   array float32).
-4. Documentar en `FORMAT.md §5` el layout verificado y, si emerge un
-   record índice, añadirlo a §3.2. Commit con la spec actualizada
-   **antes** de tocar código de parser.
+1. `records/waveform.py` con `parse_vdfw_descriptor` + `walk_vdfw_chain` +
+   `read_vcfw_samples`. Offsets en `FORMAT.md §5.5`.
+2. `models.Waveform` (frozen dataclass) con sample_rate, samples np.ndarray.
+3. `walk_waveforms(reader, point)` en `tree.py` (paralelo a `walk_spectra`).
+4. Extender `rbm extract` — añadir flag `--type fft|waveform|both`
+   (default `both`) o subcomando separado. Decidir antes de codear.
+5. Tests unit (sintéticos, similar a `test_sample.py`) + integración
+   contra M1H 5 waveforms con Pc/Pk dentro del 2% del gold.
 
-Opción paralela — **verificación visual de 2b** (no bloqueante,
-hacer si hay rato delante de AMS): cargar `tree.json` y comparar la
-lista de equipos por área contra capturas de AMS. Si emerge alguna
-discrepancia, registrarla antes de Fase 3 para no acumular bugs.
+Opción B — **Investigar calibración FFT (`vcps`) (§5.6)**: deuda
+abierta. Líneas no descartadas todavía: escala almacenada en `vdpm` o
+`vdps` en algún offset sin parsear, factor de calibración en records
+auxiliares, ventana de display específica de AMS que altere amplitudes.
+**NO probar** "FFT(waveform) → comparar" — ya descartada en sub-5a.
+
+Opción C — **Saltar a Fase 6 (export masivo)** asumiendo deuda
+amplitud. Útil si el caso de uso es producir el dataset completo y
+calibrar más tarde antes de cargar en TWist.
 
 ### Preguntas abiertas
 
-Ninguna bloqueante para Fase 2b. Lo que sigue queda registrado pero no
-es prerequisito:
+Ninguna bloqueante. Para referencia:
 
-1. **Plantillas (DEP-M, IBL-REACC S1, …)**: hoy se ignoran porque no
-   están enlazadas desde áreas. ¿Se quieren extraer? Si sí, Fase 7
-   debería escanear los ~2300 `vdpm` no alcanzados y agruparlos.
-2. **i32 signed deltas en gicm.0x60+**: aún sin función conocida. No
-   bloquea nada pero quedaría bien entenderlos.
-3. **Tags poco frecuentes** (`gina`, `gddr`, `odla`, `pdla`, `gdnp`,
-   `pdpa`, `gshr`, `gdpn`, `gdnl` …): pendientes de mapear cuando se
-   crucen en alguna fase.
+1. **Calibración amplitudes FFT**: la grande, documentada en `FORMAT.md §5.6`.
+2. **Padding waveform 488 vs 512**: 24 muestras "fantasma" en el descriptor.
+3. **Short codes nativos de áreas/equipos/puntos**: viven en el
+   continuation block de `gicm` (`0xE0+`) y en zonas equivalentes
+   para vdpm/gdcm. Cerrarían §4.6.
+4. **Plantillas (`DEP-M`, `IBL-REACC S1`, …)**: hoy filtradas. Fase 7.
+5. **`vddt` mapeo completo**: series temporales de tendencias
+   (Valores Globales / SUBSINCRONO / …). Fase 7.
+6. **i32 signed deltas en `gicm.0x60+`, `vdps.0x0C-0x10`, `vcps.0x0C-0x10`,
+   `vcfw.0x0C-0x10`**: pattern repetido en todos los records, sin
+   función identificada.
+7. **Tags poco frecuentes** (`gina`, `gddr`, `odla`, `pdla`, `gdnp`,
+   `pdpa`, `gshr`, `gdpn`, `gdnl`, `gsdh`, …): mapear cuando se crucen.
 
 ### Atajos útiles ya implementados
 
