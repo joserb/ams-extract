@@ -4,7 +4,8 @@
 > (ficheros `.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM Windows XP
 > ni del software AMS original.
 
-Versión del documento: 0.4 (tras Fase 2b — jerarquía completa funcionando)
+Versión del documento: 0.5 (housekeeping post-2b — tags reales de samples
+en Fase 3, flujo single-dev sin branches)
 Última actualización: 2026-05-28
 
 Repo: `git@github.com:joserb/ams-extract.git` (privado)
@@ -13,21 +14,21 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 
 ## Estado actual del proyecto
 
-| Fase | Estado | Branch | Notas |
-|---|---|---|---|
-| 0 — Bootstrap | ✅ completada | `phase-00-bootstrap` (merged) | uv + pyproject + structlog + stubs CLI, todo verde |
-| 1 — Reader + header | ✅ completada | `phase-01-reader-and-header` (merged) | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
-| 2a — Áreas + CI | ✅ completada | `phase-02-hierarchy-and-ci` (merged) | 15 áreas verificadas; CI matrix listo; ADR-0002 |
-| 2b — Equipos y Puntos | ✅ completada | `phase-02b-equipment-points` | 15 áreas, 252 equipos, 3795 puntos, 869 PEAKVUE; `rbm-dev scan --tags`; ADR-0003 |
-| 3 — Sample reader FFT | ⏳ pendiente | _por crear_ | Empezar por records `vcps` / `vcfw` (53% / 36% de BUNGE) |
-| 4 — Verificación visual | ⏳ pendiente | _por crear_ | |
-| 5 — Waveforms | ⏳ pendiente | _por crear_ | |
-| 6 — Export masivo | ⏳ pendiente | _por crear_ | |
-| 7 — Refinamientos | ⏳ pendiente | _por crear_ | |
+| Fase | Estado | Notas |
+|---|---|---|
+| 0 — Bootstrap | ✅ completada | uv + pyproject + structlog + stubs CLI, todo verde |
+| 1 — Reader + header | ✅ completada | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
+| 2a — Áreas + CI | ✅ completada | 15 áreas verificadas; CI matrix listo; ADR-0002 |
+| 2b — Equipos y Puntos | ✅ completada | 15 áreas, 252 equipos, 3795 puntos, 869 PEAKVUE; `rbm-dev scan --tags`; ADR-0003 |
+| 3 — Sample reader FFT | ⏳ pendiente | Sub-3a reconocimiento de `vcps`/`vcfw` (53%/36% de BUNGE) + enlace desde `vdpm.0x38+`; luego sub-3b parser + `rbm extract` |
+| 4 — Verificación visual | ⏳ pendiente | Requiere humano frente a AMS en VM |
+| 5 — Waveforms | ⏳ pendiente | Análogo a Fase 3 con `vcfw` |
+| 6 — Export masivo | ⏳ pendiente | `rbm export` con paralelización por equipo |
+| 7 — Refinamientos | ⏳ pendiente | Plantillas, field notes, bandas de alarma |
 
-Las fases 0/1/2a están ya en `master`. Fase 2b vive en
-`phase-02b-equipment-points`, lista para mergear si la verificación visual
-final no exige cambios.
+Todas las fases 0–2b están mergeadas en `master` y pusheadas a
+`origin/master`. Trabajo continúa directo sobre master (no se abren
+branches `phase-NN-*` salvo experimento arriesgado).
 
 ---
 
@@ -645,16 +646,36 @@ Una vez completada 2b, validar contra AMS (capturas del usuario):
 
 **Objetivo**: extraer espectros FFT de un punto conocido.
 
-Entregables:
+Nota: los tags `odcd` / `oddt` que mencionaba Eka no aparecen en BUNGE.
+`rbm-dev scan --tags` da `vcps` (1 931 424 records, 53%) y `vcfw`
+(1 322 008, 36%) como dominantes — esos son los samples reales. El
+enlace desde un punto a sus muestras vive en algún sitio del descriptor
+`vdpm.0x38+`, todavía sin parsear.
 
-- Parser de `odcd` (rango de samples) y `oddt` (sample individual).
-- Discriminación de tipo: por ahora "FFT" o "OTROS" (con log). El resto se aborda en
-  Fase 5.
+Sub-fase 3a (reconocimiento, sin código):
+
+- Volcar con `rbm-dev dump-record` un `vdpm` conocido (p.ej. primer punto
+  del primer equipo de CONTRA INCENDIOS) y descifrar `0x38+`:
+  ¿puntero a sample chain? ¿record índice intermedio? ¿array de punteros?
+- Seguir el enlace y volcar 2-3 `vcps` + 2-3 `vcfw`.
+- Documentar el layout en `FORMAT.md §5` y, si emerge un record índice,
+  añadirlo a §3.2. Anotar diferencias `vcps` vs `vcfw` vs `vdps` / `vdfw`.
+
+Sub-fase 3b (implementación):
+
+- Parser en `records/sample_index.py` y `records/sample.py` con los tags
+  reales que emerjan en 3a.
+- Discriminación de tipo: por ahora "FFT" o "OTROS" (con log). El resto
+  se aborda en Fase 5.
 - Decodificación de timestamp + descripción + array float32.
-- Subcomando `rbm extract FILE --point NAME --limit 3 --out samples/` que produce:
+- `walk_samples(point)` en `tree.py` que devuelve lista lazy de `Sample`.
+- Subcomando `rbm extract FILE --point NAME --limit 3 --out samples/`
+  que produce:
   - `samples/{point}_{idx}.parquet` (esquema unificado).
   - `samples/{point}_{idx}.png` (matplotlib, log-y, ejes etiquetados).
-- Tests con valores plausibles (no NaN, no infinitos, longitudes coherentes).
+- Tests: ampliar fixture sintético con ≥2 samples FFT + integración con
+  asserts de plausibilidad (no NaN, no infinitos, no constante,
+  longitudes coherentes con `n_lines`).
 
 **Definition of done**: extraemos 3 espectros de un punto BUNGE conocido, se grafican,
 la forma del espectro tiene picos plausibles (no es ruido blanco ni constante).
@@ -732,8 +753,13 @@ samples/
 
 ## 7. Plan de ejecución agéntica desde CLI
 
-La intención es lanzar las fases con agentes (Claude Code u otros) en worktrees aislados,
-desde tu CLI local.
+> **Histórico**: este bloque describe la intención original de lanzar
+> cada fase como un agente en worktree con branch `phase-NN-*`. En la
+> práctica el repo es single-dev y se trabaja directo sobre `master`
+> con commits granulares por feature; sólo se abre branch para
+> experimentos arriesgados. Las convenciones de §7.3 (idioma de
+> código y docs, type hints, structlog en vez de print, etc.) sí
+> siguen vigentes.
 
 ### 7.1 Briefing por agente (plantilla)
 
@@ -841,42 +867,45 @@ Resumen de lo cerrado en la conversación previa:
 
 ## 12. Para retomar la próxima sesión
 
-Última pausa: 2026-05-28 tras completar Fase 2b.
+Última pausa: 2026-05-28 tras housekeeping post-2b (fix de logging
+test-isolation incluido).
 
 ### Estado del repo
 
-- Branch actual: `phase-02b-equipment-points` (no mergeada a `master`,
-  no pusheada a `origin`).
-- Working tree limpio tras commitear documentación.
-- Tests verdes: 92 unit + 11 integración (con `RBM_TEST_FILE` definido).
-- CI configurada en `.github/workflows/ci.yml` pero `origin` aún no
-  conoce las branches — `git push -u origin <branch>` cuando se quiera
-  empezar a usar.
+- `master` es el branch de trabajo. Todas las fases 0–2b están
+  mergeadas y pusheadas a `origin/master`. CI matrix corriendo en cada
+  push/PR. Convención: trabajar directo sobre master, sin
+  `phase-NN-*` branches (sólo abrir branch para experimentos
+  arriesgados que puedan dejar la suite roja durante varios commits).
+- Working tree limpio.
+- Tests verdes: 93 unit + 11 integración (con `RBM_TEST_FILE`
+  definido) = 104 total.
+- `rbm tree FILE --out tree.json` genera la jerarquía completa
+  (`schema_version=2`, `phase="phase-2b-complete"`).
 
 ### Primer paso al volver
 
-Opción A — **mergear 2b y empezar Fase 3**:
+Sub-fase 3a (reconocimiento, sin código todavía):
 
-```bash
-git checkout master
-git merge --ff-only phase-02b-equipment-points
-git checkout -b phase-03-sample-reader-fft
-```
+1. Generar `tree.json` y elegir punto piloto. Sugerencia: primer
+   equipo de CONTRA INCENDIOS (los integration tests ya validan que
+   esa área tiene 4 bombas). De ese equipo, su primer `Point` con su
+   `record_num`.
+2. `uv run rbm-dev dump-record FILE --rec N` sobre ese `vdpm` y
+   descifrar `0x38+`: ¿puntero a sample chain? ¿record índice
+   intermedio (algún tag tipo `gsmp` / `gdsc`)? ¿array de punteros a
+   `vcps`?
+3. Seguir el enlace y volcar 2-3 `vcps` + 2-3 `vcfw` para mapear su
+   layout (tag, timestamp, descripción, unidades, Fmax, n_lines,
+   array float32).
+4. Documentar en `FORMAT.md §5` el layout verificado y, si emerge un
+   record índice, añadirlo a §3.2. Commit con la spec actualizada
+   **antes** de tocar código de parser.
 
-Opción B — **verificación visual de 2b primero** (recomendada si hay
-tiempo para sentarse delante de AMS): cargar `tree.json` y comparar
-visualmente la lista de equipos por área contra capturas de AMS. Si
-todo cuadra, ir a opción A.
-
-Para Fase 3:
-
-1. Empezar por los records con tag `vcps` (53% del fichero,
-   probablemente los samples FFT individuales) y `vcfw` (36%, posibles
-   waveforms).
-2. Coger un punto conocido (e.g. la primera bomba de CONTRA INCENDIOS,
-   record `vdpm` 301) y buscar cómo se enlaza con sus samples. La pista
-   está en `vdpm.0x38+`, todavía no parseado.
-3. Validar contra screenshots de AMS para el mismo punto + timestamp.
+Opción paralela — **verificación visual de 2b** (no bloqueante,
+hacer si hay rato delante de AMS): cargar `tree.json` y comparar la
+lista de equipos por área contra capturas de AMS. Si emerge alguna
+discrepancia, registrarla antes de Fase 3 para no acumular bugs.
 
 ### Preguntas abiertas
 
