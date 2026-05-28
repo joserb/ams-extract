@@ -19,7 +19,7 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 | 0 — Bootstrap | ✅ completada | uv + pyproject + structlog + stubs CLI, todo verde |
 | 1 — Reader + header | ✅ completada | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
 | 2a — Áreas + CI | ✅ completada | 15 áreas verificadas; CI matrix listo; ADR-0002 |
-| 2b — Equipos y Puntos | ✅ completada | 15 áreas, 252 equipos, 3795 puntos, 869 PEAKVUE; `rbm-dev scan --tags`; ADR-0003 |
+| 2b — Equipos y Puntos | ✅ completada | 15 áreas, 347 equipos, 5203 puntos, 1198 PEAKVUE (tras el fix gicm 20-slot del 2026-05-28); `rbm-dev scan --tags`; ADR-0003 |
 | 3 — Sample reader FFT | ⏳ pendiente | Sub-3a reconocimiento de `vcps`/`vcfw` (53%/36% de BUNGE) + enlace desde `vdpm.0x38+`; luego sub-3b parser + `rbm extract` |
 | 4 — Verificación visual | ⏳ pendiente | Requiere humano frente a AMS en VM |
 | 5 — Waveforms | ⏳ pendiente | Análogo a Fase 3 con `vcfw` |

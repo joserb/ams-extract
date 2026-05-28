@@ -118,18 +118,44 @@ sentinela de fin-de-lista. Helper único:
 
 #### `gicm` record (equipment list with names)
 
+Un chunk lógico `gicm` puede contener hasta **20 equipos**. Cuando tiene
+≤ 12, todo cabe en un único registro físico de 512 bytes. Cuando tiene
+13-20, los nombres 13-20 viven en el **registro físico inmediatamente
+siguiente** (sin tag propio — es un bloque de continuación del mismo
+chunk lógico, no un nuevo `gicm`).
+
+Registro principal del chunk:
+
 | Offset | Tamaño | Campo |
 |---|---|---|
 | `0x00` | 8 | preámbulo |
 | `0x08` | 4 | tag ASCII `gicm` |
 | `0x0C` | 4 | u32 LE (+1 encoded) — **next gicm** del chain (`0` = última) |
-| `0x10` | 48 | hasta 12 punteros u32 LE (+1 encoded) a records `gdcm` (uno por equipo del chunk); `0` antes del slot 12 termina la lista |
-| `0x40` | 32 | reservado / no interpretado |
-| `0x60` | 80 | i32 LE signed deltas (uno por equipo del chunk; función exacta sin confirmar — posibles offsets de timestamp o de orden) |
-| `0xB0` | 336 | hasta 12 slots de **28 bytes** con el nombre del equipo (cp1252, space-padded) |
+| `0x10` | 80 | hasta **20 punteros** u32 LE (+1 encoded) a records `gdcm` (uno por equipo del chunk); `0` antes del slot 20 termina la lista |
+| `0x60` | 80 | i32 LE signed deltas (uno por equipo del chunk; función exacta sin confirmar) |
+| `0xB0` | 336 | hasta **12 slots** de 28 bytes con el nombre del equipo (cp1252, space-padded) |
 
-Áreas con > 12 equipos encadenan vía `0x0C`. EXTRACCION (36 equipos en
-BUNGE) usa 3 records `gicm` consecutivos.
+Registro de continuación (`gicm_record + 1`, sólo si el chunk tiene > 12 equipos):
+
+| Offset | Tamaño | Campo |
+|---|---|---|
+| `0x000` | 224 | hasta **8 slots** adicionales de 28 bytes con los nombres de los equipos 13-20 |
+| `0x0E0` | 200 | hasta **20 short codes nativos** de 10 bytes (e.g. `"AG-100"`, `"PM-501"`). Aún no parseados en código; cerrará la incógnita de §4.6 cuando se haga. |
+| `0x1A8` | 88 | flags `01 00 01 00 …` + zero padding (función desconocida) |
+
+Áreas con > 20 equipos encadenan vía `gicm.0x0C`. En BUNGE:
+
+- DEPURADORA: 2 chunks (20 + 8 = 28)
+- EXTRACCION: 3 chunks (20 + 20 + 13 = 53)
+- PREPARACION: 5 chunks (20 + 20 + 20 + 20 + 7 = 87)
+- REFINERIA: 5 chunks (20 + 20 + 20 + 20 + 10 = 90)
+- NAVES: 1 chunk con bloque de continuación (18)
+
+> **Historia**: la versión inicial de este spec asumía 12 slots por
+> chunk. Coincidía con lo que cabía en el record físico pero erraba en
+> chunks grandes — chunk 0 de DEP tiene 20 equipos y nos comíamos PM-501
+> en adelante. Hallazgo y fix el 2026-05-28 cotejando contra capturas de
+> AMS (DEP completa).
 
 #### `gdcm` record (equipment instance)
 

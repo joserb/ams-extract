@@ -266,3 +266,76 @@ Sobre `BUNGE CARTAGENA marzo 2.0.rbm` (3 628 117 records):
   el +1 (por ejemplo, un offset en bytes en vez de record_num), habrá
   que aislarlo y nombrarlo aparte para no contaminar la convención
   actual.
+
+---
+
+## ADR-0004 — Un `gicm` lógico tiene 20 slots y usa un registro de continuación
+
+- **Fecha**: 2026-05-28
+- **Estado**: aceptada (post-Fase 2b, fix de cuentas)
+
+### Contexto
+
+Al cotejar capturas de AMS contra el `tree.json` extraído de
+`BUNGE CARTAGENA marzo 2.0.rbm`, DEPURADORA en AMS muestra **28 equipos**
+mientras el walker emitía 20. Los 8 que faltaban (`PM-501`, `PM-700`,
+`PM-701`, `PM-4500`, `PM-5400`, `PM-5500`, `PM-5502`, `RAS-500`) son
+contiguos en orden de AMS, justo entre el bloque que sí extraíamos
+(AG-100 … PM-500) y el siguiente (RAS-5500 …).
+
+La ADR-0003 había documentado el `gicm` con la regla "hasta 12 slots por
+chunk", derivada de la observación de que en `0xB0 + 12 × 28 = 0x200`
+se rellenaba exactamente el record físico de 512 bytes. Esa regla era
+correcta para los chunks pequeños observados en Fase 2b pero incompleta:
+chunk 0 de DEP tiene 20 punteros vivos en la tabla `0x10`–`0x5F`, no 12,
+y los nombres 13-20 viven en el registro físico inmediatamente siguiente.
+
+El error se reprodujo a escala con `rbm-dev` + un script ad-hoc: 5 de
+las 15 áreas tenían chunks de más de 12 equipos (EXTRACCION 53,
+DEPURADORA 28, NAVES 18, PREPARACION 87, REFINERIA 90). En total
+faltaban **91 equipos (26%)** y los puntos asociados.
+
+### Decisión
+
+Un chunk lógico `gicm` se modela como un **par de registros físicos**:
+
+- **Registro principal** (con tag `gicm`): hasta 20 punteros `gdcm` en
+  `0x10`–`0x5F` y los primeros 12 nombres en `0xB0`–`0x1FF`.
+- **Registro de continuación** (sin tag, en `gicm_record + 1`, sólo si
+  el chunk tiene > 12 equipos): nombres 13-20 en `0x000`–`0x0DF` y los
+  20 short codes nativos en `0x0E0`–`0x1A7`.
+
+El parser de slots (`_parse_single_gicm_slots`) lee el principal,
+detecta si hay > 12 punteros vivos y, si los hay, abre el siguiente
+record físico para los nombres restantes. La cadena entre chunks
+lógicos sigue siendo el puntero `gicm.0x0C` → next gicm.
+
+### Alternativas consideradas
+
+- **Asumir 12 slots por chunk y leer más records "next" hasta cubrir
+  todo**: descartada — la cadena `gicm.0x0C` apunta al siguiente chunk
+  lógico, no a la continuación. Confundir ambos haría que el chunk
+  siguiente fuese mal-interpretado como continuación del primero.
+- **Definir el registro de continuación como un nuevo tag de record
+  con su propia estructura**: descartada — no tiene tag en disco. Se
+  modela como un bloque mudo cuyo offset depende exclusivamente del
+  registro principal.
+- **Detectar continuación por contenido (presencia de espacios al
+  inicio, etc.) en vez de por `len(pointers) > 12`**: descartada por
+  ambigüedad — el contenido del bloque siguiente es legítimo nombre de
+  equipo para chunks grandes y bytes basura para chunks pequeños; sólo
+  el conteo de punteros distingue uno de otro de forma fiable.
+
+### Consecuencias
+
+- Los conteos por área cuadran con AMS (verificado contra capturas para
+  DEPURADORA; locked en `test_real_file_equipment_count_per_area`).
+- El layout `0x40`–`0x5F` que ADR-0003 anotaba como "reservado" eran
+  punteros válidos (slots 12-19); ese error queda corregido aquí.
+- Los short codes nativos (`AG-100`, `PM-501`, …) están ahora a un
+  parser de distancia — viven en `continuation[0xE0:]` con stride 10
+  bytes. Pendiente de aprovechar para cerrar la incógnita §4.6 del PLAN.
+- Esquema JSON bumpeado: `schema_version = 3`, `phase =
+  "phase-2b-equipment-count-fix"`. Consumidores que viesen v2 detectan
+  fácilmente que están leyendo un extracto incompleto y deben
+  re-procesar.
