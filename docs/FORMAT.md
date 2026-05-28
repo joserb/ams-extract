@@ -199,30 +199,135 @@ habría que escanear el fichero buscando records `vdpm` no alcanzados.
 
 ## 4. Tags de 4 chars
 
-Mapeo parcial extraído de `rbm-dev scan --tags` sobre BUNGE (los más
-frecuentes y los relevantes para Fase 2b):
+Mapeo extraído de `rbm-dev scan --tags` sobre BUNGE más la función
+verificada en cada fase:
 
-| Tag | Frecuencia | Significado verificado |
+| Tag | Frecuencia | Función verificada | Confirmado en |
+|---|---|---|---|
+| `vcps` | 1 931 424 | bloque de 122 floats de datos FFT | Fase 3a |
+| `vcfw` | 1 322 008 | bloque de datos waveform — layout análogo, pendiente verificar | Fase 3b |
+| `vdps` | 157 160 | descriptor de un espectro FFT individual | Fase 3a |
+| `vdfw` | 157 055 | descriptor de un waveform individual — pendiente | Fase 3b |
+| `vdpm` | 6 141 | point descriptor (config: template, RPM, alarmas; incluye plantillas) | Fase 2b + 3a |
+| `pdcd` | (no listado por scan) | índice de tipos de medida por punto ("Set Colección Datos Primar") | Fase 3a |
+| `vddt` | pendiente medir | otro tipo de medida (Overall / PeakVue / bandas?) — pendiente | Fase 3b |
+| `gdsc` | 6 504 | aún sin confirmar (¿descriptor general?) | — |
+| `gicm` | 26 | equipment list chunk (20 slots + continuation) | Fase 2b (ADR-0004) |
+| `gdcm` | 347 | equipment instance | Fase 2b (ADR-0003) |
+| `gscm` | 347 | sibling de `gdcm` — función pendiente | — |
+| `gipm` | 344 | point list per equipment | Fase 2b (ADR-0003) |
+| `gdts` | 16 | índice área → equipment chain | Fase 2b (ADR-0003) |
+| `gits` | 1 | área list "prefix-list" | Fase 2a (ADR-0002) |
+| `gddh` | 1 | database header tag (record 0) | Fase 1 |
+
+## 5. Sample records — FFT chain
+
+Verificado en `BUNGE` durante la sub-fase 3a (2026-05-28) contra el
+punto piloto **M1H (MOTOR LOA HORIZONTAL) de MECLADOR AGITADOR
+AG-100**, cuyo gold data conocemos de la UI de AMS (Fmax=1000 Hz,
+n_lines=1600, RPM=1455, CARGA=100%, 5 espectros con timestamps
+`2019-10-15`, `2019-11-12`, `2019-12-12`, `2020-01-21`, `2020-02-19`).
+
+### 5.1 Modelo
+
+```
+vdpm (point)
+  └── 0x10 → pdcd ("Set Colección Datos Primar" — índice del punto)
+        ├── 0x04 → vcfw (waveform chain head — pendiente §5.5)
+        ├── 0x38 → vdpm (back-ref al propio punto)
+        ├── 0x3C → vddt (otro tipo de medida, p.ej. global/overall — pendiente)
+        ├── 0x40 → vddt (otro tipo de medida — pendiente)
+        ├── 0x44 → vdps (primer espectro FFT, el más antiguo)
+        └── 0x48 → vdps (último espectro FFT, el más reciente)
+
+vdps chain (espectros FFT ordenados de antiguo a moderno):
+  vdps → 0x14 → vdps siguiente (0 = último)
+              0x18 → primer vcps de la cadena de datos de este espectro
+              0x1C → ¿back-ref a pdcd? (siempre el mismo para los 5 vdps de M1H)
+              0x20 → float32 Fmax (Hz)
+              0x24 → u32 LE Unix timestamp (segundos, UTC; el huso local
+                     varía CET/CEST a lo largo del año)
+              0x28 → float32 RPM × 2 (¿o CPM?) — para M1H da 2920, RPM nativa
+                     en vdpm.0x164 = 1455
+              0x2C → float32 CARGA % (100.0 en M1H)
+              0x50 → u32 LE n_lines (1600 en M1H)
+              0x78 → ASCII 8 bytes — units, p.ej. "plg/segs"
+                     (= pulgadas/segundo; AMS lo convierte a mm/seg en
+                     pantalla cuando configurado en SI)
+
+vcps chain (datos amplitud de un espectro):
+  vcps → 0x14 → siguiente vcps (0 = fin de cadena de este espectro)
+              0x18 hasta 0x1FF → 122 × float32 LE (amplitud bin a bin)
+
+Total por espectro: ~13 vcps × 122 = 1586 floats (n_lines=1600 nominal;
+los últimos ~14 bins quedan implícitos o como zero-pad, pendiente de
+afinar).
+```
+
+### 5.2 `pdcd` record — índice de tipos de medida por punto
+
+| Offset | Tamaño | Campo |
 |---|---|---|
-| `vcps` | 1 931 424 | sample data (vibration channel parameters/samples) — pendiente Fase 3 |
-| `vcfw` | 1 322 008 | sample data (vibration channel waveform?) — pendiente Fase 3 |
-| `vdps` | 157 160 | sample data variant — pendiente |
-| `vdfw` | 157 055 | sample data variant — pendiente |
-| `vdpm` | 6 141 | point descriptor (incluye plantillas) |
-| `gdsc` | 6 504 | aún sin confirmar (¿descriptor general?) |
-| `gicm` | 26 | equipment list chunk (uno por área pequeña; varios por área grande) |
-| `gdcm` | 347 | equipment instance |
-| `gscm` | 347 | sibling de `gdcm` — función pendiente |
-| `gipm` | 344 | point list por equipo |
-| `gdts` | 16 | one per area + 1 extra |
-| `gits` | 1 | prefix-list area record |
-| `gddh` | 1 | database header tag (record 0) |
+| `0x00` | 8 | preámbulo |
+| `0x08` | 4 | tag ASCII `pdcd` |
+| `0x04` | 4 | u32 LE (+1 encoded) — primer `vcfw` (waveform chain) |
+| `0x10` | 32 | descripción ASCII (`"Set Colección Datos Primar     "`) |
+| `0x38` | 4 | u32 LE (+1 encoded) — back-ref al `vdpm` del punto |
+| `0x3C` | 4 | u32 LE (+1 encoded) — `vddt` (otro tipo de medida) |
+| `0x40` | 4 | u32 LE (+1 encoded) — `vddt` (otro tipo de medida) |
+| `0x44` | 4 | u32 LE (+1 encoded) — primer `vdps` de la cadena FFT (más antiguo) |
+| `0x48` | 4 | u32 LE (+1 encoded) — último `vdps` de la cadena FFT (más reciente) |
 
-## 5. Sample record (`oddt` / `tddo`)
+### 5.3 `vdps` record — descriptor de un espectro FFT
 
-Pendiente (Fase 3). La cabecera del PLAN.md mencionaba estos nombres
-basados en Eka, pero `rbm-dev scan --tags` sugiere que los tags reales
-son `vcps` / `vcfw` / `vdps` / `vdfw`. A confirmar en Fase 3.
+| Offset | Tamaño | Campo |
+|---|---|---|
+| `0x00` | 8 | preámbulo |
+| `0x08` | 4 | tag ASCII `vdps` |
+| `0x0C` | 4 | i32 LE signed (función desconocida) |
+| `0x10` | 4 | i32 LE signed (función desconocida) |
+| `0x14` | 4 | u32 LE (+1 encoded) — **siguiente `vdps`** en el tiempo (`0` = último) |
+| `0x18` | 4 | u32 LE (+1 encoded) — **primer `vcps`** de la cadena de datos de este espectro |
+| `0x1C` | 4 | u32 LE (+1 encoded) — apunta al `pdcd` del punto (back-ref compartido) |
+| `0x20` | 4 | float32 LE — **Fmax (Hz)** |
+| `0x24` | 4 | u32 LE — **Unix timestamp (UTC, segundos)** |
+| `0x28` | 4 | float32 LE — RPM × 2 (interpretación tentativa) |
+| `0x2C` | 4 | float32 LE — **CARGA %** |
+| `0x50` | 4 | u32 LE — **n_lines** (típico 1600) |
+| `0x78` | 8 | ASCII — **units** (e.g. `"plg/segs"`) |
+
+### 5.4 `vcps` record — bloque de datos de amplitud
+
+| Offset | Tamaño | Campo |
+|---|---|---|
+| `0x00` | 8 | preámbulo |
+| `0x08` | 4 | tag ASCII `vcps` |
+| `0x0C` | 4 | i32 LE signed (delta / chain backwards) |
+| `0x10` | 4 | i32 LE signed (función desconocida) |
+| `0x14` | 4 | u32 LE (+1 encoded) — **siguiente `vcps`** en la misma cadena (`0` = fin) |
+| `0x18`–`0x1FF` | 488 | **122 × float32 LE** — amplitudes consecutivas del espectro |
+
+### 5.5 Pendientes (Fase 3b / 3c)
+
+- **Escalado de amplitudes**: las amplitudes crudas tienen magnitud
+  ≈ 0–0.02 mientras AMS muestra picos hasta ~5 mm/seg. Posiblemente
+  haga falta una conversión `plg/seg → mm/seg` (×25.4) y/o un factor
+  de escala adicional almacenado en `vdpm` o `vdps`.
+- **Padding 1586 vs 1600**: cómo se reconcilian los 14 bins que faltan
+  para llegar a `n_lines = 1600`. ¿Padding implícito? ¿Bin 0 = DC
+  reservado? ¿Otro slot que no estoy leyendo?
+- **`vcfw` (waveform)**: layout análogo esperado, con cadena más corta
+  (≈ 9 records = 1098 floats ≈ 1024 muestras temporales). El puntero
+  `vdpm.0x3C → vcps 131328` que originalmente confundimos con FFT es,
+  probablemente, el head de waveform de algún punto vecino —
+  pendiente verificar contra `pdcd.0x04 → vcfw`.
+- **`vddt` (pdcd.0x3C, 0x40)**: tipos adicionales (Overall, PeakVue, Mp
+  Wave…). Las cadenas FFT cubren sólo 5 timestamps; los 4 timestamps
+  de waveform y los demás canales (Valores Globales, bandas con
+  nombre) probablemente cuelgan de los otros punteros del `pdcd`.
+- **Significado preciso de los i32 deltas en `vcps.0x0C`/`0x10` y
+  `vdps.0x0C`/`0x10`**. No bloquean Fase 3b si los ignoramos en la
+  lectura.
 
 ## 6. Encoding y strings
 
@@ -240,15 +345,30 @@ Implementación: `ams_extract.encoding`.
 
 ## 7. Incógnitas abiertas
 
-- Layout exacto de `0x22-0x2B` y `0x30-0x57` en la cabecera.
+Resueltas en sub-fase 3a:
+
+- ~~Cómo se enlazan los samples a su punto~~: vía `vdpm.0x10 → pdcd`,
+  y `pdcd` actúa como índice de cadenas por tipo de medida.
+- ~~Dónde se almacenan Fmax / n_lines / units / timestamp por
+  espectro~~: en el record `vdps` (ver §5.3).
+- ~~Layout interno de `vcps`~~: header de 24 bytes + 122 float32 LE
+  consecutivos (ver §5.4).
+
+Pendientes:
+
+- Layout exacto de `0x22-0x2B` y `0x30-0x57` en la cabecera (Fase 1).
 - Función de los u32 LE en el "rebozado" de cada record (preámbulo
   `0x00-0x07`): timestamps, contadores, versión… aún sin confirmar.
-- Estructura interna de los records de sample (`vcps` / `vcfw`):
-  cómo se distingue FFT de waveform, dónde van Fmax / n_lines / unidades
-  / window / n_avgs, y cómo se enlazan a su punto (`vdpm`). Fase 3.
-- Marker para distinguir un `vdpm` "real" (alcanzable desde la jerarquía
-  de áreas) de uno "plantilla". Hoy se filtran por construcción al
-  recorrer sólo lo enlazado.
-- Significado preciso de los i32 signed deltas en `gicm.0x60+` y
-  `vdpm.0x10+`. No bloqueante para la jerarquía actual.
+- Estructura interna de `vcfw` y `vdfw` (waveforms). Sub-fase 3b.
+- Estructura de `vddt` (otros tipos de medida: Overall, PeakVue,
+  bandas con nombre). Fase 3b o 5.
+- Marker para distinguir un `vdpm` "real" de uno "plantilla". Hoy se
+  filtran por construcción al recorrer sólo lo enlazado.
+- Significado preciso de los i32 signed deltas en `gicm.0x60+`,
+  `vdpm.0x10+`, `vdps.0x0C`/`0x10` y `vcps.0x0C`/`0x10`. No bloquean
+  ninguna fase actual.
+- Escalado/normalización de las amplitudes en `vcps` para casar con
+  el eje Y de AMS (sub-fase 3b).
+- Reconciliación entre `n_lines = 1600` y los 1586 floats que
+  realmente caben en una cadena `vcps` de 13 records.
 - Resto de la lista inicial en `docs/PLAN.md` §4.6.

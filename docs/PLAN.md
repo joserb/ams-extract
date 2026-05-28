@@ -20,7 +20,7 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 | 1 — Reader + header | ✅ completada | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
 | 2a — Áreas + CI | ✅ completada | 15 áreas verificadas; CI matrix listo; ADR-0002 |
 | 2b — Equipos y Puntos | ✅ completada | 15 áreas, 347 equipos, 5203 puntos, 1198 PEAKVUE (tras el fix gicm 20-slot del 2026-05-28); `rbm-dev scan --tags`; ADR-0003 |
-| 3 — Sample reader FFT | ⏳ pendiente | Sub-3a reconocimiento de `vcps`/`vcfw` (53%/36% de BUNGE) + enlace desde `vdpm.0x38+`; luego sub-3b parser + `rbm extract` |
+| 3 — Sample reader FFT | 🚧 en curso | Sub-3a ✅ (vdpm→pdcd→vdps→vcps mapeado contra M1H de AG-100, FORMAT §5); sub-3b pendiente (parser + `rbm extract`) |
 | 4 — Verificación visual | ⏳ pendiente | Requiere humano frente a AMS en VM |
 | 5 — Waveforms | ⏳ pendiente | Análogo a Fase 3 con `vcfw` |
 | 6 — Export masivo | ⏳ pendiente | `rbm export` con paralelización por equipo |
@@ -652,14 +652,16 @@ Nota: los tags `odcd` / `oddt` que mencionaba Eka no aparecen en BUNGE.
 enlace desde un punto a sus muestras vive en algún sitio del descriptor
 `vdpm.0x38+`, todavía sin parsear.
 
-Sub-fase 3a (reconocimiento, sin código):
+Sub-fase 3a (reconocimiento) — ✅ completada 2026-05-28:
 
-- Volcar con `rbm-dev dump-record` un `vdpm` conocido (p.ej. primer punto
-  del primer equipo de CONTRA INCENDIOS) y descifrar `0x38+`:
-  ¿puntero a sample chain? ¿record índice intermedio? ¿array de punteros?
-- Seguir el enlace y volcar 2-3 `vcps` + 2-3 `vcfw`.
-- Documentar el layout en `FORMAT.md §5` y, si emerge un record índice,
-  añadirlo a §3.2. Anotar diferencias `vcps` vs `vcfw` vs `vdps` / `vdfw`.
+- Mapeado contra M1H de AG-100 (record `vdpm` 336982). El path
+  verificado es `vdpm.0x10 → pdcd (índice) → 0x44 → primer vdps →
+  0x18 → primer vcps`.
+- 5 `vdps` (uno por timestamp) encadenados vía `0x14`, con Fmax /
+  n_lines / units / CARGA en offsets conocidos.
+- 13 `vcps` por espectro (122 floats c/u = 1586 ≈ 1600 líneas).
+- Documentado en `FORMAT.md §5`. Pendiente para 3b: `vcfw` waveform,
+  `vddt` (otros tipos), escalado de amplitudes.
 
 Sub-fase 3b (implementación):
 
