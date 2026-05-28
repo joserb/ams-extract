@@ -13,9 +13,11 @@ from ams_extract.records.equipment import (
     GDCM_TAG,
     GDTS_GICM_POINTER_OFFSET,
     GDTS_TAG,
+    GICM_CONTINUATION_NAMES_OFFSET,
     GICM_GDCM_POINTERS_OFFSET,
-    GICM_MAX_EQUIPMENT,
+    GICM_MAX_SLOTS_PER_CHUNK,
     GICM_NAME_SLOT_SIZE,
+    GICM_NAMES_IN_HEADER_RECORD,
     GICM_NAMES_OFFSET,
     GICM_NEXT_POINTER_OFFSET,
     GICM_TAG,
@@ -44,7 +46,17 @@ def _make_gicm(
     gdcm_pointers_stored: list[int],
     names: list[bytes],
     next_pointer_stored: int = 0,
-) -> bytes:
+) -> list[bytes]:
+    """Build the 1-or-2 physical records that make up one logical gicm chunk.
+
+    Returns a list of 512-byte records: just the gicm record when there
+    are ≤12 names, or the gicm record + its continuation record when
+    there are 13-20 names.
+    """
+    if len(gdcm_pointers_stored) > GICM_MAX_SLOTS_PER_CHUNK:
+        raise AssertionError(
+            f"a gicm chunk holds at most {GICM_MAX_SLOTS_PER_CHUNK} slots"
+        )
     record = _empty_record()
     record[TAG_OFFSET : TAG_OFFSET + 4] = GICM_TAG
     struct.pack_into(
@@ -54,12 +66,22 @@ def _make_gicm(
         struct.pack_into(
             "<I", record, GICM_GDCM_POINTERS_OFFSET + i * 4, ptr
         )
-    for i, name in enumerate(names):
+    for i, name in enumerate(names[:GICM_NAMES_IN_HEADER_RECORD]):
         off = GICM_NAMES_OFFSET + i * GICM_NAME_SLOT_SIZE
         slot = bytearray(b" " * GICM_NAME_SLOT_SIZE)
         slot[: len(name)] = name
         record[off : off + GICM_NAME_SLOT_SIZE] = bytes(slot)
-    return bytes(record)
+
+    overflow = names[GICM_NAMES_IN_HEADER_RECORD:]
+    if not overflow:
+        return [bytes(record)]
+    continuation = _empty_record()
+    for i, name in enumerate(overflow):
+        off = GICM_CONTINUATION_NAMES_OFFSET + i * GICM_NAME_SLOT_SIZE
+        slot = bytearray(b" " * GICM_NAME_SLOT_SIZE)
+        slot[: len(name)] = name
+        continuation[off : off + GICM_NAME_SLOT_SIZE] = bytes(slot)
+    return [bytes(record), bytes(continuation)]
 
 
 def _make_gdcm(gipm_pointer_stored: int) -> bytes:
@@ -122,7 +144,7 @@ class TestParseGicmEquipmentSlots:
             gdcm_pointers_stored=[10, 11, 12],
             names=[b"PUMP-01", b"PUMP-02", b"FAN-01"],
         )
-        records = [_make_header(), gicm]
+        records = [_make_header(), *gicm]
         records += [_empty_record()] * 14
         with reader_factory(records) as reader:
             slots = parse_gicm_equipment_slots(reader, 1)
@@ -135,29 +157,52 @@ class TestParseGicmEquipmentSlots:
             gdcm_pointers_stored=[10, 0, 12],
             names=[b"A", b"B", b"C"],
         )
-        records = [_make_header(), gicm] + [_empty_record()] * 14
+        records = [_make_header(), *gicm] + [_empty_record()] * 14
         with reader_factory(records) as reader:
             slots = parse_gicm_equipment_slots(reader, 1)
         assert len(slots) == 1
         assert slots[0].long_name == "A"
 
-    def test_follows_next_gicm_chain(self, reader_factory) -> None:
-        # gicm at record 1 has 12 slots + next-pointer to record 2 (stored +1 = 3),
-        # gicm at record 2 has 3 more slots with no further chain.
-        first = _make_gicm(
-            gdcm_pointers_stored=[i + 100 for i in range(GICM_MAX_EQUIPMENT)],
-            names=[f"EQ-{i:02d}".encode() for i in range(GICM_MAX_EQUIPMENT)],
-            next_pointer_stored=3,
+    def test_reads_overflow_names_from_continuation_record(
+        self, reader_factory
+    ) -> None:
+        # 15 equipment in one logical chunk: 12 names in the gicm record,
+        # 3 more in the immediately following physical record.
+        gicm = _make_gicm(
+            gdcm_pointers_stored=[100 + i for i in range(15)],
+            names=[f"EQ-{i:02d}".encode() for i in range(15)],
         )
+        assert len(gicm) == 2  # gicm header + 1 continuation record
+        records = [_make_header(), *gicm] + [_empty_record()] * 13
+        with reader_factory(records) as reader:
+            slots = parse_gicm_equipment_slots(reader, 1)
+        assert len(slots) == 15
+        assert slots[0].long_name == "EQ-00"
+        assert slots[11].long_name == "EQ-11"
+        # The next three names live in the continuation record.
+        assert slots[12].long_name == "EQ-12"
+        assert slots[14].long_name == "EQ-14"
+        assert [s.slot_index for s in slots] == list(range(15))
+
+    def test_follows_next_gicm_chain(self, reader_factory) -> None:
+        # gicm at record 1 has the maximum 20 slots in a single chunk
+        # (uses a continuation record at record 2), next-pointer to a
+        # second gicm at record 3 (stored +1 = 4) with 3 more slots.
+        first = _make_gicm(
+            gdcm_pointers_stored=[i + 100 for i in range(GICM_MAX_SLOTS_PER_CHUNK)],
+            names=[f"EQ-{i:02d}".encode() for i in range(GICM_MAX_SLOTS_PER_CHUNK)],
+            next_pointer_stored=4,
+        )
+        assert len(first) == 2
         second = _make_gicm(
             gdcm_pointers_stored=[200, 201, 202],
             names=[b"EXTRA-1", b"EXTRA-2", b"EXTRA-3"],
         )
-        records = [_make_header(), first, second] + [_empty_record()] * 13
+        records = [_make_header(), *first, *second] + [_empty_record()] * 12
         with reader_factory(records) as reader:
             slots = parse_gicm_equipment_slots(reader, 1)
-        assert len(slots) == GICM_MAX_EQUIPMENT + 3
-        assert slots[GICM_MAX_EQUIPMENT].long_name == "EXTRA-1"
+        assert len(slots) == GICM_MAX_SLOTS_PER_CHUNK + 3
+        assert slots[GICM_MAX_SLOTS_PER_CHUNK].long_name == "EXTRA-1"
         assert slots[-1].long_name == "EXTRA-3"
 
     def test_detects_gicm_chain_cycle(self, reader_factory) -> None:
@@ -168,7 +213,7 @@ class TestParseGicmEquipmentSlots:
             names=[b"LOOP"],
             next_pointer_stored=2,
         )
-        records = [_make_header(), looped] + [_empty_record()] * 14
+        records = [_make_header(), *looped] + [_empty_record()] * 14
         with reader_factory(records) as reader, pytest.raises(
             EquipmentChainError, match="cycle"
         ):

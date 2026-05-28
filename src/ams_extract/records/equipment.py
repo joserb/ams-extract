@@ -1,6 +1,7 @@
 """Parsers for the area → equipment chain (``gdts`` / ``gicm`` / ``gdcm``).
 
-Verified chain (per ADR-0003, against ``BUNGE CARTAGENA marzo 2.0.rbm``)::
+Verified chain (per ADR-0003 + the 2026-05-28 equipment-count fix, against
+``BUNGE CARTAGENA marzo 2.0.rbm``)::
 
     Area
       └─ gdts record   (one per area; from the prefix-list area record's
@@ -8,11 +9,16 @@ Verified chain (per ADR-0003, against ``BUNGE CARTAGENA marzo 2.0.rbm``)::
           └─ gicm record   (first in a singly-linked list, pointer at
                             gdts offset 0x18; the last one is mirrored at
                             gdts offset 0x1C as a convenience)
-              ├─ up to GICM_MAX_EQUIPMENT slots, each with:
+              ├─ up to GICM_MAX_SLOTS_PER_CHUNK (20) slots, each with:
               │     • a u32 LE pointer at 0x10 + i*4 to a gdcm record
-              │     • a 28-byte name slot at 0xB0 + i*28
-              ├─ a "next gicm" pointer at offset 0x0C; areas with more
-              │   than 12 equipment chain via that field, terminated by 0
+              │     • a 28-byte name slot whose location depends on i:
+              │         - i ∈ [0, 11]: name at 0xB0 + i*28 of the gicm
+              │           record itself (12 names fill the rest of it)
+              │         - i ∈ [12, 19]: name at 0x00 + (i-12)*28 of the
+              │           NEXT physical record, which is an untagged
+              │           continuation block of this gicm
+              ├─ a "next gicm" pointer at offset 0x0C; chunks with more
+              │   than 20 equipment chain via that field, terminated by 0
               └─ ... follows to the next gicm in the chain
 
 A ``gdcm`` record is the equipment instance — it carries the pointer to
@@ -39,13 +45,15 @@ GICM_TAG = b"gicm"
 GICM_NEXT_POINTER_OFFSET = 0x0C
 """Offset of the "next ``gicm`` in chain" pointer (0 = end-of-chain)."""
 GICM_GDCM_POINTERS_OFFSET = 0x10
-GICM_NAMES_OFFSET = 0xB0
+GICM_MAX_SLOTS_PER_CHUNK = 20
+"""Max equipment slots per logical ``gicm`` chunk."""
 GICM_NAME_SLOT_SIZE = 28
-GICM_MAX_EQUIPMENT = (RECORD_SIZE - GICM_NAMES_OFFSET) // GICM_NAME_SLOT_SIZE
-"""Maximum equipment slots one ``gicm`` record can hold (BUNGE: 12).
-
-Areas with more than this many equipment chain via :data:`GICM_NEXT_POINTER_OFFSET`.
-"""
+GICM_NAMES_OFFSET = 0xB0
+"""Offset where the in-record name slots begin (slot 0)."""
+GICM_NAMES_IN_HEADER_RECORD = (RECORD_SIZE - GICM_NAMES_OFFSET) // GICM_NAME_SLOT_SIZE
+"""How many names fit in the gicm record itself before overflowing (12)."""
+GICM_CONTINUATION_NAMES_OFFSET = 0x00
+"""Where overflow names (slot 12+) start in the continuation record."""
 GICM_CHAIN_MAX_LENGTH = 256
 """Defensive cap on the length of a ``gicm`` chain to bound cycles."""
 
@@ -93,32 +101,70 @@ def parse_gdts_gicm_pointer(reader: RbmReader, gdts_record: int) -> int | None:
     return decode_inner_pointer(stored)
 
 
+def _read_gicm_slot_name(
+    record: bytes, continuation: bytes | None, slot_index: int
+) -> str:
+    """Return the long name for ``slot_index`` of one gicm chunk.
+
+    Slots 0-11 live at ``GICM_NAMES_OFFSET + i*28`` of the gicm record
+    itself; slots 12-19 live at ``i*28`` of the continuation record (the
+    physical record immediately after the gicm one).
+    """
+    if slot_index < GICM_NAMES_IN_HEADER_RECORD:
+        name_off = GICM_NAMES_OFFSET + slot_index * GICM_NAME_SLOT_SIZE
+        name_bytes = record[name_off : name_off + GICM_NAME_SLOT_SIZE]
+    else:
+        if continuation is None:
+            raise EquipmentChainError(
+                f"gicm slot {slot_index} requires continuation record but none was loaded"
+            )
+        cont_index = slot_index - GICM_NAMES_IN_HEADER_RECORD
+        name_off = GICM_CONTINUATION_NAMES_OFFSET + cont_index * GICM_NAME_SLOT_SIZE
+        name_bytes = continuation[name_off : name_off + GICM_NAME_SLOT_SIZE]
+    return decode_string(name_bytes)
+
+
 def _parse_single_gicm_slots(
-    record: bytes, gicm_record: int
+    reader: RbmReader, gicm_record: int
 ) -> tuple[list[EquipmentSlot], int | None]:
-    """Decode one ``gicm`` record into its equipment slots + next-chain pointer.
+    """Decode one logical ``gicm`` chunk into its equipment slots + next-chain pointer.
+
+    A logical chunk has up to :data:`GICM_MAX_SLOTS_PER_CHUNK` (20) slots.
+    Names for slots 0-11 fit in the gicm record itself; for chunks with
+    more than 12 equipment, names for slots 12-19 live in the physical
+    record immediately following ``gicm_record`` (an untagged continuation
+    block).
 
     Returns ``(slots, next_gicm)`` where ``next_gicm`` is the zero-based
-    record number of the next ``gicm`` in the chain or ``None`` if this is
-    the last gicm. The slot index is recorded relative to ``gicm_record``
-    so that callers building cross-record indices can disambiguate.
+    record number of the next ``gicm`` in the chain or ``None`` if this
+    is the last gicm.
     """
-    slots: list[EquipmentSlot] = []
-    for i in range(GICM_MAX_EQUIPMENT):
+    record = reader.read_record(gicm_record)
+    _check_tag(record, GICM_TAG, gicm_record)
+
+    pointers: list[int] = []
+    for i in range(GICM_MAX_SLOTS_PER_CHUNK):
         ptr_off = GICM_GDCM_POINTERS_OFFSET + i * 4
         (stored,) = struct.unpack_from("<I", record, ptr_off)
         gdcm = decode_inner_pointer(stored)
         if gdcm is None:
             break
-        name_off = GICM_NAMES_OFFSET + i * GICM_NAME_SLOT_SIZE
-        name_bytes = record[name_off : name_off + GICM_NAME_SLOT_SIZE]
-        slots.append(
-            EquipmentSlot(
-                long_name=decode_string(name_bytes),
-                gdcm_record=gdcm,
-                slot_index=i,
-            )
+        pointers.append(gdcm)
+
+    continuation = (
+        reader.read_record(gicm_record + 1)
+        if len(pointers) > GICM_NAMES_IN_HEADER_RECORD
+        else None
+    )
+
+    slots = [
+        EquipmentSlot(
+            long_name=_read_gicm_slot_name(record, continuation, i),
+            gdcm_record=gdcm,
+            slot_index=i,
         )
+        for i, gdcm in enumerate(pointers)
+    ]
     (next_stored,) = struct.unpack_from("<I", record, GICM_NEXT_POINTER_OFFSET)
     return slots, decode_inner_pointer(next_stored)
 
@@ -128,11 +174,11 @@ def parse_gicm_equipment_slots(
 ) -> list[EquipmentSlot]:
     """Return every equipment slot in the ``gicm`` chain starting at ``gicm_record``.
 
-    Areas with more than :data:`GICM_MAX_EQUIPMENT` equipment chain via
-    the "next gicm" pointer at offset :data:`GICM_NEXT_POINTER_OFFSET`.
-    This function follows that linked list, in order, accumulating all
-    slots. Visited gicm records are tracked so a cyclic chain terminates
-    instead of spinning forever, and the chain length is hard-capped by
+    Areas with more than :data:`GICM_MAX_SLOTS_PER_CHUNK` equipment chain
+    via the "next gicm" pointer at :data:`GICM_NEXT_POINTER_OFFSET`. This
+    function follows that linked list, in order, accumulating all slots.
+    Visited gicm records are tracked so a cyclic chain terminates instead
+    of spinning forever, and the chain length is hard-capped by
     :data:`GICM_CHAIN_MAX_LENGTH`.
 
     Raises:
@@ -149,9 +195,7 @@ def parse_gicm_equipment_slots(
                 f"gicm chain cycle detected at record {current}"
             )
         visited.add(current)
-        record = reader.read_record(current)
-        _check_tag(record, GICM_TAG, current)
-        chunk, current = _parse_single_gicm_slots(record, current)
+        chunk, current = _parse_single_gicm_slots(reader, current)
         slots.extend(chunk)
     else:
         raise EquipmentChainError(
