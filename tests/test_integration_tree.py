@@ -60,12 +60,32 @@ def test_real_file_includes_accented_name(real_rbm: Path) -> None:
 
 # --- Phase 2b: full hierarchy walk ---
 
-# Counts measured against BUNGE CARTAGENA marzo 2.0.rbm after the gicm-chain
-# walker was wired up. PEAKVUE-named points line up with the ~895 figure
-# captured in the original PLAN (within the ±5% tolerance the DoD allows).
-BUNGE_EQUIPMENT_COUNT = 252
-BUNGE_TOTAL_POINTS = 3795
-BUNGE_PEAKVUE_POINTS = 869
+# Counts measured against BUNGE CARTAGENA marzo 2.0.rbm after the gicm
+# 20-slot continuation fix. The earlier 12-slot model under-counted by
+# 91 equipment (~26%) — the largest areas (EXTRACCION, PREPARACION,
+# REFINERIA) had chunks with 13-20 equipment whose names spill over to
+# the gicm's continuation record.
+BUNGE_EQUIPMENT_COUNT = 347
+BUNGE_TOTAL_POINTS = 5203
+BUNGE_PEAKVUE_POINTS = 1198
+
+BUNGE_EQUIPMENT_PER_AREA = {
+    "CONTRA INCENDIOS": 4,
+    "EXTRACCION": 53,
+    "DEPURADORA": 28,
+    "IMPULSIÓN DE MAR": 4,
+    "NAVES": 18,
+    "PASILLO DE BOMBAS": 5,
+    "PELETIZACION": 10,
+    "PREPARACION": 87,
+    "REFINERIA": 90,
+    "CALDERAS": 11,
+    "FULL-FAT": 12,
+    "PARQUE TANQUES": 5,
+    "OBSOLETOS": 12,
+    "SERVICIOS": 6,
+    "OSMOSIS": 2,
+}
 
 
 def test_real_file_walk_hierarchy_counts(real_rbm: Path) -> None:
@@ -76,6 +96,15 @@ def test_real_file_walk_hierarchy_counts(real_rbm: Path) -> None:
     point_count = sum(len(eq.points) for a in areas for eq in a.equipment)
     assert equipment_count == BUNGE_EQUIPMENT_COUNT
     assert point_count == BUNGE_TOTAL_POINTS
+
+
+def test_real_file_equipment_count_per_area(real_rbm: Path) -> None:
+    # Catches a regression of the 12-vs-20 slot bug as soon as it
+    # changes any area's count, not just the totals.
+    with RbmReader(real_rbm) as reader:
+        areas = walk_hierarchy(reader)
+    actual = {a.long_name: len(a.equipment) for a in areas}
+    assert actual == BUNGE_EQUIPMENT_PER_AREA
 
 
 def test_real_file_peakvue_point_count_within_tolerance(real_rbm: Path) -> None:
@@ -125,6 +154,10 @@ def test_real_file_first_equipment_point_names(real_rbm: Path) -> None:
 
 def test_real_file_depuradora_includes_expected_machines(real_rbm: Path) -> None:
     # DEPURADORA equipment list matches the user's AMS screenshot.
+    # PM-501 is specifically the equipment that revealed the 12-vs-20
+    # slot bug: it lives at slot 12 of chunk 0, so its name overflows to
+    # the gicm's continuation record. Keep it in the asserted set so a
+    # regression in the overflow reader trips this test.
     with RbmReader(real_rbm) as reader:
         areas = walk_hierarchy(reader)
     depuradora = next(a for a in areas if a.long_name == "DEPURADORA")
@@ -134,7 +167,10 @@ def test_real_file_depuradora_includes_expected_machines(real_rbm: Path) -> None
         "CENTRIF HORIZONTAL CF-4900",
         "CENTRIF HORIZONTAL CF-5900",
         "Bomba Centrifuga PM-100",
-        "Bomba Centrifuga PM-100B",
         "Bomba Centrifuga PM-101",
+        "Bomba Centrifuga PM-501",  # first equipment in the overflow region
+        "Bomba Centrifuga PM-5502",  # last equipment in the overflow region
+        "MOTOR REDUCTOR RAS-500",
+        "Tornillo deshidr TRD.10100",
     ):
         assert expected in names, f"missing equipment in DEPURADORA: {expected!r}"
