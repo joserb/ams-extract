@@ -22,7 +22,7 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 | 2b — Equipos y Puntos | ✅ completada | 15 áreas, 347 equipos, 5203 puntos, 1198 PEAKVUE (tras el fix gicm 20-slot del 2026-05-28); `rbm-dev scan --tags`; ADR-0003 |
 | 3 — Sample reader FFT | ✅ completada (FFT) | Sub-3a ✅ + sub-3b ✅: `rbm extract --point NAME --equipment SUBSTR --limit N` emite Parquet + PNG; 5 espectros de M1H con timestamps y picos coincidentes con AMS. Escalado de amplitud (mm/seg) pendiente para refinamiento. |
 | 4 — Verificación visual | ⏳ pendiente | Requiere humano frente a AMS en VM |
-| 5 — Waveforms | ⏳ pendiente | Análogo a Fase 3 con `vcfw` |
+| 5 — Waveforms | 🚧 en curso | Sub-5a ✅ cadena `pdcd → 0x5C → vdfw → 0x18 → vcfw` mapeada contra M1H (Pc, Pk, n_samples, sample_rate cuadran con AMS). Sub-5b pendiente (parser + extract). |
 | 6 — Export masivo | ⏳ pendiente | `rbm export` con paralelización por equipo |
 | 7 — Refinamientos | ⏳ pendiente | Plantillas, field notes, bandas de alarma |
 

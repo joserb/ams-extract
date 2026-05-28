@@ -205,9 +205,9 @@ verificada en cada fase:
 | Tag | Frecuencia | Función verificada | Confirmado en |
 |---|---|---|---|
 | `vcps` | 1 931 424 | bloque de 122 floats de datos FFT | Fase 3a |
-| `vcfw` | 1 322 008 | bloque de datos waveform — layout análogo, pendiente verificar | Fase 3b |
+| `vcfw` | 1 322 008 | bloque de int16 LE para datos de waveform (244 muestras/record) | Fase 5a |
 | `vdps` | 157 160 | descriptor de un espectro FFT individual | Fase 3a |
-| `vdfw` | 157 055 | descriptor de un waveform individual — pendiente | Fase 3b |
+| `vdfw` | 157 055 | descriptor de un waveform individual (n_samples, sample_period, units) | Fase 5a |
 | `vdpm` | 6 141 | point descriptor (config: template, RPM, alarmas; incluye plantillas) | Fase 2b + 3a |
 | `pdcd` | (no listado por scan) | índice de tipos de medida por punto ("Set Colección Datos Primar") | Fase 3a |
 | `vddt` | pendiente medir | otro tipo de medida (Overall / PeakVue / bandas?) — pendiente | Fase 3b |
@@ -307,7 +307,54 @@ afinar).
 | `0x14` | 4 | u32 LE (+1 encoded) — **siguiente `vcps`** en la misma cadena (`0` = fin) |
 | `0x18`–`0x1FF` | 488 | **122 × float32 LE** — amplitudes consecutivas del espectro |
 
-### 5.5 Pendientes (Fase 3c / 5 / 7)
+### 5.5 Waveform chain (sub-fase 5a, mapeado contra M1H 19-feb-2020)
+
+Estructura paralela a la de FFT, anclada en `pdcd` con **dos punteros
+adicionales** que sub-3a no había probado (sweep limitado a 0x00-0x4C):
+
+```
+pdcd
+  ├── 0x5C → vdfw (primer descriptor waveform, más antiguo)
+  └── 0x60 → vdfw (último descriptor waveform, más reciente)
+
+vdfw chain (chronological, oldest → newest):
+  vdfw → 0x14 → vdfw siguiente  (0 = último)
+              0x18 → primer vcfw (data chain head)
+              0x1C → back-ref al pdcd
+              0x24 → float32 sample_period (1/sample_rate; M1H: 3.9e-4 s = 1/2560)
+              0x2C → u32 n_samples (M1H: 512)
+              0x34 → u32 Unix timestamp UTC
+              0x38 → float32 RPM (no Fmax como en vdps)
+              0x3C → float32 CARGA %
+              0x6C → ASCII 8 bytes — units (e.g. "G's")
+
+vcfw chain (datos de la waveform):
+  vcfw → 0x14 → siguiente vcfw  (0 = fin)
+              0x18 hasta 0x1FF → 244 × int16 LE (muestras acel. centradas)
+```
+
+Para M1H 19-feb-2020 BUNGE: 2 vcfw records → 488 muestras decoded
+(24 menos que las 512 nominales — pendiente entender el padding).
+Cotejado contra el screenshot AMS:
+
+| Métrica | AMS | Decodificado | Match |
+|---|---|---|---|
+| Pc(+) | 0.483 G | 0.482 G | ✓ 0.2% |
+| Pk(-) | -0.510 G | -0.500 G | ✓ 2% |
+| n_samples (nominal) | 512 | 512 (en vdfw) | ✓ |
+| n_samples (reales decoded) | — | 488 | -4.7% |
+| sample_rate | 2560 Hz (= 2.56 × Fmax_FFT) | 2560 Hz | ✓ |
+| Duration | 0.20-0.21 s | 0.191 s | ≈ |
+| Units | G | G | ✓ |
+
+**Hipótesis descartada en sub-5a**: "AMS reconstruye FFT desde
+waveform". La waveform almacenada (488 muestras / 0.19 s) no permite
+una FFT de 1600 líneas con resolución 0.625 Hz/bin como muestra AMS —
+necesitaría 4096 muestras / 1.6 s. Conclusión: `vcps` (FFT) y `vcfw`
+(waveform) son representaciones independientes en el fichero, y la
+deuda de calibración de amplitudes del FFT (§5.5) sigue abierta.
+
+### 5.6 Pendientes (Fase 3c / 5 / 7)
 
 - **Amplitud absoluta — discrepancia estructural confirmada
   (2026-05-29)**. Cotejando contra la "Lista de Picos" de AMS para M1H
