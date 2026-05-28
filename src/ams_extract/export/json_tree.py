@@ -8,8 +8,8 @@ Schema (informal)::
 
     {
       "meta": {
-        "schema_version": 2,
-        "phase": "phase-2b-complete",
+        "schema_version": 3,
+        "phase": "phase-2b-equipment-count-fix",
         "source": "<path of the input .rbm>",
         "signature": "MT4.00",
         "description": "Preditec",
@@ -54,8 +54,8 @@ from ams_extract.models import Area, Equipment, Point
 from ams_extract.reader import RbmReader
 from ams_extract.records.header import parse_header
 
-SCHEMA_VERSION = 2
-PHASE_LABEL = "phase-2b-complete"
+SCHEMA_VERSION = 3
+PHASE_LABEL = "phase-2b-equipment-count-fix"
 
 
 def _point_to_dict(point: Point) -> dict[str, Any]:
