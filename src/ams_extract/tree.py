@@ -15,9 +15,10 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
+import numpy as np
 import structlog
 
-from ams_extract.models import Area, Equipment, Point, Spectrum
+from ams_extract.models import Area, Equipment, Point, Spectrum, Waveform
 from ams_extract.naming import NameSanitizer
 from ams_extract.reader import RbmReader
 from ams_extract.records.area import (
@@ -48,8 +49,14 @@ from ams_extract.records.sample import (
     walk_vdps_chain,
 )
 from ams_extract.records.sample_index import (
+    PdcdLinks,
     SampleIndexError,
     parse_pdcd_links,
+)
+from ams_extract.records.waveform import (
+    WaveformChainError,
+    read_vcfw_samples,
+    walk_vdfw_chain,
 )
 
 _log = structlog.get_logger(__name__)
@@ -290,13 +297,12 @@ def walk_hierarchy(reader: RbmReader) -> list[Area]:
     return populated
 
 
-def walk_spectra(reader: RbmReader, point: Point) -> Iterator[Spectrum]:
-    """Yield every FFT spectrum recorded for ``point``, oldest first.
+def _resolve_pdcd_links(reader: RbmReader, point: Point) -> PdcdLinks | None:
+    """Resolve ``point``'s ``pdcd`` sample-index links, or ``None``.
 
-    Walks ``vdpm.0x10 → pdcd → 0x44 → vdps → (chain via 0x14)`` and, for
-    each ``vdps``, reads its full ``vcps`` data chain into a numpy array.
-    Per-spectrum failures are logged and the walk continues; a missing
-    pdcd or first-vdps yields zero spectra.
+    Walks ``vdpm.0x10 → pdcd`` and parses the chain heads. Per-record
+    failures (bad tag, missing pointer) are logged and surface as ``None``
+    so callers yield zero samples rather than aborting.
     """
     try:
         pdcd_record = parse_vdpm_pdcd_pointer(reader, point.record_num)
@@ -307,17 +313,17 @@ def walk_spectra(reader: RbmReader, point: Point) -> Iterator[Spectrum]:
             vdpm_record=point.record_num,
             error=str(exc),
         )
-        return
+        return None
     if pdcd_record is None:
         _log.info(
             "point_has_no_sample_index",
             point=point.long_name,
             vdpm_record=point.record_num,
         )
-        return
+        return None
 
     try:
-        links = parse_pdcd_links(reader, pdcd_record)
+        return parse_pdcd_links(reader, pdcd_record)
     except SampleIndexError as exc:
         _log.warning(
             "pdcd_parse_failed",
@@ -325,13 +331,26 @@ def walk_spectra(reader: RbmReader, point: Point) -> Iterator[Spectrum]:
             pdcd_record=pdcd_record,
             error=str(exc),
         )
+        return None
+
+
+def walk_spectra(reader: RbmReader, point: Point) -> Iterator[Spectrum]:
+    """Yield every FFT spectrum recorded for ``point``, oldest first.
+
+    Walks ``vdpm.0x10 → pdcd → 0x44 → vdps → (chain via 0x14)`` and, for
+    each ``vdps``, reads its full ``vcps`` data chain into a numpy array.
+    Per-spectrum failures are logged and the walk continues; a missing
+    pdcd or first-vdps yields zero spectra.
+    """
+    links = _resolve_pdcd_links(reader, point)
+    if links is None:
         return
 
     if links.fft_first_vdps is None:
         _log.info(
             "point_has_no_fft_chain",
             point=point.long_name,
-            pdcd_record=pdcd_record,
+            pdcd_record=links.record_num,
         )
         return
 
@@ -374,4 +393,69 @@ def walk_spectra(reader: RbmReader, point: Point) -> Iterator[Spectrum]:
             units=desc.units,
             carga_pct=desc.carga_pct,
             amplitude=amplitude,
+        )
+
+
+def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
+    """Yield every time-domain waveform recorded for ``point``, oldest first.
+
+    Walks ``vdpm.0x10 → pdcd → 0x5C → vdfw → (chain via 0x14)`` and, for
+    each ``vdfw``, reads its full ``vcfw`` data chain into a numpy array.
+    Per-waveform failures are logged and the walk continues; a missing
+    pdcd or first-vdfw yields zero waveforms.
+    """
+    links = _resolve_pdcd_links(reader, point)
+    if links is None:
+        return
+
+    if links.waveform_first_vdfw is None:
+        _log.info(
+            "point_has_no_waveform_chain",
+            point=point.long_name,
+            pdcd_record=links.record_num,
+        )
+        return
+
+    try:
+        descriptors = list(walk_vdfw_chain(reader, links.waveform_first_vdfw))
+    except WaveformChainError as exc:
+        _log.warning(
+            "vdfw_chain_failed",
+            point=point.long_name,
+            first_vdfw=links.waveform_first_vdfw,
+            error=str(exc),
+        )
+        return
+
+    for desc in descriptors:
+        if desc.first_vcfw is None:
+            _log.warning(
+                "vdfw_missing_vcfw_chain",
+                point=point.long_name,
+                vdfw_record=desc.record_num,
+            )
+            continue
+        try:
+            raw = read_vcfw_samples(reader, desc.first_vcfw)
+        except WaveformChainError as exc:
+            _log.warning(
+                "vcfw_chain_failed",
+                point=point.long_name,
+                vdfw_record=desc.record_num,
+                first_vcfw=desc.first_vcfw,
+                error=str(exc),
+            )
+            continue
+        # Calibrate raw int16 counts to display units via vdfw.0x28.
+        samples = (raw * desc.scale_factor).astype(np.float32)
+        yield Waveform(
+            record_num=desc.record_num,
+            point_record_num=point.record_num,
+            timestamp_utc=desc.timestamp_utc,
+            n_samples=desc.n_samples,
+            sample_rate_hz=desc.sample_rate_hz,
+            rpm=desc.rpm,
+            units=desc.units,
+            carga_pct=desc.carga_pct,
+            samples=samples,
         )
