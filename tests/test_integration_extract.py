@@ -16,6 +16,8 @@ import pytest
 from typer.testing import CliRunner
 
 from ams_extract.cli import app as rbm_app
+from ams_extract.reader import RbmReader
+from ams_extract.tree import walk_hierarchy, walk_spectra
 
 pytestmark = pytest.mark.integration
 
@@ -144,6 +146,49 @@ def test_extract_fft_payload_matches_ams_gold(real_rbm: Path, tmp_path: Path) ->
         ours = float(amplitude[bin_index])
         assert ours == pytest.approx(ams_mms, rel=0.15), (
             f"{freq_hz} Hz: decoded {ours:.3f} mm/s vs AMS {ams_mms:.3f}"
+        )
+
+
+# AMS PeakVue "Lista de Picos" for PM-6901-A M2P (MOTOR LA VERTICAL PEAKVUE),
+# CALDERAS, 2024-01-24 (Hz -> G's RMS). Acceleration uses the same low-band +
+# chain reconstruction but a different scale (no inch->mm; RMS). Dominant peak
+# at 199.79 Hz = 0.907 G.
+_PM6901_M2P_PEAKVUE_GOLD = [
+    (25.92, 0.135),
+    (179.83, 0.160),
+    (199.79, 0.907),
+    (400.20, 0.116),
+    (599.84, 0.105),
+    (800.18, 0.231),
+]
+
+
+def test_peakvue_acceleration_matches_ams_gold(real_rbm: Path) -> None:
+    # Acceleration (G's) spectra calibrate to G's via ACCEL_SCALE_G; validate
+    # the full reconstruction reproduces the AMS PeakVue peak list within 15%.
+    with RbmReader(real_rbm) as reader:
+        point = next(
+            p
+            for area in walk_hierarchy(reader)
+            if "CALDERAS" in area.long_name
+            for eq in area.equipment
+            if "PM-6901-A" in eq.long_name
+            for p in eq.points
+            if p.long_name == "MOTOR LA VERTICAL PEAKVUE"
+        )
+        spectrum = next(
+            s
+            for s in walk_spectra(reader, point)
+            if s.timestamp_utc.strftime("%Y-%m-%d") == "2024-01-24"
+        )
+
+    assert spectrum.units == "G's"
+    assert spectrum.amplitude.shape == (1600,)
+    bin_width = spectrum.fmax_hz / spectrum.n_lines
+    for freq_hz, ams_g in _PM6901_M2P_PEAKVUE_GOLD:
+        ours = float(spectrum.amplitude[round(freq_hz / bin_width)])
+        assert ours == pytest.approx(ams_g, rel=0.15), (
+            f"{freq_hz} Hz: decoded {ours:.3f} G vs AMS {ams_g:.3f}"
         )
 
 
