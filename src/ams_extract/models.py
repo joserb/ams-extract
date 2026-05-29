@@ -5,7 +5,9 @@ Frozen, slotted dataclasses for memory efficiency and immutability.
 populates them from the equipment- and point-record chains discovered in
 ADR-0003 (``gdts`` → ``gicm`` → ``gdcm`` → ``gipm`` → ``vdpm``).
 ``Spectrum`` is added in sub-fase 3b for FFT samples reached through the
-``vdpm.0x10 → pdcd → vdps → vcps`` chain.
+``vdpm.0x10 → pdcd → vdps → vcps`` chain. ``Waveform`` is added in
+sub-fase 5b for time-domain samples reached through the parallel
+``pdcd → 0x5C → vdfw → vcfw`` chain.
 """
 
 from __future__ import annotations
@@ -105,3 +107,39 @@ class Spectrum:
     units: str
     carga_pct: float
     amplitude: NDArray[np.float32]
+
+
+@dataclass(frozen=True, slots=True)
+class Waveform:
+    """One time-domain waveform measured at a point.
+
+    Reached through ``vdpm.0x10 → pdcd → 0x5C → vdfw → 0x18 → vcfw``.
+    The samples array length is ``244 * <vcfw chain length>`` — typically
+    ~488 in BUNGE for the nominal ``n_samples = 512``; reconciliation of
+    those trailing samples is still open (FORMAT §5.5).
+
+    Attributes:
+        record_num: Zero-based record number of the ``vdfw`` descriptor.
+        point_record_num: Record number of the parent ``vdpm`` (point).
+        timestamp_utc: Sample timestamp as decoded from ``vdfw.0x34``.
+        n_samples: Nominal sample count, from ``vdfw.0x2C``.
+        sample_rate_hz: Sample rate in Hz, derived from ``vdfw.0x24``
+            (``1 / sample_period``).
+        rpm: Shaft speed in RPM, from ``vdfw.0x38``.
+        units: Units string as stored in ``vdfw.0x6C`` (e.g. ``"G's"``).
+        carga_pct: CARGA % field, from ``vdfw.0x3C``.
+        samples: Calibrated float32 sample buffer in ``units`` — the raw
+            ``vcfw`` int16 counts multiplied by ``vdfw.0x28`` (scale
+            factor). For M1H 19-feb-2020 this reproduces the AMS Pc/Pk
+            values within 0.3% (FORMAT §5.5).
+    """
+
+    record_num: int
+    point_record_num: int
+    timestamp_utc: datetime
+    n_samples: int
+    sample_rate_hz: float
+    rpm: float
+    units: str
+    carga_pct: float
+    samples: NDArray[np.float32]
