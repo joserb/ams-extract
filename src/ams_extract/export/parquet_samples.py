@@ -1,15 +1,22 @@
-"""Per-sample Parquet export.
+"""Per-equipment Parquet export.
 
-Sub-fase 3b emits ONE parquet file per spectrum with one row inside,
-mirroring the schema sketched in PLAN.md §3.5; sub-fase 5b adds the
-parallel writer for waveforms. The full Hive-partitioned dataset layout
-(Fase 6) is built on top of these primitives.
+Sub-fase 3b/5b emitted ONE parquet file per sample (used by ``rbm
+extract``). Fase 6 (``rbm export``) writes ONE parquet file per equipment
+*and per sample type*, with one row per sample — see PLAN.md §3.5 and the
+"separate files per type" decision. The single-sample writers are kept as
+thin wrappers over the batch writers so ``extract`` and ``export`` share
+exactly one schema definition.
+
+Every row carries a deterministic ``sample_id`` (see :func:`sample_id`) so
+the per-equipment file can be joined back to ``manifest.parquet``.
 """
 
 # pyright: reportUnknownMemberType=false
 
 from __future__ import annotations
 
+import hashlib
+from collections.abc import Sequence
 from pathlib import Path
 
 import pyarrow as pa
@@ -18,38 +25,57 @@ import pyarrow.parquet as pq
 from ams_extract.models import Point, Spectrum, Waveform
 
 
-def write_spectrum_parquet(
-    spectrum: Spectrum,
-    point: Point,
+def sample_id(point_record_num: int, sample_record_num: int, sample_type: str) -> str:
+    """Return a deterministic, stable id for a single sample.
+
+    The id is a 16-hex-char SHA-1 prefix over
+    ``"<point_record_num>:<sample_record_num>:<sample_type>"``. Determinism
+    lets the per-equipment Parquet and ``manifest.parquet`` reference the
+    same sample across runs without coordination.
+    """
+    raw = f"{point_record_num}:{sample_record_num}:{sample_type}"
+    return hashlib.sha1(raw.encode("ascii")).hexdigest()[:16]
+
+
+def write_spectra_parquet(
+    items: Sequence[tuple[Spectrum, Point]],
     path: Path,
 ) -> None:
-    """Serialize one :class:`Spectrum` to a Parquet file.
+    """Serialize a batch of ``(spectrum, point)`` pairs to one Parquet file.
 
-    Schema: one row with metadata columns + ``amplitude`` as a
-    ``list<float32>``. Frequency bins are derivable from ``fmax_hz`` and
-    the amplitude length, so they are not stored.
+    One row per spectrum. Metadata columns + ``amplitude`` as a
+    ``list<float32>``. Frequency bins are derivable from ``fmax_hz`` and the
+    amplitude length, so they are not stored. Writing an empty ``items``
+    still produces a valid zero-row file with the canonical schema.
     """
-    amplitude = spectrum.amplitude
     table = pa.table(
         {
-            "point_record_num": pa.array(
-                [spectrum.point_record_num], type=pa.int64()
+            "sample_id": pa.array(
+                [sample_id(s.point_record_num, s.record_num, "FFT") for s, _ in items],
+                type=pa.string(),
             ),
-            "point_long_name": pa.array([point.long_name], type=pa.string()),
-            "point_short_code": pa.array([point.short_code], type=pa.string()),
+            "point_record_num": pa.array(
+                [s.point_record_num for s, _ in items], type=pa.int64()
+            ),
+            "point_long_name": pa.array(
+                [p.long_name for _, p in items], type=pa.string()
+            ),
+            "point_short_code": pa.array(
+                [p.short_code for _, p in items], type=pa.string()
+            ),
             "spectrum_record_num": pa.array(
-                [spectrum.record_num], type=pa.int64()
+                [s.record_num for s, _ in items], type=pa.int64()
             ),
             "timestamp_utc": pa.array(
-                [spectrum.timestamp_utc], type=pa.timestamp("us", tz="UTC")
+                [s.timestamp_utc for s, _ in items], type=pa.timestamp("us", tz="UTC")
             ),
-            "sample_type": pa.array(["FFT"], type=pa.string()),
-            "fmax_hz": pa.array([spectrum.fmax_hz], type=pa.float32()),
-            "n_lines": pa.array([spectrum.n_lines], type=pa.int32()),
-            "units": pa.array([spectrum.units], type=pa.string()),
-            "carga_pct": pa.array([spectrum.carga_pct], type=pa.float32()),
+            "sample_type": pa.array(["FFT"] * len(items), type=pa.string()),
+            "fmax_hz": pa.array([s.fmax_hz for s, _ in items], type=pa.float32()),
+            "n_lines": pa.array([s.n_lines for s, _ in items], type=pa.int32()),
+            "units": pa.array([s.units for s, _ in items], type=pa.string()),
+            "carga_pct": pa.array([s.carga_pct for s, _ in items], type=pa.float32()),
             "amplitude": pa.array(
-                [amplitude.tolist()], type=pa.list_(pa.float32())
+                [s.amplitude.tolist() for s, _ in items], type=pa.list_(pa.float32())
             ),
         }
     )
@@ -57,41 +83,63 @@ def write_spectrum_parquet(
     pq.write_table(table, path)
 
 
-def write_waveform_parquet(
-    waveform: Waveform,
-    point: Point,
+def write_waveforms_parquet(
+    items: Sequence[tuple[Waveform, Point]],
     path: Path,
 ) -> None:
-    """Serialize one :class:`Waveform` to a Parquet file.
+    """Serialize a batch of ``(waveform, point)`` pairs to one Parquet file.
 
-    Schema: one row with metadata columns + ``samples`` as a
+    One row per waveform. Metadata columns + ``samples`` as a
     ``list<float32>``. The time axis is derivable from ``sample_rate_hz``
-    and the samples length, so it is not stored.
+    and the samples length, so it is not stored. Writing an empty ``items``
+    still produces a valid zero-row file with the canonical schema.
     """
-    samples = waveform.samples
     table = pa.table(
         {
-            "point_record_num": pa.array(
-                [waveform.point_record_num], type=pa.int64()
+            "sample_id": pa.array(
+                [
+                    sample_id(w.point_record_num, w.record_num, "WAVEFORM")
+                    for w, _ in items
+                ],
+                type=pa.string(),
             ),
-            "point_long_name": pa.array([point.long_name], type=pa.string()),
-            "point_short_code": pa.array([point.short_code], type=pa.string()),
+            "point_record_num": pa.array(
+                [w.point_record_num for w, _ in items], type=pa.int64()
+            ),
+            "point_long_name": pa.array(
+                [p.long_name for _, p in items], type=pa.string()
+            ),
+            "point_short_code": pa.array(
+                [p.short_code for _, p in items], type=pa.string()
+            ),
             "waveform_record_num": pa.array(
-                [waveform.record_num], type=pa.int64()
+                [w.record_num for w, _ in items], type=pa.int64()
             ),
             "timestamp_utc": pa.array(
-                [waveform.timestamp_utc], type=pa.timestamp("us", tz="UTC")
+                [w.timestamp_utc for w, _ in items], type=pa.timestamp("us", tz="UTC")
             ),
-            "sample_type": pa.array(["WAVEFORM"], type=pa.string()),
-            "sample_rate_hz": pa.array([waveform.sample_rate_hz], type=pa.float32()),
-            "n_samples": pa.array([waveform.n_samples], type=pa.int32()),
-            "rpm": pa.array([waveform.rpm], type=pa.float32()),
-            "units": pa.array([waveform.units], type=pa.string()),
-            "carga_pct": pa.array([waveform.carga_pct], type=pa.float32()),
+            "sample_type": pa.array(["WAVEFORM"] * len(items), type=pa.string()),
+            "sample_rate_hz": pa.array(
+                [w.sample_rate_hz for w, _ in items], type=pa.float32()
+            ),
+            "n_samples": pa.array([w.n_samples for w, _ in items], type=pa.int32()),
+            "rpm": pa.array([w.rpm for w, _ in items], type=pa.float32()),
+            "units": pa.array([w.units for w, _ in items], type=pa.string()),
+            "carga_pct": pa.array([w.carga_pct for w, _ in items], type=pa.float32()),
             "samples": pa.array(
-                [samples.tolist()], type=pa.list_(pa.float32())
+                [w.samples.tolist() for w, _ in items], type=pa.list_(pa.float32())
             ),
         }
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     pq.write_table(table, path)
+
+
+def write_spectrum_parquet(spectrum: Spectrum, point: Point, path: Path) -> None:
+    """Serialize a single :class:`Spectrum` (one-row file). See ``extract``."""
+    write_spectra_parquet([(spectrum, point)], path)
+
+
+def write_waveform_parquet(waveform: Waveform, point: Point, path: Path) -> None:
+    """Serialize a single :class:`Waveform` (one-row file). See ``extract``."""
+    write_waveforms_parquet([(waveform, point)], path)
