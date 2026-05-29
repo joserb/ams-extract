@@ -88,14 +88,63 @@ def test_extract_parquet_payload_is_plausible(
     assert row["sample_type"] == "FFT"
     assert row["fmax_hz"] == pytest.approx(1000.0)
     assert row["n_lines"] == 1600
-    assert row["units"] == "plg/segs"
+    # Velocity spectra are calibrated to mm/s (FORMAT §5.6).
+    assert row["units"] == "mm/s"
     assert row["carga_pct"] == pytest.approx(100.0)
 
+    # Full spectrum = low band (vdps tail) + vcps chain, truncated to n_lines.
     amplitude = np.array(row["amplitude"], dtype=np.float32)
-    assert amplitude.shape == (1586,)
+    assert amplitude.shape == (1600,)
     assert np.isfinite(amplitude).all()
     assert amplitude.std() > 0.0, "spectrum is constant; data was not actually decoded"
     assert (amplitude > 0).any(), "no positive amplitudes; suspicious"
+
+
+# AMS "Lista de Picos" for AG-100 M1H velocity FFT 2020-02-19 (Hz -> mm/s).
+# A representative spread of low-, mid- and high-frequency peaks; the low
+# ones (<49 Hz) live in the vdps tail and the highest exercise the chain.
+_AG100_M1H_20200219_VEL_GOLD = [
+    (14.68, 5.059),
+    (24.44, 1.796),
+    (48.92, 1.370),
+    (146.73, 0.750),
+    (584.79, 0.364),
+    (884.67, 0.240),
+]
+
+
+def test_extract_fft_payload_matches_ams_gold(real_rbm: Path, tmp_path: Path) -> None:
+    # The calibrated velocity spectrum must reproduce the AMS peak list:
+    # full reconstruction (low band + chain) + x48.5 scale -> mm/s, with
+    # bin i at i*Fmax/n_lines (FORMAT §5.6). Validated to ~5% on 3 machines;
+    # allow 15% here to absorb screenshot-reading + bin-rounding error.
+    out_dir = tmp_path / "samples"
+    result = runner.invoke(
+        rbm_app,
+        [
+            "extract",
+            str(real_rbm),
+            "--point", "MOTOR LOA HORIZONTAL",
+            "--equipment", "AG-100",
+            "--type", "fft",
+            "--limit", "5",
+            "--out", str(out_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    newest = next(out_dir.glob("*fft*20200219*.parquet"))
+    row = pq.read_table(newest).to_pylist()[0]
+    assert row["units"] == "mm/s"
+    amplitude = np.array(row["amplitude"], dtype=np.float32)
+    bin_width = row["fmax_hz"] / row["n_lines"]
+
+    for freq_hz, ams_mms in _AG100_M1H_20200219_VEL_GOLD:
+        bin_index = round(freq_hz / bin_width)
+        ours = float(amplitude[bin_index])
+        assert ours == pytest.approx(ams_mms, rel=0.15), (
+            f"{freq_hz} Hz: decoded {ours:.3f} mm/s vs AMS {ams_mms:.3f}"
+        )
 
 
 def test_extract_errors_when_point_is_ambiguous(

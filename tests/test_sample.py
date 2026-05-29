@@ -19,6 +19,8 @@ from ams_extract.records.sample import (
     VDPS_CARGA_OFFSET,
     VDPS_FIRST_VCPS_OFFSET,
     VDPS_FMAX_OFFSET,
+    VDPS_LOW_BAND_FLOATS,
+    VDPS_LOW_BAND_OFFSET,
     VDPS_N_LINES_OFFSET,
     VDPS_NEXT_OFFSET,
     VDPS_TAG,
@@ -26,8 +28,10 @@ from ams_extract.records.sample import (
     VDPS_UNITS_LENGTH,
     VDPS_UNITS_OFFSET,
     SampleChainError,
+    assemble_spectrum,
     parse_vdps_descriptor,
     read_vcps_amplitudes,
+    read_vdps_low_band,
     walk_vdps_chain,
 )
 
@@ -51,6 +55,7 @@ def _make_vdps(
     carga_pct: float,
     first_vcps_stored: int,
     next_vdps_stored: int = 0,
+    low_band: list[float] | None = None,
 ) -> bytes:
     record = _empty_record()
     record[TAG_OFFSET : TAG_OFFSET + 4] = VDPS_TAG
@@ -63,6 +68,9 @@ def _make_vdps(
     units_slot = bytearray(b" " * VDPS_UNITS_LENGTH)
     units_slot[: len(units)] = units
     record[VDPS_UNITS_OFFSET : VDPS_UNITS_OFFSET + VDPS_UNITS_LENGTH] = bytes(units_slot)
+    if low_band is not None:
+        for i, v in enumerate(low_band):
+            struct.pack_into("<f", record, VDPS_LOW_BAND_OFFSET + i * 4, v)
     return bytes(record)
 
 
@@ -212,3 +220,46 @@ class TestReadVcpsAmplitudes:
         records = [_make_header(), _empty_record()]
         with reader_factory(records) as reader, pytest.raises(SampleChainError):
             read_vcps_amplitudes(reader, 1)
+
+
+class TestReadVdpsLowBand:
+    def test_reads_78_low_bins_from_descriptor_tail(self, reader_factory) -> None:
+        low = [float(i) for i in range(VDPS_LOW_BAND_FLOATS)]
+        vdps = _make_vdps(
+            timestamp_raw=1_700_000_000,
+            fmax_hz=1000.0, n_lines=1600, units=b"plg/segs",
+            carga_pct=100.0, first_vcps_stored=0, low_band=low,
+        )
+        records = [_make_header(), vdps] + [_empty_record()] * 3
+        with reader_factory(records) as reader:
+            band = read_vdps_low_band(reader, 1)
+        assert band.dtype == np.float32
+        assert band.shape == (VDPS_LOW_BAND_FLOATS,)  # 78
+        assert band[0] == pytest.approx(0.0)
+        assert band[-1] == pytest.approx(VDPS_LOW_BAND_FLOATS - 1)
+
+    def test_rejects_record_with_wrong_tag(self, reader_factory) -> None:
+        records = [_make_header(), _empty_record()]
+        with reader_factory(records) as reader, pytest.raises(SampleChainError):
+            read_vdps_low_band(reader, 1)
+
+
+class TestAssembleSpectrum:
+    def test_concatenates_low_band_then_chain_and_truncates(self) -> None:
+        low = np.arange(VDPS_LOW_BAND_FLOATS, dtype=np.float32)
+        chain = np.arange(100, 100 + 1586, dtype=np.float32)
+        full = assemble_spectrum(low, chain, n_lines=1600)
+        assert full.shape == (1600,)
+        assert full.dtype == np.float32
+        # Low band occupies bins 0..77, chain starts at bin 78.
+        assert full[0] == pytest.approx(0.0)
+        assert full[VDPS_LOW_BAND_FLOATS] == pytest.approx(100.0)
+        # 78 + 1586 = 1664 truncated to 1600 (last 64 chain bins dropped).
+        assert full[-1] == pytest.approx(100.0 + (1600 - VDPS_LOW_BAND_FLOATS) - 1)
+
+    def test_short_buffers_are_not_padded(self) -> None:
+        low = np.array([1.0, 2.0], dtype=np.float32)
+        chain = np.array([3.0, 4.0], dtype=np.float32)
+        full = assemble_spectrum(low, chain, n_lines=1600)
+        # Fewer than n_lines available -> return what we have, no padding.
+        assert full.tolist() == [1.0, 2.0, 3.0, 4.0]
