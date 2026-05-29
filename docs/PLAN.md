@@ -4,10 +4,11 @@
 > (ficheros `.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM Windows XP
 > ni del software AMS original.
 
-Versión del documento: 0.8 (post Fase 6: `rbm export` produce el dataset
-completo —hierarchy.json + manifest.parquet + samples por equipo/tipo—
-con paralelización opcional; deuda de calibración FFT aún abierta)
-Última actualización: 2026-05-29
+Versión del documento: 0.9 (post Fase 6 + **calibración FFT resuelta**:
+`rbm export` produce el dataset completo —hierarchy.json + manifest.parquet
++ samples por equipo/tipo— con paralelización opcional; el espectro de
+velocidad sale completo y calibrado en mm/s, validado contra 3 máquinas)
+Última actualización: 2026-05-30
 
 Repo: `git@github.com:joserb/ams-extract.git` (privado)
 
@@ -21,8 +22,8 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 | 1 — Reader + header | ✅ completada | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
 | 2a — Áreas + CI | ✅ completada | 15 áreas verificadas; CI matrix listo; ADR-0002 |
 | 2b — Equipos y Puntos | ✅ completada | 15 áreas, 347 equipos, 5203 puntos, 1198 PEAKVUE (tras el fix gicm 20-slot del 2026-05-28); `rbm-dev scan --tags`; ADR-0003 |
-| 3 — Sample reader FFT | ✅ completada estructural | Sub-3a + sub-3b: `rbm extract --point NAME --equipment SUBSTR --limit N` emite Parquet + PNG; timestamps y posiciones de picos coinciden con AMS. Calibración absoluta de amplitudes pendiente (§5.6). |
-| 4 — Verificación visual | ✅ parcial | 7/15 áreas visualmente verificadas; FFT con frecuencias y waveform con Pc/Pk dentro del 2% del gold de AMS. Hallazgo: calibración FFT no resoluble vía waveform (memoria del proyecto). |
+| 3 — Sample reader FFT | ✅ completada | Sub-3a + sub-3b: `rbm extract --point NAME --equipment SUBSTR --limit N` emite Parquet + PNG. **Calibración RESUELTA (2026-05-30)**: espectro completo = banda baja (`vdps[0xC8:0x200]`, 78 bins) + cadena `vcps`, ×48.5 → mm/s. Validado a ±5–10% en 3 máquinas (§5.6). |
+| 4 — Verificación visual | ✅ parcial | 7/15 áreas visualmente verificadas; FFT (amplitudes mm/s y frecuencias) y waveform (Pc/Pk) dentro del ~5–10% del gold de AMS. La calibración FFT se resolvió leyendo la banda baja del `vdps` + escala ×48.5 (§5.6). |
 | 5 — Waveforms | ✅ completada | sub-5a (recon) + sub-5b (impl): `records/waveform.py`, `walk_waveforms`, `rbm extract --type fft\|waveform\|both`. **Calibración de amplitud RESUELTA** vía `vdfw.0x28` (Pc/Pk de M1H idénticos al gold de AMS). |
 | 6 — Export masivo | ✅ completada | `rbm export FILE --out dataset/ [--types fft,waveform] [--areas …] [--parallel N]` emite hierarchy.json + manifest.parquet + samples/area=X/equipment=Y__{fft,waveform}.parquet. Decisión: **ficheros separados por tipo**. Serial + ProcessPoolExecutor por equipo. |
 | 7 — Refinamientos | ⏳ pendiente | Plantillas, field notes, bandas de alarma, `vddt`, short codes nativos |

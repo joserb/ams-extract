@@ -371,31 +371,61 @@ necesitaría 4096 muestras / 1.6 s. Conclusión: `vcps` (FFT) y `vcfw`
 (waveform) son representaciones independientes en el fichero, y la
 deuda de calibración de amplitudes del FFT (§5.5) sigue abierta.
 
-### 5.6 Pendientes (Fase 3c / 5 / 7)
+### 5.6 Calibración y banda baja del FFT — RESUELTO (2026-05-30)
 
-- **Amplitud absoluta — discrepancia estructural confirmada
-  (2026-05-29)**. Cotejando contra la "Lista de Picos" de AMS para M1H
-  19-feb-2020 (24 picos con sus amplitudes en mm/Seg), los ratios
-  AMS/decoded *no* son constantes: van de 15.7 (100 Hz, donde casi
-  cuadran) a 2332 (885 Hz), pasando por 1500 a 14.68 Hz (el pico mayor
-  según AMS, prácticamente ausente en nuestro decode). Las hipótesis
-  simples — escalado constante, integración acel→velocidad, decimación
-  de pares (re/im), sqrt(re²+im²) — fallan todas. La forma cualitativa
-  (picos en las freqs correctas, unidades textuales correctas) sí
-  coincide; la magnitud no. Inspección de los dos `vddt` que `pdcd`
-  apunta (0x3C → rec 336987, 0x40 → rec 336992) revela series
-  temporales [timestamp + floats] que van de 2013 a 2020 — pintan a
-  tendencias de bandas (Valores Globales / SUBSINCRONO / etc.), no
-  a complemento del espectro. **Hipótesis viva**: AMS reconstruye el
-  espectro desde la *waveform* al display time, y el `vcps` que
-  almacenamos es un preview comprimido o un envelope detector
-  pre-procesado. Verificable cuando Fase 5 (waveforms) esté lista y
-  podamos comparar la FFT de la waveform extraída contra la lista de
-  picos de AMS.
-- **Padding 1586 vs 1600**: cómo se reconcilian los 14 bins que faltan
-  para llegar a `n_lines = 1600`. ¿Padding implícito? ¿Bin 0 = DC
-  reservado? ¿Otro slot que no estoy leyendo? Sin urgencia hasta que
-  la deuda de calibración esté resuelta.
+> Histórico: esta sección registró durante meses una "discrepancia
+> estructural" — los ratios AMS/decoded parecían no constantes (16 a 2330)
+> y el pico dominante de AMS (M1H 14.68 Hz) "ausente". Se llegó a cerrar
+> como *no recuperable*. **Era falso**: faltaba leer la banda baja y
+> aplicar la escala. El error venía de comparar un espectro **incompleto**
+> (le faltaban los 78 bins de baja) contra el gold.
+
+**Reconstrucción del espectro completo.** El espectro de display de AMS
+tiene dos piezas:
+
+1. **Bins 0..77 (0–48.75 Hz)** — viven en la **cola del propio record
+   `vdps`**, en offsets `0xC8..0x1FF` (78 float32 contiguos = 312 bytes).
+   `(0x200 - 0xC8) / 4 = 78` exactos. Aquí caen 1X/2X de giro y, a menudo,
+   el pico mayor.
+2. **Bins 78..1663** — la cadena `vcps` (≈1586 floats). De ahí que la
+   cadena "empezara en la línea 78".
+
+Espectro completo = `concat(vdps[0xC8:0x200], cadena_vcps)` truncado a
+`n_lines` (1600). Bin `i` → frecuencia `i · Fmax / n_lines` (0.625 Hz/bin
+con Fmax=1000). Sin offset una vez antepuesta la banda baja.
+
+**Calibración de amplitud (velocidad).** Una sola escala:
+`mm/s = VELOCITY_SCALE · raw`, con `VELOCITY_SCALE = 48.5` (pooled median
+48.8 / mean 48.4 sobre 72 picos; ≈ pulgadas→mm 25.4 × ~1.9 de
+ventana/normalización). Las unidades crudas de velocidad aparecen como
+`plg/segs`, `in/sec` o `pul/sg` (variantes de pulgadas/segundo); todas se
+calibran igual y se emiten como `mm/s`.
+
+**Validación (3 máquinas, 3 RPM distintas, gold de la "Lista de Picos"):**
+
+| Punto | RPM | logcorr | escala | CV |
+|---|---|---|---|---|
+| AG-100 M1H 2020-02-19 | 1455 | +0.999 | 48.0 | 0.04 |
+| PM-6901-A M1H 2026-01-20 | 3000 | +0.999 | 48.7 | 0.04 |
+| AR-1211 M1H 2026-03-26 | 1500 | +0.998 | 47.9 | 0.05 |
+
+Picos por pico dentro de ±5–10% (incl. el dominante AG-100 14.68 Hz:
+5.059 mm/s gold vs 4.76 decoded). Test de nulidad: barriendo offsets
+0..160 bins, **78 es el único** con logcorr>0.90. Implementado en
+`records/sample.py` (`read_vdps_low_band`, `assemble_spectrum`,
+`VELOCITY_SCALE_MM_S`) y aplicado en `tree.walk_spectra`.
+
+**Aceleración (`G's`) pendiente.** ~38% de los `vdps` son espectros de
+aceleración (units `G's`). La banda baja + ensamblado aplican igual, pero
+el ×48.5 (que incluye pulgadas→mm) NO; se emiten **crudos** con su unidad
+y un warning. Calibrarlos necesita gold de aceleración (la escala sería
+solo el factor ~1.9 de normalización, sin el 25.4). Trabajo futuro.
+
+**Pendientes menores del FFT:**
+
+- ~~**Padding 1586 vs 1600**~~: RESUELTO — los 14 que "faltaban" no eran
+  el tema; el espectro real son 1664 bins (78 baja + 1586 cadena),
+  truncados a 1600. La cadena tiene incluso ~64 bins por encima de Fmax.
 - ~~**`vcfw` (waveform)**~~: RESUELTO en sub-5b. Layout: 244 int16 LE
   por record (no float32 como `vcps`), cadena de 2 records = 488 muestras
   para M1H. Calibración vía `vdfw.0x28` (ver §5.5). Parser en
