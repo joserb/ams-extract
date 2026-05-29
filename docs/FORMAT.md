@@ -415,11 +415,27 @@ Picos por pico dentro de ±5–10% (incl. el dominante AG-100 14.68 Hz:
 `records/sample.py` (`read_vdps_low_band`, `assemble_spectrum`,
 `VELOCITY_SCALE_MM_S`) y aplicado en `tree.walk_spectra`.
 
-**Aceleración (`G's`) pendiente.** ~38% de los `vdps` son espectros de
-aceleración (units `G's`). La banda baja + ensamblado aplican igual, pero
-el ×48.5 (que incluye pulgadas→mm) NO; se emiten **crudos** con su unidad
-y un warning. Calibrarlos necesita gold de aceleración (la escala sería
-solo el factor ~1.9 de normalización, sin el 25.4). Trabajo futuro.
+**Aceleración (`G's`) — RESUELTO (2026-05-30).** ~38% de los `vdps` son
+espectros de aceleración (units `G's`): puntos **PeakVue** (fmax 1000,
+demodulación HP 10 kHz para rodamientos/engranajes) y **Alta Frecuencia
+(HF)** (fmax 6000). Misma reconstrucción que velocidad (banda baja en
+`vdps[0xC8:0x200]` + cadena, offset 0 tras ensamblar) pero **distinta
+escala**: `G's = ACCEL_SCALE_G · raw`, con `ACCEL_SCALE_G = 1.30`. No hay
+conversión de unidad (G's→G's) y los valores son **RMS** (velocidad es
+"PC"/pico), de ahí que el factor difiera del 48.5. Las unidades se quedan
+en `G's`. Validado en 2 espectros PeakVue de PM-6901-A (M2P 24-01-2024:
+24 picos ±8%, dominante 199.79 Hz 0.907 G; B1P 24-01-2024: residual
+gold/calibrado median 0.998, logcorr +0.995).
+
+> **Pendiente menor**: la escala ×1.30 se aplica a todos los `G's`,
+> incluidos los HF (fmax 6000), pero solo está validada contra PeakVue
+> (fmax 1000). Confirmar con un gold HF cuando convenga (la estructura y el
+> formato son idénticos, así que casi seguro es la misma escala).
+>
+> **Nota — aceleración derivada de M1H**: para puntos de *velocidad* (M1H,
+> etc.) AMS muestra además una "aceleración" que NO está almacenada: la
+> deriva como `a = v·2πf` (ratio gold/derivado constante 0.716 ≈ 1/√2,
+> RMS-vs-pico). No la emitimos; sería una columna derivada de la velocidad.
 
 **Pendientes menores del FFT:**
 
