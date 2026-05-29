@@ -4,8 +4,9 @@
 > (ficheros `.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM Windows XP
 > ni del software AMS original.
 
-Versión del documento: 0.7 (post sub-5b: waveforms implementados y
-calibrados vía vdfw.0x28; deuda de calibración FFT aún abierta)
+Versión del documento: 0.8 (post Fase 6: `rbm export` produce el dataset
+completo —hierarchy.json + manifest.parquet + samples por equipo/tipo—
+con paralelización opcional; deuda de calibración FFT aún abierta)
 Última actualización: 2026-05-29
 
 Repo: `git@github.com:joserb/ams-extract.git` (privado)
@@ -23,13 +24,12 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 | 3 — Sample reader FFT | ✅ completada estructural | Sub-3a + sub-3b: `rbm extract --point NAME --equipment SUBSTR --limit N` emite Parquet + PNG; timestamps y posiciones de picos coinciden con AMS. Calibración absoluta de amplitudes pendiente (§5.6). |
 | 4 — Verificación visual | ✅ parcial | 7/15 áreas visualmente verificadas; FFT con frecuencias y waveform con Pc/Pk dentro del 2% del gold de AMS. Hallazgo: calibración FFT no resoluble vía waveform (memoria del proyecto). |
 | 5 — Waveforms | ✅ completada | sub-5a (recon) + sub-5b (impl): `records/waveform.py`, `walk_waveforms`, `rbm extract --type fft\|waveform\|both`. **Calibración de amplitud RESUELTA** vía `vdfw.0x28` (Pc/Pk de M1H idénticos al gold de AMS). |
-| 6 — Export masivo | ⏳ pendiente | `rbm export` con paralelización por equipo |
+| 6 — Export masivo | ✅ completada | `rbm export FILE --out dataset/ [--types fft,waveform] [--areas …] [--parallel N]` emite hierarchy.json + manifest.parquet + samples/area=X/equipment=Y__{fft,waveform}.parquet. Decisión: **ficheros separados por tipo**. Serial + ProcessPoolExecutor por equipo. |
 | 7 — Refinamientos | ⏳ pendiente | Plantillas, field notes, bandas de alarma, `vddt`, short codes nativos |
 
-Todas las fases hasta sub-5b están en `master` (sub-5b por commitear
-en esta misma sesión). Origin pendiente de push manual. Trabajo
-continúa directo sobre master (no se abren `phase-NN-*` branches
-salvo experimento arriesgado).
+Todas las fases hasta la 6 están en `master`. Origin pendiente de push
+manual. Trabajo continúa directo sobre master (no se abren `phase-NN-*`
+branches salvo experimento arriesgado).
 
 ---
 
@@ -757,21 +757,57 @@ las muestras crudas reproduce el gold de AMS al < 0.3% (Pc 0.483 G,
 Pk -0.510 G en M1H 19-feb). A diferencia del FFT, la waveform **no
 hereda** la deuda de calibración de §5.6.
 
-### Fase 6 — Export masivo (≈ 1 sesión)
+### Fase 6 — Export masivo (≈ 1 sesión) — ✅ completada 2026-05-29
 
 **Objetivo**: dump completo de la base.
 
-Entregables:
+**Decisión de diseño** (consultada con humano, §7.4): **un Parquet por
+equipo y por tipo de muestra** —
+`samples/area=X/equipment=Y__fft.parquet` y `…__waveform.parquet`— en
+lugar de un fichero unificado con `sample_type` discriminando. Esquemas
+limpios sin columnas nullables, a costa de duplicar rutas por equipo.
 
-- `rbm export FILE --out dataset/` itera todos los equipos y escribe la estructura de
-  §3.5 (hierarchy.json + manifest.parquet + samples/area=X/equipment=Y.parquet).
-- Progress bars con `rich`, logging agregado, filtros por área/tipo.
-- Paralelización con `--parallel N` (ProcessPoolExecutor por equipo).
-- Benchmark documentado: tiempo total para el `.rbm` de BUNGE.
+Entregables completados:
 
-**Definition of done**: `dataset/` se genera completo. Carga vía
-`pl.scan_parquet("dataset/samples/", hive_partitioning=True)` funciona. Objetivo blando:
-< 30 minutos en máquina moderna.
+- `export/parquet_samples.py`: writers batch `write_spectra_parquet` /
+  `write_waveforms_parquet` (una fila por muestra) + `sample_id`
+  determinista (SHA-1 de `point_rec:sample_rec:type`). Los writers de
+  una sola muestra de `extract` quedan como wrappers sobre los batch:
+  un único esquema compartido.
+- `export/manifest.py`: `manifest.parquet` global, una fila por muestra
+  **sin arrays** (índice maestro), con columnas type-específicas
+  nullables (fmax/n_lines para FFT; sample_rate/rpm/n_samples para
+  waveform) + `parquet_path` relativo.
+- `export/dataset.py`: `export_dataset()` camina la jerarquía una vez,
+  escribe `hierarchy.json` (árbol **completo**, no filtrado), y por cada
+  equipo emite sus Parquet por tipo. Serial o
+  `ProcessPoolExecutor` (un equipo por proceso, mmap reabierto en cada
+  worker). Filtros por área (long_name o short_code, case-insensitive) y
+  por tipo. Progress bar `rich`, logging agregado y `ExportSummary`.
+  Política WARN-no-abort por equipo: una máquina corrupta no aborta el run.
+- `rbm export FILE --out dataset/ [--types fft,waveform] [--areas …]
+  [--parallel N]` operativo (default `--types fft,waveform`).
+- Tests: 11 unit (`test_export_parquet.py` writers+manifest;
+  `test_export_dataset.py` orquestación sobre fixture sintético + CLI) +
+  3 integración (`test_integration_export.py`: layout DEPURADORA, M1H con
+  5 FFT + 5 waveform en manifest y ficheros, paridad serial↔parallel).
+
+**Definition of done cumplida**: `dataset/` se genera completo; carga vía
+`pyarrow.dataset(..., partitioning="hive")` inyecta `area` desde la ruta;
+M1H aparece con sus 5+5 muestras. Verificado sobre BUNGE (CONTRA
+INCENDIOS: 4 equipos, 647 FFT + 647 waveform en < 1 s; DEPURADORA en los
+tests de integración). Benchmark del fichero completo (1.86 GB) pendiente
+de medir cuando se ejecute el export total.
+
+**Notas / aplazado**:
+
+- `ProcessPoolExecutor` usa el start-method `fork` por defecto en Linux y
+  emite un `DeprecationWarning` (proceso multihilo). Es benigno —cada
+  worker reabre su propio mmap sin estado compartido—; migrar a `spawn`
+  si alguna vez molesta.
+- `hierarchy.json` siempre refleja el árbol completo aunque `--areas`
+  filtre; el filtro sólo restringe muestras y manifest (decisión
+  consciente: la jerarquía es el mapa canónico de la BD).
 
 ### Fase 7 (opcional) — Refinamientos
 
@@ -924,40 +960,39 @@ Resumen de lo cerrado en la conversación previa:
 
 ## 12. Para retomar la próxima sesión
 
-Última pausa: 2026-05-29 tras sub-fase 5b (implementación waveforms +
-calibración resuelta). Commits por delante de `origin/master`
-esperando push manual.
+Última pausa: 2026-05-29 tras Fase 6 (export masivo). Commits por delante
+de `origin/master` esperando push manual.
 
 ### Estado del repo
 
-- `master` es el branch de trabajo. Todas las fases 0–5 están
+- `master` es el branch de trabajo. Todas las fases 0–6 están
   mergeadas. CI matrix corre en push/PR. Convención: trabajar directo
   sobre master, sin `phase-NN-*` branches salvo experimentos arriesgados.
 - Working tree limpio.
-- Tests verdes: 119 unit + 19 integración (con `RBM_TEST_FILE`
-  definido) = 131 total. Ruff + pyright limpios.
+- Tests verdes: 127 unit + 22 integración (con `RBM_TEST_FILE`
+  definido) = 149 total. Ruff + `pyright src/` limpios.
 - `rbm tree FILE --out tree.json` genera la jerarquía completa
   (`schema_version=3`, `phase="phase-2b-equipment-count-fix"`).
 - `rbm extract FILE --point NAME [--equipment SUBSTR] --type fft|waveform|both
   --limit N --out DIR` emite Parquet + PNG por espectro FFT y/o waveform.
   Las waveforms salen calibradas (G's); el FFT sigue en crudo (deuda §5.6).
+- `rbm export FILE --out dataset/ [--types fft,waveform] [--areas …]
+  [--parallel N]` genera el dataset completo (hierarchy.json +
+  manifest.parquet + samples/area=X/equipment=Y__{fft,waveform}.parquet).
 
 ### Primer paso al volver
 
-Opción A (recomendada) — **Fase 6 (export masivo)**: `rbm export
-FILE --out dataset/` itera todos los equipos y escribe la estructura de
-§3.5 (hierarchy.json + manifest.parquet + samples/area=X/equipment=Y.parquet),
-incluyendo FFT y waveform. Toda la maquinaria de lectura está lista;
-falta orquestación + paralelización + progress bars. Decisión a tomar:
-una fila por muestra con `sample_type` discriminando FFT/waveform, o
-ficheros separados por tipo.
+Opción A (recomendada) — **Investigar calibración FFT (`vcps`) (§5.6)**:
+es la única deuda funcional grande que queda. Ahora con la waveform
+calibrada vía `vdfw.0x28`, mirar si `vdps` tiene un offset análogo de
+escala (no probado aún). Líneas no descartadas: escala en `vdps`/`vdpm`
+sin parsear, factor en records auxiliares. **NO probar** "FFT(waveform)
+→ comparar" — ya descartada en sub-5a (la waveform de 488 muestras no da
+1600 líneas).
 
-Opción B — **Investigar calibración FFT (`vcps`) (§5.6)**: deuda
-abierta. Ahora con la waveform calibrada vía `vdfw.0x28`, mirar si `vdps`
-tiene un offset análogo de escala (no probado aún). Líneas no
-descartadas: escala en `vdps`/`vdpm` sin parsear, factor en records
-auxiliares. **NO probar** "FFT(waveform) → comparar" — ya descartada en
-sub-5a (la waveform de 488 muestras no da 1600 líneas).
+Opción B — **Fase 7 (refinamientos)**: benchmark del export total de
+BUNGE (1.86 GB), plantillas, bandas de alarma, `vddt`, short codes
+nativos, field notes.
 
 ### Preguntas abiertas
 
