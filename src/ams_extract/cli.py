@@ -10,6 +10,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+from ams_extract.export.dataset import VALID_TYPES, export_dataset
 from ams_extract.export.json_tree import build_tree_document, write_tree_json
 from ams_extract.export.parquet_samples import (
     write_spectrum_parquet,
@@ -40,12 +41,6 @@ class SampleKind(StrEnum):
     FFT = "fft"
     WAVEFORM = "waveform"
     BOTH = "both"
-
-
-def _not_implemented(command: str) -> None:
-    """Emit a user-visible 'not implemented yet' notice and exit cleanly."""
-    _console.print(f"[yellow]rbm {command}[/yellow]: not implemented yet (Phase 0 stub).")
-    raise typer.Exit(code=0)
 
 
 def _abort(message: str) -> typer.Exit:
@@ -311,8 +306,8 @@ def export(
     out: Annotated[Path, typer.Option("--out", help="Output dataset directory.")],
     types: Annotated[
         str,
-        typer.Option("--types", help="Comma-separated sample types to include."),
-    ] = "fft",
+        typer.Option("--types", help="Comma-separated sample types: fft, waveform."),
+    ] = "fft,waveform",
     areas: Annotated[
         str | None,
         typer.Option("--areas", help="Comma-separated area filter; all areas if omitted."),
@@ -322,6 +317,54 @@ def export(
         typer.Option("--parallel", help="Worker processes; 1 means serial."),
     ] = 1,
 ) -> None:
-    """Dump the full database to the standard dataset layout."""
-    _ = file, out, types, areas, parallel
-    _not_implemented("export")
+    """Dump the full database to the standard dataset layout.
+
+    Writes ``hierarchy.json``, ``manifest.parquet`` and one Parquet file
+    per equipment and sample type under
+    ``samples/area=<area>/equipment=<equipment>__<type>.parquet``.
+    """
+    if not file.exists():
+        raise _abort(f"file not found: {file}")
+    if parallel < 1:
+        raise _abort(f"--parallel must be >= 1, got {parallel}")
+
+    type_set = {t.strip().lower() for t in types.split(",") if t.strip()}
+    if not type_set:
+        raise _abort("no sample types selected; --types must list fft and/or waveform")
+    unknown = type_set - VALID_TYPES
+    if unknown:
+        raise _abort(
+            f"unknown sample type(s): {', '.join(sorted(unknown))}; "
+            f"valid types are {', '.join(sorted(VALID_TYPES))}"
+        )
+
+    area_filter = (
+        {a.strip() for a in areas.split(",") if a.strip()} if areas else None
+    )
+
+    try:
+        summary = export_dataset(
+            file,
+            out,
+            types=type_set,
+            area_filter=area_filter,
+            parallel=parallel,
+        )
+    except RbmFileError as exc:
+        raise _abort(str(exc)) from exc
+
+    _console.print(
+        f"wrote dataset to [bold]{out}[/bold]\n"
+        f"  areas: {summary.areas}  "
+        f"equipment: {summary.equipment_with_samples}/{summary.equipment_total} "
+        f"with samples"
+        + (
+            f"  ([red]{summary.equipment_failed} failed[/red])"
+            if summary.equipment_failed
+            else ""
+        )
+        + f"\n  samples: {summary.fft_samples} FFT + "
+        f"{summary.waveform_samples} waveform  "
+        f"({summary.parquet_files} parquet files, "
+        f"{summary.manifest_rows} manifest rows)"
+    )
