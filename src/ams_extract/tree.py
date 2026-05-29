@@ -44,6 +44,8 @@ from ams_extract.records.point import (
     parse_vdpm_point,
 )
 from ams_extract.records.sample import (
+    ACCEL_SCALE_G,
+    ACCEL_UNITS_RAW,
     VELOCITY_SCALE_MM_S,
     VELOCITY_UNITS_CALIBRATED,
     VELOCITY_UNITS_RAW,
@@ -391,12 +393,16 @@ def walk_spectra(reader: RbmReader, point: Point) -> Iterator[Spectrum]:
             )
             continue
         # Full spectrum = low band (vdps tail) + vcps chain, truncated to
-        # n_lines. Calibrate velocity spectra to mm/s; leave other unit
-        # types raw (none observed) — see FORMAT §5.6.
+        # n_lines. Calibrate velocity (-> mm/s) and acceleration (G's, kept
+        # in G's) by their respective scale; leave unknown units raw with a
+        # warning — see FORMAT §5.6.
         amplitude = assemble_spectrum(low_band, chain, desc.n_lines)
         if desc.units in VELOCITY_UNITS_RAW:
             amplitude = (amplitude * VELOCITY_SCALE_MM_S).astype(np.float32)
             units = VELOCITY_UNITS_CALIBRATED
+        elif desc.units in ACCEL_UNITS_RAW:
+            amplitude = (amplitude * ACCEL_SCALE_G).astype(np.float32)
+            units = desc.units
         else:
             units = desc.units
             _log.warning(

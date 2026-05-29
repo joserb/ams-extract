@@ -71,11 +71,17 @@ VDPS_LOW_BAND_FLOATS = (RECORD_SIZE - VDPS_LOW_BAND_OFFSET) // 4  # 78
 VELOCITY_SCALE_MM_S = 48.5
 
 # Units strings AMS stores for the (uncalibrated) inches/sec velocity
-# spectrum — locale/version variants of the same physical unit. The whole
-# file uses these for velocity plus "G's" for acceleration (whose
-# calibration differs and is left raw — see FORMAT §5.6).
+# spectrum — locale/version variants of the same physical unit.
 VELOCITY_UNITS_RAW = frozenset({"plg/segs", "in/sec", "pul/sg"})
 VELOCITY_UNITS_CALIBRATED = "mm/s"
+
+# Acceleration spectra (PeakVue + high-frequency points) store units "G's".
+# Same reconstruction as velocity (low band + chain), but a different scale:
+# no inch->mm conversion and the values are RMS (velocity is "PC"/peak).
+# ACCEL_SCALE_G validated on the PeakVue spectrum PM-6901-A M2P 2024-01-24
+# (24 peaks within +-8%, median ratio 1.30). Units stay "G's". FORMAT 5.6.
+ACCEL_SCALE_G = 1.30
+ACCEL_UNITS_RAW = frozenset({"G's"})
 
 # Safety caps to bound traversal of malformed chains.
 VDPS_CHAIN_MAX_LENGTH = 4096
