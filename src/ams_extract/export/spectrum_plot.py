@@ -1,9 +1,9 @@
 """Render an FFT spectrum to PNG via matplotlib.
 
-Sub-fase 3b emits one PNG per extracted spectrum so the analyst can
-visually compare against AMS. The Y-axis stays in raw vcps units for
-now — amplitude scaling/conversion to mm/s is deferred per the open
-question in FORMAT §5.5.
+Emits one PNG per extracted spectrum so the analyst can visually compare
+against AMS. The spectrum is the full, calibrated buffer (low band + vcps
+chain, scaled to mm/s for velocity); the Y-axis is in ``spectrum.units``
+(FORMAT §5.6).
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false
@@ -32,15 +32,16 @@ def render_spectrum_png(
         raise ValueError(
             f"cannot plot spectrum at record {spectrum.record_num}: empty amplitude"
         )
-    # Linear frequency axis from 0 to fmax across the actual array length.
-    freq = np.linspace(0.0, spectrum.fmax_hz, num=amplitude.size, dtype=np.float32)
+    # Frequency axis: bin i -> i * fmax / n_lines (bin width is fmax/n_lines).
+    bin_width = spectrum.fmax_hz / spectrum.n_lines if spectrum.n_lines else 0.0
+    freq = (np.arange(amplitude.size, dtype=np.float32) * bin_width).astype(np.float32)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(10, 4))
     try:
         ax.plot(freq, amplitude, linewidth=0.6)
         ax.set_xlabel(f"Frequency (Hz) — Fmax={spectrum.fmax_hz:.0f}")
-        ax.set_ylabel(f"Amplitude (raw, units={spectrum.units!r})")
+        ax.set_ylabel(f"Amplitude ({spectrum.units})")
         ax.set_title(
             f"{point.long_name} — {spectrum.timestamp_utc.isoformat()} — "
             f"n_lines={spectrum.n_lines}, CARGA={spectrum.carga_pct:.0f}%"
