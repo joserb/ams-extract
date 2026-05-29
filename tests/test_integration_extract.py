@@ -43,14 +43,15 @@ def test_extract_three_m1h_spectra_writes_parquet_and_png(
             str(real_rbm),
             "--point", "MOTOR LOA HORIZONTAL",
             "--equipment", "AG-100",
+            "--type", "fft",
             "--limit", "3",
             "--out", str(out_dir),
         ],
     )
     assert result.exit_code == 0, result.output
 
-    parquet_files = sorted(out_dir.glob("*.parquet"))
-    png_files = sorted(out_dir.glob("*.png"))
+    parquet_files = sorted(out_dir.glob("*fft*.parquet"))
+    png_files = sorted(out_dir.glob("*fft*.png"))
     assert len(parquet_files) == 3
     assert len(png_files) == 3
 
@@ -73,13 +74,14 @@ def test_extract_parquet_payload_is_plausible(
             str(real_rbm),
             "--point", "MOTOR LOA HORIZONTAL",
             "--equipment", "AG-100",
+            "--type", "fft",
             "--limit", "1",
             "--out", str(out_dir),
         ],
     )
     assert result.exit_code == 0, result.output
 
-    parquet = next(out_dir.glob("*.parquet"))
+    parquet = next(out_dir.glob("*fft*.parquet"))
     table = pq.read_table(parquet)
     row = table.to_pylist()[0]
 
@@ -114,3 +116,71 @@ def test_extract_errors_when_point_is_ambiguous(
     )
     assert result.exit_code == 2
     assert "ambiguous" in result.output
+
+
+def test_extract_five_m1h_waveforms_writes_parquet_and_png(
+    real_rbm: Path, tmp_path: Path
+) -> None:
+    out_dir = tmp_path / "samples"
+    result = runner.invoke(
+        rbm_app,
+        [
+            "extract",
+            str(real_rbm),
+            "--point", "MOTOR LOA HORIZONTAL",
+            "--equipment", "AG-100",
+            "--type", "waveform",
+            "--limit", "5",
+            "--out", str(out_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    parquet_files = sorted(out_dir.glob("*waveform*.parquet"))
+    png_files = sorted(out_dir.glob("*waveform*.png"))
+    assert len(parquet_files) == 5
+    assert len(png_files) == 5
+
+    # Filenames embed the chronological index + UTC timestamp; M1H has the
+    # same 5 acquisition dates for waveform as for FFT.
+    for path, expected_ts in zip(parquet_files, M1H_GOLD_TIMESTAMPS, strict=True):
+        assert expected_ts in path.name, (
+            f"expected timestamp {expected_ts} in {path.name}"
+        )
+
+
+def test_extract_waveform_payload_matches_ams_gold(
+    real_rbm: Path, tmp_path: Path
+) -> None:
+    # The 2020-02-19 waveform is the newest (chronological index 4). AMS
+    # reports Pc(+)=0.483 G and Pk(-)=-0.510 G; applying the vdfw.0x28
+    # scale factor must reproduce those within 2% (FORMAT §5.5).
+    out_dir = tmp_path / "samples"
+    result = runner.invoke(
+        rbm_app,
+        [
+            "extract",
+            str(real_rbm),
+            "--point", "MOTOR LOA HORIZONTAL",
+            "--equipment", "AG-100",
+            "--type", "waveform",
+            "--limit", "5",
+            "--out", str(out_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    newest = next(out_dir.glob("*waveform*20200219*.parquet"))
+    row = pq.read_table(newest).to_pylist()[0]
+
+    assert row["sample_type"] == "WAVEFORM"
+    assert row["sample_rate_hz"] == pytest.approx(2560.0)
+    assert row["n_samples"] == 512
+    assert row["rpm"] == pytest.approx(1455.0, rel=0.01)
+    assert row["units"] == "G's"
+
+    samples = np.array(row["samples"], dtype=np.float32)
+    assert samples.shape == (488,)
+    assert np.isfinite(samples).all()
+    assert samples.max() == pytest.approx(0.483, abs=0.02)
+    assert samples.min() == pytest.approx(-0.510, abs=0.02)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
@@ -10,14 +11,18 @@ from rich.console import Console
 from rich.table import Table
 
 from ams_extract.export.json_tree import build_tree_document, write_tree_json
-from ams_extract.export.parquet_samples import write_spectrum_parquet
+from ams_extract.export.parquet_samples import (
+    write_spectrum_parquet,
+    write_waveform_parquet,
+)
 from ams_extract.export.spectrum_plot import render_spectrum_png
+from ams_extract.export.waveform_plot import render_waveform_png
 from ams_extract.logging_setup import LogFormat, LogLevel, configure_logging
 from ams_extract.models import Point
 from ams_extract.naming import NameSanitizer
 from ams_extract.reader import RbmFileError, RbmReader
 from ams_extract.records.header import parse_header
-from ams_extract.tree import walk_hierarchy, walk_spectra
+from ams_extract.tree import walk_hierarchy, walk_spectra, walk_waveforms
 
 app = typer.Typer(
     name="rbm",
@@ -27,6 +32,14 @@ app = typer.Typer(
 )
 
 _console = Console()
+
+
+class SampleKind(StrEnum):
+    """Which sample representations ``rbm extract`` should emit."""
+
+    FFT = "fft"
+    WAVEFORM = "waveform"
+    BOTH = "both"
 
 
 def _not_implemented(command: str) -> None:
@@ -166,6 +179,54 @@ def _find_points_by_name(
     return matches
 
 
+def _extract_spectra(
+    reader: RbmReader,
+    target: Point,
+    equipment_short: str,
+    point_slug: str,
+    limit: int,
+    out: Path,
+) -> int:
+    """Write up to ``limit`` FFT spectra; return the number emitted."""
+    written = 0
+    for idx, spectrum in enumerate(walk_spectra(reader, target)):
+        if idx >= limit:
+            break
+        base = (
+            out
+            / f"{equipment_short}__{point_slug}__fft_{idx:02d}_"
+            f"{spectrum.timestamp_utc.strftime('%Y%m%d_%H%M%S')}"
+        )
+        write_spectrum_parquet(spectrum, target, base.with_suffix(".parquet"))
+        render_spectrum_png(spectrum, target, base.with_suffix(".png"))
+        written += 1
+    return written
+
+
+def _extract_waveforms(
+    reader: RbmReader,
+    target: Point,
+    equipment_short: str,
+    point_slug: str,
+    limit: int,
+    out: Path,
+) -> int:
+    """Write up to ``limit`` waveforms; return the number emitted."""
+    written = 0
+    for idx, waveform in enumerate(walk_waveforms(reader, target)):
+        if idx >= limit:
+            break
+        base = (
+            out
+            / f"{equipment_short}__{point_slug}__waveform_{idx:02d}_"
+            f"{waveform.timestamp_utc.strftime('%Y%m%d_%H%M%S')}"
+        )
+        write_waveform_parquet(waveform, target, base.with_suffix(".parquet"))
+        render_waveform_png(waveform, target, base.with_suffix(".png"))
+        written += 1
+    return written
+
+
 @app.command("extract")
 def extract(
     file: Annotated[Path, typer.Argument(help="Path to a .rbm database file.")],
@@ -177,17 +238,24 @@ def extract(
             help="Substring filter on equipment long_name to disambiguate.",
         ),
     ] = None,
-    limit: Annotated[int, typer.Option("--limit", help="Maximum number of samples.")] = 3,
+    type_: Annotated[
+        SampleKind,
+        typer.Option("--type", help="Which sample representation(s) to extract."),
+    ] = SampleKind.BOTH,
+    limit: Annotated[int, typer.Option("--limit", help="Maximum samples per type.")] = 3,
     out: Annotated[
         Path,
         typer.Option("--out", help="Directory where Parquet + PNG outputs are written."),
     ] = Path("samples"),
 ) -> None:
-    """Extract a few FFT spectra from a single point as Parquet + PNG."""
+    """Extract a few FFT spectra and/or waveforms from a point as Parquet + PNG."""
     if not file.exists():
         raise _abort(f"file not found: {file}")
     if limit < 1:
         raise _abort(f"--limit must be >= 1, got {limit}")
+
+    want_fft = type_ in (SampleKind.FFT, SampleKind.BOTH)
+    want_waveform = type_ in (SampleKind.WAVEFORM, SampleKind.BOTH)
 
     try:
         with RbmReader(file) as reader:
@@ -207,31 +275,33 @@ def extract(
 
             sanitizer = NameSanitizer()
             point_slug = sanitizer.sanitize(target.long_name)
-            written: list[Path] = []
-            for idx, spectrum in enumerate(walk_spectra(reader, target)):
-                if idx >= limit:
-                    break
-                base = (
-                    out
-                    / f"{equipment_short}__{point_slug}__{idx:02d}_"
-                    f"{spectrum.timestamp_utc.strftime('%Y%m%d_%H%M%S')}"
-                )
-                parquet_path = base.with_suffix(".parquet")
-                png_path = base.with_suffix(".png")
-                write_spectrum_parquet(spectrum, target, parquet_path)
-                render_spectrum_png(spectrum, target, png_path)
-                written.extend([parquet_path, png_path])
+            n_fft = (
+                _extract_spectra(reader, target, equipment_short, point_slug, limit, out)
+                if want_fft
+                else 0
+            )
+            n_waveform = (
+                _extract_waveforms(reader, target, equipment_short, point_slug, limit, out)
+                if want_waveform
+                else 0
+            )
     except RbmFileError as exc:
         raise _abort(str(exc)) from exc
 
-    if not written:
+    if n_fft == 0 and n_waveform == 0:
         _console.print(
-            f"[yellow]no FFT spectra found for point[/yellow] {target.long_name!r}"
+            f"[yellow]no samples found for point[/yellow] {target.long_name!r} "
+            f"(type={type_.value})"
         )
         return
+    parts: list[str] = []
+    if want_fft:
+        parts.append(f"{n_fft} spectra")
+    if want_waveform:
+        parts.append(f"{n_waveform} waveforms")
     _console.print(
-        f"wrote [bold]{len(written) // 2}[/bold] spectra "
-        f"(parquet + png) for [bold]{target.long_name}[/bold] under {out}"
+        f"wrote [bold]{' + '.join(parts)}[/bold] (parquet + png) for "
+        f"[bold]{target.long_name}[/bold] under {out}"
     )
 
 
