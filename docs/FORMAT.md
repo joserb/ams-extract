@@ -423,15 +423,17 @@ demodulación HP 10 kHz para rodamientos/engranajes) y **Alta Frecuencia
 escala**: `G's = ACCEL_SCALE_G · raw`, con `ACCEL_SCALE_G = 1.30`. No hay
 conversión de unidad (G's→G's) y los valores son **RMS** (velocidad es
 "PC"/pico), de ahí que el factor difiera del 48.5. Las unidades se quedan
-en `G's`. Validado en 2 espectros PeakVue de PM-6901-A (M2P 24-01-2024:
-24 picos ±8%, dominante 199.79 Hz 0.907 G; B1P 24-01-2024: residual
-gold/calibrado median 0.998, logcorr +0.995).
+en `G's`. Validado en 3 espectros, los dos tipos de aceleración:
 
-> **Pendiente menor**: la escala ×1.30 se aplica a todos los `G's`,
-> incluidos los HF (fmax 6000), pero solo está validada contra PeakVue
-> (fmax 1000). Confirmar con un gold HF cuando convenga (la estructura y el
-> formato son idénticos, así que casi seguro es la misma escala).
->
+| Punto | Tipo | Fmax | residual gold/calib | logcorr |
+|---|---|---|---|---|
+| PM-6901-A M2P 24-01-24 | PeakVue | 1000 | ±8% (24 picos) | — |
+| PM-6901-A B1P 24-01-24 | PeakVue | 1000 | median 0.998 | +0.995 |
+| PM-6901-B M1F 25-01-24 | HF | 6000 | median 1.009, 24/24 ±10% | +0.998 |
+
+El mismo ×1.30 vale para PeakVue (fmax 1000) y HF (fmax 6000) → es una
+constante de digitización del formato, independiente de Fmax.
+
 > **Nota — aceleración derivada de M1H**: para puntos de *velocidad* (M1H,
 > etc.) AMS muestra además una "aceleración" que NO está almacenada: la
 > deriva como `a = v·2πf` (ratio gold/derivado constante 0.716 ≈ 1/√2,

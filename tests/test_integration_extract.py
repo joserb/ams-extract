@@ -192,6 +192,49 @@ def test_peakvue_acceleration_matches_ams_gold(real_rbm: Path) -> None:
         )
 
 
+# AMS HF "Lista de Picos" for PM-6901-B M1F (MOTOR LOA ALTA FRECUENCIA),
+# CALDERAS, 2024-01-25 (Hz -> G's RMS). Fmax 6000 (bin width 3.75 Hz) — the
+# same x1.30 acceleration scale as PeakVue, on a different frequency grid.
+_PM6901B_M1F_HF_GOLD = [
+    (459.79, 0.0487),
+    (919.57, 0.0706),
+    (1072.8, 0.142),
+    (1187.4, 0.0859),
+    (1223.9, 0.142),
+    (1378.8, 0.152),
+    (4131.4, 0.0129),
+]
+
+
+def test_hf_acceleration_matches_ams_gold(real_rbm: Path) -> None:
+    # High-frequency (fmax 6000) acceleration uses the same G's calibration
+    # as PeakVue; validate the reconstruction against the AMS peak list.
+    with RbmReader(real_rbm) as reader:
+        point = next(
+            p
+            for area in walk_hierarchy(reader)
+            if "CALDERAS" in area.long_name
+            for eq in area.equipment
+            if "PM-6901-B" in eq.long_name
+            for p in eq.points
+            if "ALTA FRECUENCIA" in p.long_name and "LOA" in p.long_name
+        )
+        spectrum = next(
+            s
+            for s in walk_spectra(reader, point)
+            if s.timestamp_utc.strftime("%Y-%m-%d") == "2024-01-25"
+        )
+
+    assert spectrum.units == "G's"
+    assert spectrum.fmax_hz == pytest.approx(6000.0)
+    bin_width = spectrum.fmax_hz / spectrum.n_lines
+    for freq_hz, ams_g in _PM6901B_M1F_HF_GOLD:
+        ours = float(spectrum.amplitude[round(freq_hz / bin_width)])
+        assert ours == pytest.approx(ams_g, rel=0.15), (
+            f"{freq_hz} Hz: decoded {ours:.3f} G vs AMS {ams_g:.3f}"
+        )
+
+
 def test_extract_errors_when_point_is_ambiguous(
     real_rbm: Path, tmp_path: Path
 ) -> None:
