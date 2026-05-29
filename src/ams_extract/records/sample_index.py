@@ -4,14 +4,19 @@ Each point's ``vdpm`` record points at offset 0x10 to a ``pdcd`` record
 ("Set Colección Datos Primar" per the embedded description string).
 The ``pdcd`` acts as a per-point index of measurement chains:
 
-- ``pdcd.0x04`` → first ``vcfw`` (waveform chain — Fase 3b/5)
+- ``pdcd.0x04`` → first ``vcfw`` (early hypothesis; superseded by the
+  verified ``vdfw`` descriptor chain below — kept for reference)
 - ``pdcd.0x3C`` → first ``vddt`` (other measurement type — pending)
 - ``pdcd.0x40`` → first ``vddt`` (other measurement type — pending)
 - ``pdcd.0x44`` → first ``vdps`` of the FFT chain (oldest spectrum)
 - ``pdcd.0x48`` → last  ``vdps`` of the FFT chain (newest spectrum)
+- ``pdcd.0x5C`` → first ``vdfw`` waveform descriptor (oldest), sub-fase 5a
+- ``pdcd.0x60`` → last  ``vdfw`` waveform descriptor (newest), sub-fase 5a
 
 The FFT spectrum chain runs vdps → vdps via offset 0x14 from the head
-returned here; see :mod:`ams_extract.records.sample`.
+returned here; see :mod:`ams_extract.records.sample`. The waveform
+descriptor chain runs vdfw → vdfw via offset 0x14; see
+:mod:`ams_extract.records.waveform`.
 """
 
 from __future__ import annotations
@@ -27,6 +32,8 @@ TAG_OFFSET = 0x08
 PDCD_FFT_FIRST_VDPS_OFFSET = 0x44
 PDCD_FFT_LAST_VDPS_OFFSET = 0x48
 PDCD_WAVEFORM_FIRST_OFFSET = 0x04
+PDCD_WAVEFORM_FIRST_VDFW_OFFSET = 0x5C
+PDCD_WAVEFORM_LAST_VDFW_OFFSET = 0x60
 
 
 class SampleIndexError(ValueError):
@@ -45,6 +52,8 @@ class PdcdLinks:
     fft_first_vdps: int | None
     fft_last_vdps: int | None
     waveform_first: int | None
+    waveform_first_vdfw: int | None
+    waveform_last_vdfw: int | None
 
 
 def _check_tag(record: bytes, expected: bytes, record_num: int) -> None:
@@ -73,4 +82,6 @@ def parse_pdcd_links(reader: RbmReader, pdcd_record: int) -> PdcdLinks:
         fft_first_vdps=_pointer(PDCD_FFT_FIRST_VDPS_OFFSET),
         fft_last_vdps=_pointer(PDCD_FFT_LAST_VDPS_OFFSET),
         waveform_first=_pointer(PDCD_WAVEFORM_FIRST_OFFSET),
+        waveform_first_vdfw=_pointer(PDCD_WAVEFORM_FIRST_VDFW_OFFSET),
+        waveform_last_vdfw=_pointer(PDCD_WAVEFORM_LAST_VDFW_OFFSET),
     )

@@ -13,6 +13,8 @@ from ams_extract.records.sample_index import (
     PDCD_FFT_LAST_VDPS_OFFSET,
     PDCD_TAG,
     PDCD_WAVEFORM_FIRST_OFFSET,
+    PDCD_WAVEFORM_FIRST_VDFW_OFFSET,
+    PDCD_WAVEFORM_LAST_VDFW_OFFSET,
     TAG_OFFSET,
     SampleIndexError,
     parse_pdcd_links,
@@ -34,12 +36,20 @@ def _make_pdcd(
     fft_first_stored: int = 0,
     fft_last_stored: int = 0,
     waveform_first_stored: int = 0,
+    waveform_first_vdfw_stored: int = 0,
+    waveform_last_vdfw_stored: int = 0,
 ) -> bytes:
     record = _empty_record()
     record[TAG_OFFSET : TAG_OFFSET + 4] = PDCD_TAG
     struct.pack_into("<I", record, PDCD_FFT_FIRST_VDPS_OFFSET, fft_first_stored)
     struct.pack_into("<I", record, PDCD_FFT_LAST_VDPS_OFFSET, fft_last_stored)
     struct.pack_into("<I", record, PDCD_WAVEFORM_FIRST_OFFSET, waveform_first_stored)
+    struct.pack_into(
+        "<I", record, PDCD_WAVEFORM_FIRST_VDFW_OFFSET, waveform_first_vdfw_stored
+    )
+    struct.pack_into(
+        "<I", record, PDCD_WAVEFORM_LAST_VDFW_OFFSET, waveform_last_vdfw_stored
+    )
     return bytes(record)
 
 
@@ -60,6 +70,8 @@ class TestParsePdcdLinks:
             fft_first_stored=11,
             fft_last_stored=42,
             waveform_first_stored=7,
+            waveform_first_vdfw_stored=21,
+            waveform_last_vdfw_stored=30,
         )
         records = [_make_header(), pdcd] + [_empty_record()] * 50
         with reader_factory(records) as reader:
@@ -68,6 +80,8 @@ class TestParsePdcdLinks:
         assert links.fft_first_vdps == 10
         assert links.fft_last_vdps == 41
         assert links.waveform_first == 6
+        assert links.waveform_first_vdfw == 20
+        assert links.waveform_last_vdfw == 29
 
     def test_returns_none_for_null_pointers(self, reader_factory) -> None:
         pdcd = _make_pdcd()  # all zero -> all None
@@ -77,6 +91,8 @@ class TestParsePdcdLinks:
         assert links.fft_first_vdps is None
         assert links.fft_last_vdps is None
         assert links.waveform_first is None
+        assert links.waveform_first_vdfw is None
+        assert links.waveform_last_vdfw is None
 
     def test_rejects_record_with_wrong_tag(self, reader_factory) -> None:
         records = [_make_header(), _empty_record()]  # rec 1 has no pdcd tag
