@@ -4,8 +4,8 @@
 > (ficheros `.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM Windows XP
 > ni del software AMS original.
 
-Versión del documento: 0.6 (post sub-3b + Fase 4 parcial + sub-5a;
-deuda de calibración FFT registrada)
+Versión del documento: 0.7 (post sub-5b: waveforms implementados y
+calibrados vía vdfw.0x28; deuda de calibración FFT aún abierta)
 Última actualización: 2026-05-29
 
 Repo: `git@github.com:joserb/ams-extract.git` (privado)
@@ -22,11 +22,11 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 | 2b — Equipos y Puntos | ✅ completada | 15 áreas, 347 equipos, 5203 puntos, 1198 PEAKVUE (tras el fix gicm 20-slot del 2026-05-28); `rbm-dev scan --tags`; ADR-0003 |
 | 3 — Sample reader FFT | ✅ completada estructural | Sub-3a + sub-3b: `rbm extract --point NAME --equipment SUBSTR --limit N` emite Parquet + PNG; timestamps y posiciones de picos coinciden con AMS. Calibración absoluta de amplitudes pendiente (§5.6). |
 | 4 — Verificación visual | ✅ parcial | 7/15 áreas visualmente verificadas; FFT con frecuencias y waveform con Pc/Pk dentro del 2% del gold de AMS. Hallazgo: calibración FFT no resoluble vía waveform (memoria del proyecto). |
-| 5 — Waveforms | 🚧 sub-5a ✅ / sub-5b pendiente | Cadena `pdcd → 0x5C → vdfw → 0x18 → vcfw` mapeada y validada contra M1H. Implementación reusa toda la maquinaria de sub-3b. |
+| 5 — Waveforms | ✅ completada | sub-5a (recon) + sub-5b (impl): `records/waveform.py`, `walk_waveforms`, `rbm extract --type fft\|waveform\|both`. **Calibración de amplitud RESUELTA** vía `vdfw.0x28` (Pc/Pk de M1H idénticos al gold de AMS). |
 | 6 — Export masivo | ⏳ pendiente | `rbm export` con paralelización por equipo |
 | 7 — Refinamientos | ⏳ pendiente | Plantillas, field notes, bandas de alarma, `vddt`, short codes nativos |
 
-Todas las fases hasta sub-5a están en `master` (sub-5a por commitear
+Todas las fases hasta sub-5b están en `master` (sub-5b por commitear
 en esta misma sesión). Origin pendiente de push manual. Trabajo
 continúa directo sobre master (no se abren `phase-NN-*` branches
 salvo experimento arriesgado).
@@ -735,19 +735,27 @@ Sub-fase 5a (reconocimiento) — ✅:
 - Para M1H 19-feb-2020: 488 muestras (de 512 nominales) a 2560 Hz,
   Pc/Pk cuadran con AMS dentro del 2%. Documentado en `FORMAT.md §5.5`.
 
-Sub-fase 5b (implementación) — pendiente:
+Sub-fase 5b (implementación) — ✅ completada 2026-05-29:
 
-- `records/waveform.py` con parsers `parse_vdfw_descriptor` y
-  `read_vcfw_samples` (análogo a `sample.py`).
+- `records/waveform.py` con `parse_vdfw_descriptor`, `walk_vdfw_chain`
+  y `read_vcfw_samples` (análogo a `sample.py`; vcfw = 244 int16 LE/record).
+- `pdcd` extendido con punteros vdfw (0x5C/0x60) en `sample_index.py`.
 - `models.Waveform` (frozen dataclass) con timestamp, n_samples,
-  sample_rate, units, samples `np.ndarray`.
+  sample_rate_hz, rpm, units, samples `np.ndarray` calibrados.
 - `walk_waveforms(reader, point)` en `tree.py` (paralelo a
-  `walk_spectra`).
-- Extender `rbm extract` con flag `--type fft|waveform|both` (default
-  `both`) o detectarlo por extensión. Filename pattern análogo:
-  `{eq}__{point}__waveform_{idx}_{ts}.parquet|.png`.
-- Tests unit (sintéticos) + integración (M1H 5 waveforms con
-  timestamps + Pc/Pk dentro del 2% del gold).
+  `walk_spectra`; reusa el helper `_resolve_pdcd_links`).
+- `rbm extract` con flag `--type fft|waveform|both` (default `both`).
+  Filename: `{eq}__{point}__{fft|waveform}_{idx}_{ts}.parquet|.png`.
+- `export/parquet_samples.write_waveform_parquet` +
+  `export/waveform_plot.render_waveform_png`.
+- Tests: 12 unit (`test_waveform.py`) + 2 integración (M1H 5 waveforms
+  con timestamps gold; Pc/Pk del 19-feb dentro del 2% del gold de AMS).
+
+**Hallazgo clave (calibración resuelta)**: cada `vdfw` lleva en `0x28`
+un float32 `scale_factor` (display units por cuenta int16). Aplicado a
+las muestras crudas reproduce el gold de AMS al < 0.3% (Pc 0.483 G,
+Pk -0.510 G en M1H 19-feb). A diferencia del FFT, la waveform **no
+hereda** la deuda de calibración de §5.6.
 
 ### Fase 6 — Export masivo (≈ 1 sesión)
 
@@ -916,46 +924,40 @@ Resumen de lo cerrado en la conversación previa:
 
 ## 12. Para retomar la próxima sesión
 
-Última pausa: 2026-05-29 tras sub-fase 5a (reconocimiento waveforms).
-15 commits por delante de `origin/master` esperando push manual.
+Última pausa: 2026-05-29 tras sub-fase 5b (implementación waveforms +
+calibración resuelta). Commits por delante de `origin/master`
+esperando push manual.
 
 ### Estado del repo
 
-- `master` es el branch de trabajo. Todas las fases 0–3b están
-  mergeadas; sub-5a (docs only) también. CI matrix corre en push/PR.
-  Convención: trabajar directo sobre master, sin `phase-NN-*` branches
-  salvo experimentos arriesgados.
+- `master` es el branch de trabajo. Todas las fases 0–5 están
+  mergeadas. CI matrix corre en push/PR. Convención: trabajar directo
+  sobre master, sin `phase-NN-*` branches salvo experimentos arriesgados.
 - Working tree limpio.
-- Tests verdes: 105 unit + 17 integración (con `RBM_TEST_FILE`
-  definido) = 122 total. Ruff + pyright limpios.
+- Tests verdes: 119 unit + 19 integración (con `RBM_TEST_FILE`
+  definido) = 131 total. Ruff + pyright limpios.
 - `rbm tree FILE --out tree.json` genera la jerarquía completa
   (`schema_version=3`, `phase="phase-2b-equipment-count-fix"`).
-- `rbm extract FILE --point NAME [--equipment SUBSTR] --limit N --out DIR`
-  emite Parquet + PNG por espectro FFT.
+- `rbm extract FILE --point NAME [--equipment SUBSTR] --type fft|waveform|both
+  --limit N --out DIR` emite Parquet + PNG por espectro FFT y/o waveform.
+  Las waveforms salen calibradas (G's); el FFT sigue en crudo (deuda §5.6).
 
 ### Primer paso al volver
 
-Opción A (recomendada) — **Sub-fase 5b**: implementación de parsers y
-extract para waveforms. Reusa toda la maquinaria de sub-3b. Entregables:
-
-1. `records/waveform.py` con `parse_vdfw_descriptor` + `walk_vdfw_chain` +
-   `read_vcfw_samples`. Offsets en `FORMAT.md §5.5`.
-2. `models.Waveform` (frozen dataclass) con sample_rate, samples np.ndarray.
-3. `walk_waveforms(reader, point)` en `tree.py` (paralelo a `walk_spectra`).
-4. Extender `rbm extract` — añadir flag `--type fft|waveform|both`
-   (default `both`) o subcomando separado. Decidir antes de codear.
-5. Tests unit (sintéticos, similar a `test_sample.py`) + integración
-   contra M1H 5 waveforms con Pc/Pk dentro del 2% del gold.
+Opción A (recomendada) — **Fase 6 (export masivo)**: `rbm export
+FILE --out dataset/` itera todos los equipos y escribe la estructura de
+§3.5 (hierarchy.json + manifest.parquet + samples/area=X/equipment=Y.parquet),
+incluyendo FFT y waveform. Toda la maquinaria de lectura está lista;
+falta orquestación + paralelización + progress bars. Decisión a tomar:
+una fila por muestra con `sample_type` discriminando FFT/waveform, o
+ficheros separados por tipo.
 
 Opción B — **Investigar calibración FFT (`vcps`) (§5.6)**: deuda
-abierta. Líneas no descartadas todavía: escala almacenada en `vdpm` o
-`vdps` en algún offset sin parsear, factor de calibración en records
-auxiliares, ventana de display específica de AMS que altere amplitudes.
-**NO probar** "FFT(waveform) → comparar" — ya descartada en sub-5a.
-
-Opción C — **Saltar a Fase 6 (export masivo)** asumiendo deuda
-amplitud. Útil si el caso de uso es producir el dataset completo y
-calibrar más tarde antes de cargar en TWist.
+abierta. Ahora con la waveform calibrada vía `vdfw.0x28`, mirar si `vdps`
+tiene un offset análogo de escala (no probado aún). Líneas no
+descartadas: escala en `vdps`/`vdpm` sin parsear, factor en records
+auxiliares. **NO probar** "FFT(waveform) → comparar" — ya descartada en
+sub-5a (la waveform de 488 muestras no da 1600 líneas).
 
 ### Preguntas abiertas
 

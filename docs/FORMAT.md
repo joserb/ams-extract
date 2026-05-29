@@ -322,6 +322,8 @@ vdfw chain (chronological, oldest → newest):
               0x18 → primer vcfw (data chain head)
               0x1C → back-ref al pdcd
               0x24 → float32 sample_period (1/sample_rate; M1H: 3.9e-4 s = 1/2560)
+              0x28 → float32 scale_factor (display units por cuenta int16;
+                     M1H 19-feb: 3.7548e-05 G/cuenta)
               0x2C → u32 n_samples (M1H: 512)
               0x34 → u32 Unix timestamp UTC
               0x38 → float32 RPM (no Fmax como en vdps)
@@ -330,8 +332,19 @@ vdfw chain (chronological, oldest → newest):
 
 vcfw chain (datos de la waveform):
   vcfw → 0x14 → siguiente vcfw  (0 = fin)
-              0x18 hasta 0x1FF → 244 × int16 LE (muestras acel. centradas)
+              0x18 hasta 0x1FF → 244 × int16 LE (muestras acel. centradas;
+                     amplitud calibrada = int16 × scale_factor de vdfw.0x28)
 ```
+
+**Calibración de amplitud — RESUELTA (sub-fase 5b, 2026-05-29)**. A
+diferencia del FFT (§5.6, deuda abierta), la waveform sí calibra: cada
+`vdfw` lleva en `0x28` un float32 `scale_factor` (display units por cuenta
+int16). Para M1H 19-feb-2020, `scale_factor = 3.7548e-05 G/cuenta`;
+aplicado a las muestras crudas (max=12862, min=-13575) da Pc(+)=0.483 G y
+Pk(-)=-0.510 G, idéntico al gold de AMS (error < 0.3%). El factor es
+**por-waveform** (varía entre adquisiciones: 3.84e-05 para 15-oct,
+3.7548e-05 para el resto). `walk_waveforms` aplica el factor y emite
+`Waveform.samples` ya en unidades de display (`units`, p.ej. G's).
 
 Para M1H 19-feb-2020 BUNGE: 2 vcfw records → 488 muestras decoded
 (24 menos que las 512 nominales — pendiente entender el padding).
@@ -346,6 +359,10 @@ Cotejado contra el screenshot AMS:
 | sample_rate | 2560 Hz (= 2.56 × Fmax_FFT) | 2560 Hz | ✓ |
 | Duration | 0.20-0.21 s | 0.191 s | ≈ |
 | Units | G | G | ✓ |
+
+> **Actualización sub-5b**: con `scale_factor` (vdfw.0x28) aplicado, Pc/Pk
+> mejoran a 0.483 / -0.510 (antes 0.482 / -0.500 con la escala empírica
+> de sub-5a). La calibración deja de ser deuda para la waveform.
 
 **Hipótesis descartada en sub-5a**: "AMS reconstruye FFT desde
 waveform". La waveform almacenada (488 muestras / 0.19 s) no permite
@@ -379,9 +396,10 @@ deuda de calibración de amplitudes del FFT (§5.5) sigue abierta.
   para llegar a `n_lines = 1600`. ¿Padding implícito? ¿Bin 0 = DC
   reservado? ¿Otro slot que no estoy leyendo? Sin urgencia hasta que
   la deuda de calibración esté resuelta.
-- **`vcfw` (waveform)**: layout análogo al de `vcps` esperado, cadena
-  más corta (~9 records = 1098 floats ≈ 1024 muestras temporales).
-  Fase 5 lo aborda directamente.
+- ~~**`vcfw` (waveform)**~~: RESUELTO en sub-5b. Layout: 244 int16 LE
+  por record (no float32 como `vcps`), cadena de 2 records = 488 muestras
+  para M1H. Calibración vía `vdfw.0x28` (ver §5.5). Parser en
+  `records/waveform.py`, walker `walk_waveforms`.
 - **`vddt` (pdcd.0x3C, 0x40)**: tras inspección no es complemento del
   espectro sino series temporales de tendencias. Mapeo completo
   aplazado a Fase 7 si queremos exponer "Valores Globales" o bandas
