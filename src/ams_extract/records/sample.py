@@ -18,10 +18,14 @@ M1H of AG-100, BUNGE)::
     A spectrum's amplitude buffer is the concatenation of every vcps in
     the chain that descends from the spectrum's vdps.
 
-Amplitude values are emitted *raw* — AMS displays them after applying
-unit conversion (units field is typically "plg/segs"; the UI converts
-to mm/seg when the analyst's profile is metric). Sub-fase 3b leaves
-that scaling deferred.
+Full-spectrum reconstruction (solved 2026-05-29, FORMAT §5.6): the first
+78 bins (0..48.75 Hz, where 1X/2X running-speed peaks live) are NOT in
+the vcps chain — they live in the *tail* of the vdps descriptor record at
+offsets 0xC8..0x1FF (78 consecutive float32 = 312 bytes). The complete
+spectrum is ``concat(vdps[0xC8:0x200], vcps_chain)`` truncated to
+``n_lines``. Calibration to the AMS velocity display (mm/s) is a single
+scale factor :data:`VELOCITY_SCALE_MM_S`. Validated on 3 machines/RPMs
+(AG-100, PM-6901-A, AR-1211): logcorr 0.998-0.999 over all gold peaks.
 """
 
 from __future__ import annotations
@@ -54,6 +58,24 @@ VDPS_UNITS_LENGTH = 8
 VCPS_NEXT_OFFSET = 0x14
 VCPS_DATA_OFFSET = 0x18
 VCPS_DATA_FLOATS = (RECORD_SIZE - VCPS_DATA_OFFSET) // 4  # 122
+
+# The low-frequency bins (0..48.75 Hz) live in the vdps descriptor tail,
+# not in the vcps chain — see the module docstring and FORMAT §5.6.
+VDPS_LOW_BAND_OFFSET = 0xC8
+VDPS_LOW_BAND_FLOATS = (RECORD_SIZE - VDPS_LOW_BAND_OFFSET) // 4  # 78
+
+# Empirical amplitude scale: raw vcps/low-band value -> AMS velocity display
+# (mm/s). Pooled median 48.8 / mean 48.4 over 72 gold peaks across 3
+# machines (AG-100, PM-6901-A, AR-1211), std ~2.3 (≈5%, screenshot-reading
+# noise). Likely ~ inch-to-mm (25.4) x ~1.9 (window/normalization). FORMAT 5.6.
+VELOCITY_SCALE_MM_S = 48.5
+
+# Units strings AMS stores for the (uncalibrated) inches/sec velocity
+# spectrum — locale/version variants of the same physical unit. The whole
+# file uses these for velocity plus "G's" for acceleration (whose
+# calibration differs and is left raw — see FORMAT §5.6).
+VELOCITY_UNITS_RAW = frozenset({"plg/segs", "in/sec", "pul/sg"})
+VELOCITY_UNITS_CALIBRATED = "mm/s"
 
 # Safety caps to bound traversal of malformed chains.
 VDPS_CHAIN_MAX_LENGTH = 4096
@@ -187,3 +209,39 @@ def read_vcps_amplitudes(reader: RbmReader, first_vcps: int) -> np.ndarray:
     if not chunks:
         return np.empty(0, dtype=np.float32)
     return np.concatenate(chunks)
+
+
+def read_vdps_low_band(reader: RbmReader, vdps_record: int) -> np.ndarray:
+    """Return the 78 low-frequency bins stored in the ``vdps`` descriptor tail.
+
+    These are the float32 amplitudes for bins 0..77 (0..48.75 Hz) at
+    offsets ``0xC8..0x1FF`` of the ``vdps`` record — the low band that the
+    ``vcps`` chain omits (see the module docstring and FORMAT §5.6).
+
+    Raises:
+        SampleChainError: If the record's tag is not ``vdps``.
+    """
+    record = reader.read_record(vdps_record)
+    _check_tag(record, VDPS_TAG, vdps_record)
+    return np.frombuffer(
+        record,
+        dtype=np.float32,
+        count=VDPS_LOW_BAND_FLOATS,
+        offset=VDPS_LOW_BAND_OFFSET,
+    ).copy()
+
+
+def assemble_spectrum(
+    low_band: np.ndarray, chain: np.ndarray, n_lines: int
+) -> np.ndarray:
+    """Concatenate the low band and the vcps chain into the full spectrum.
+
+    Returns ``concat(low_band, chain)`` truncated to ``n_lines`` bins (the
+    nominal FFT length from ``vdps.0x50``; AMS displays 0..Fmax across these
+    lines). The result is uncalibrated — apply :data:`VELOCITY_SCALE_MM_S`
+    separately. Bin ``i`` maps to frequency ``i * Fmax / n_lines``.
+    """
+    full = np.concatenate([low_band, chain])
+    if n_lines > 0:
+        full = full[:n_lines]
+    return full.astype(np.float32)

@@ -84,19 +84,23 @@ class Spectrum:
     """One FFT spectrum measured at a point.
 
     Reached through ``vdpm.0x10 → pdcd → 0x44 → vdps → 0x18 → vcps``.
-    The amplitude array length is ``122 * <vcps chain length>`` —
-    typically ~1586 in BUNGE for the nominal ``n_lines = 1600``;
-    reconciliation of those 14 trailing bins is still open (FORMAT §5.5).
+    The amplitude array is the full spectrum: the low 78 bins from the
+    ``vdps`` descriptor tail (0xC8..0x1FF) concatenated with the ``vcps``
+    chain, truncated to ``n_lines`` (FORMAT §5.6). Bin ``i`` maps to
+    frequency ``i * fmax_hz / n_lines``.
 
     Attributes:
         record_num: Zero-based record number of the ``vdps`` descriptor.
         point_record_num: Record number of the parent ``vdpm`` (point).
         timestamp_utc: Sample timestamp as decoded from ``vdps.0x24``.
         fmax_hz: Nominal Fmax in Hz, from ``vdps.0x20``.
-        n_lines: Nominal FFT bin count, from ``vdps.0x50``.
-        units: Units string as stored in ``vdps.0x78`` (e.g. ``"plg/segs"``).
+        n_lines: Nominal FFT bin count, from ``vdps.0x50`` (= amplitude length).
+        units: Display units — ``"mm/s"`` for the calibrated velocity
+            spectrum (the common case), else the raw ``vdps.0x78`` string.
         carga_pct: CARGA % field, from ``vdps.0x2C``.
-        amplitude: Raw float32 amplitude buffer from the ``vcps`` chain.
+        amplitude: Calibrated float32 amplitude buffer. For velocity
+            spectra the raw values are scaled to mm/s (FORMAT §5.6);
+            reproduces the AMS peak list within ~5% on 3 validated machines.
     """
 
     record_num: int

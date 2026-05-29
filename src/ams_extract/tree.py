@@ -44,8 +44,13 @@ from ams_extract.records.point import (
     parse_vdpm_point,
 )
 from ams_extract.records.sample import (
+    VELOCITY_SCALE_MM_S,
+    VELOCITY_UNITS_CALIBRATED,
+    VELOCITY_UNITS_RAW,
     SampleChainError,
+    assemble_spectrum,
     read_vcps_amplitudes,
+    read_vdps_low_band,
     walk_vdps_chain,
 )
 from ams_extract.records.sample_index import (
@@ -374,7 +379,8 @@ def walk_spectra(reader: RbmReader, point: Point) -> Iterator[Spectrum]:
             )
             continue
         try:
-            amplitude = read_vcps_amplitudes(reader, desc.first_vcps)
+            low_band = read_vdps_low_band(reader, desc.record_num)
+            chain = read_vcps_amplitudes(reader, desc.first_vcps)
         except SampleChainError as exc:
             _log.warning(
                 "vcps_chain_failed",
@@ -384,13 +390,28 @@ def walk_spectra(reader: RbmReader, point: Point) -> Iterator[Spectrum]:
                 error=str(exc),
             )
             continue
+        # Full spectrum = low band (vdps tail) + vcps chain, truncated to
+        # n_lines. Calibrate velocity spectra to mm/s; leave other unit
+        # types raw (none observed) — see FORMAT §5.6.
+        amplitude = assemble_spectrum(low_band, chain, desc.n_lines)
+        if desc.units in VELOCITY_UNITS_RAW:
+            amplitude = (amplitude * VELOCITY_SCALE_MM_S).astype(np.float32)
+            units = VELOCITY_UNITS_CALIBRATED
+        else:
+            units = desc.units
+            _log.warning(
+                "spectrum_units_uncalibrated",
+                point=point.long_name,
+                vdps_record=desc.record_num,
+                units=desc.units,
+            )
         yield Spectrum(
             record_num=desc.record_num,
             point_record_num=point.record_num,
             timestamp_utc=desc.timestamp_utc,
             fmax_hz=desc.fmax_hz,
             n_lines=desc.n_lines,
-            units=desc.units,
+            units=units,
             carga_pct=desc.carga_pct,
             amplitude=amplitude,
         )
