@@ -496,15 +496,36 @@ def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
         )
 
 
+def _point_spectrum_units(reader: RbmReader, links: PdcdLinks) -> str | None:
+    """Return the units string of the point's first FFT spectrum, or ``None``.
+
+    A ``vddt`` carries no unit string, so the trend's native unit is read
+    from the point's primary FFT measurement (velocity → ``plg/segs`` etc.,
+    acceleration → ``G's``). Returns ``None`` if the point has no FFT chain
+    or it cannot be parsed.
+    """
+    if links.fft_first_vdps is None:
+        return None
+    try:
+        return next(walk_vdps_chain(reader, links.fft_first_vdps)).units
+    except (SampleChainError, StopIteration):
+        return None
+
+
 def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
     """Yield the "Valores Globales" trend series for ``point`` (usually one).
 
     Walks ``vdpm.0x10 → pdcd → 0x3C → vddt → (chain via 0x10)``, decodes
     each ``vddt`` record's sample slots, and flattens the whole chain into a
     single :class:`~ams_extract.models.Trend` with the overall calibrated to
-    mm/s (FORMAT §5.7). ``vddt`` records using an unsupported (non-velocity)
-    layout are logged and skipped; a missing pdcd or first-vddt yields no
-    trend. If every record was skipped the trend is omitted entirely.
+    mm/s (FORMAT §5.7).
+
+    Only **velocity** points are emitted (overall ``x 25.4`` → mm/s), the
+    case validated 47/47 against the AMS gold. Acceleration points (PeakVue /
+    high-frequency, units ``G's``) decode structurally too, but the overall
+    scale is not yet gold-confirmed, so they are skipped with a log rather
+    than emitting unverified values (PLAN §7.4). A missing pdcd / first-vddt,
+    an undetermined unit, or an all-skipped chain yields no trend.
     """
     links = _resolve_pdcd_links(reader, point)
     if links is None:
@@ -515,6 +536,15 @@ def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
             "point_has_no_trend_chain",
             point=point.long_name,
             pdcd_record=links.record_num,
+        )
+        return
+
+    units_raw = _point_spectrum_units(reader, links)
+    if units_raw not in VELOCITY_UNITS_RAW:
+        _log.info(
+            "trend_skipped_non_velocity",
+            point=point.long_name,
+            spectrum_units=units_raw,
         )
         return
 
