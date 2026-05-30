@@ -498,10 +498,25 @@ cracking: `scripts/investigate_vddt_layout.py`.
 
 ### Consecuencias
 
-- La tendencia de Valores Globales es ahora extraíble y verificada; queda
-  implementar `models.Trend` + `walk_trends` + emisión en `extract`/`export`
-  + tests, análogo a `walk_spectra`/`walk_waveforms`.
-- El etiquetado de las 7 bandas (cuál es SUBSINCRONO, etc.) queda pendiente
-  hasta tener gold del PLOTDATA por banda; no bloquea el overall.
-- El marcador `d3 fa ff 00` y el stride 41 B son específicos de esta
-  versión MT4.00; si aparece otro formato habría que re-derivarlos.
+- La tendencia de Valores Globales es ahora extraíble y verificada.
+- Implementado (`records/trend.py`, `tree.walk_trends`, `models.Trend`,
+  export `__trend.parquet` una fila por lectura, CLI `--type/--types trend`).
+
+### Actualización (misma fecha, tras cotejar más puntos)
+
+Lo de "slots de 41 B con marcador `d3 fa ff 00`" era una sobre-generalización
+de AG-100. Corregido:
+
+- Los 4 bytes iniciales del slot son **flags por slot**, no un marcador fijo
+  (el `d3 fa ff 00` es dato de AG-100; otros puntos muestran `fe ff ff 00`…).
+- El stride es **`13 + band_count·4`** (band_count en `0x24`), no 41 fijo: 41
+  para 7 bandas, 29 para 4, 17 para 1. Un mismo punto mezcla records con
+  distinto `band_count` a lo largo del tiempo; `band_count` **no** discrimina
+  la unidad.
+- La **unidad** se decide por el espectro del punto (`vdps.0x78`): velocidad
+  → mm/s (×25.4, validado); aceleración → G's (se salta de momento, escala
+  del overall sin gold, §7.4).
+- **Bandas etiquetadas** (template velocidad, 62/62 vs PLOTDATA por banda):
+  col0 = Mp Wave (**G's**), col1 SUBSINCRONO, col2 DESEQUILIBRIO, col3
+  DESALINEACION, col4 HOLGURAS, col5 11-40X RPM (mm/s), col6 1-20 KHz (sin
+  confirmar). Unidades mixtas → emitir las bandas queda pendiente.

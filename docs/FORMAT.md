@@ -215,7 +215,7 @@ verificada en cada fase:
 | `vdfw` | 157 055 | descriptor de un waveform individual (n_samples, sample_period, units) | Fase 5a |
 | `vdpm` | 6 141 | point descriptor (config: template, RPM, alarmas; incluye plantillas) | Fase 2b + 3a |
 | `pdcd` | (no listado por scan) | índice de tipos de medida por punto ("Set Colección Datos Primar") | Fase 3a |
-| `vddt` | (no listado por scan) | series temporales de tendencias (Valores Globales + 7 bandas). **RESUELTO**: slots de 41 B (marcador `d3faff00`), overall en `+0x04` ×25.4 → mm/s, ts de la muestra siguiente en `+0x24`. Validado 47/47 vs gold (§5.7) | 2026-05-30 |
+| `vddt` | (no listado por scan) | series de tendencias (Valores Globales + bandas). **RESUELTO**: slots de `13+band_count·4` B, overall en `+0x04`, ts de la muestra siguiente off-by-one; unidad por el espectro del punto (velocidad ×25.4 → mm/s). Validado 47/47; 7 bandas etiquetadas (§5.7) | 2026-05-30 |
 | `gdsc` | 6 504 | aún sin confirmar (¿descriptor general?) | — |
 | `gicm` | 26 | equipment list chunk (20 slots + continuation) | Fase 2b (ADR-0004) |
 | `gdcm` | 347 | equipment instance | Fase 2b (ADR-0003) |
@@ -482,22 +482,24 @@ es "RMSVelocidad en mm/Seg".
 | `0x14` | 4 | u32 LE (+1 encoded) — back-ref al `pdcd` |
 | `0x18` | 4 | u32 LE — Unix ts de la **primera** muestra del record (`d0`) |
 | `0x1C` | 4 | u32 LE — Unix ts de la **última** muestra del record (`d1`) |
-| `0x24` | 4 | u32 LE — `7` (≈ nº de columnas/bandas; **no** es nº de muestras) |
+| `0x24` | 4 | u32 LE — **band_count**: nº de columnas-banda por slot (**no** es nº de muestras). Varía por época dentro de un mismo punto (7 al inicio, luego 4…); fija el stride |
 | `0x2F` | … | inicio del primer **slot** de muestra (ver abajo) |
 
-**Slots de muestra** — secuencia de **slots de 41 bytes** (stride `0x29`),
-el primero en offset `0x2F`, cada uno precedido por el marcador `d3 fa ff 00`:
+**Slots de muestra** — secuencia de slots de tamaño **`13 + band_count·4`**
+(p.ej. 41 B para `band_count=7`, 29 B para 4, 17 B para 1), el primero en
+offset `0x2F`:
 
 | Offset (dentro del slot) | Tamaño | Campo |
 |---|---|---|
-| `+0x00` | 4 | marcador de slot `d3 fa ff 00` |
-| `+0x04` | 4 | **float32 overall** (Valores Globales). `mm/s = float × 25.4` (almacenado en in/s) |
-| `+0x08` | 28 | **7 × float32** — bandas con nombre (orden por confirmar con gold por-banda) |
-| `+0x24` | 4 | u32 LE — Unix ts de la muestra **SIGUIENTE** (ver regla de fechas) |
+| `+0x00` | 4 | flags por slot (alarma/estado; **no** es un marcador fijo — el `d3 fa ff 00` que se ve en AG-100 es dato del punto, varía) |
+| `+0x04` | 4 | **float32 overall** (Valores Globales) en la unidad nativa del punto |
+| `+0x08` | `band_count·4` | **band_count × float32** — bandas (ver etiquetas) |
+| `+0x08+band_count·4` | 4 | u32 LE — Unix ts de la muestra **SIGUIENTE** (ver regla de fechas) |
 
-Hay **11 slots** por record (el último de la cadena, menos). Pueden aparecer
-marcadores espurios antes de `0x2F` o slots con overall fuera de rango al
-final; se descartan filtrando por `0 < overall < ~50 mm/s`.
+Se itera por stride hasta que el overall sale de rango o el ts es `0`/no
+plausible (fin de los slots vivos). El `band_count` (`0x24`) **no** indica
+el tipo de medida — un mismo punto de velocidad mezcla records con 7 y 4
+bandas (reconfiguración del análisis a lo largo del tiempo).
 
 **Regla de fechas (la clave del decode)**: el timestamp guardado en `+0x24`
 de un slot es la fecha de la muestra **siguiente**, no la suya. Por tanto:
@@ -511,16 +513,39 @@ La última muestra de cada record toma su fecha del `+0x24` del slot anterior;
 su propio `+0x24` suele ser `0`. La primera muestra del record siguiente
 toma su fecha del `d0` de ese record.
 
-**Validación**: decodificados 62 puntos para M1H AG-100; los primeros 47
-coinciden **EXACTO** (fecha + valor) con la tabla gold de AMS (PLOTDATA
-"Valore Globale", 47 filas 28-feb-2013 → 18-abr-2018), incluido el
-duplicado del 13-jul-2017 (6.01 y 36.43 mm/s el mismo día). Anclas:
-`slot@0x58 +0x04 = 0.6038 → 15.34 mm/s` (20-abr-2017),
-`slot@0xFC +0x04 = 1.4341 → 36.43 mm/s` (13-jul-2017, pico del trend).
+**Unidad / escala**: el `vddt` no almacena unidad. La unidad nativa la marca
+la medida primaria del punto (`vdps.0x78`): **velocidad** (`plg/segs`…) → el
+overall está en in/s y AMS muestra mm/s, `mm/s = raw × 25.4` (factor de
+conversión puro, distinto del 48.5 del FFT). **Aceleración** (`G's`,
+PeakVue/HF) → en G's. `walk_trends` emite hoy **solo velocidad** (mm/s);
+los trends de aceleración decodifican estructuralmente pero su escala de
+overall no está confirmada contra gold, así que se saltan (§7.4).
 
-**Pendiente (menor)**: etiquetar cuál de las 7 bandas es SUBSINCRONO,
-DESEQUILIBRIO, etc. — requiere capturas gold del PLOTDATA **por banda**
-(no solo del overall). No bloquea emitir la tendencia de Valores Globales.
+**Etiquetas de las bandas** (template de velocidad, `band_count=7`), cada
+columna validada **62/62** contra el PLOTDATA por-banda de M1H AG-100.
+**Unidades mixtas** dentro del slot:
+
+| Columna | Offset | Banda | Unidad |
+|---|---|---|---|
+| 0 | `+0x08` | **Mp Wave** (F.Onda Pico Máx) | **G's** (raw, sin ×25.4) |
+| 1 | `+0x0C` | SUBSINCRONO | mm/s (×25.4) |
+| 2 | `+0x10` | DESEQUILIBRIO | mm/s |
+| 3 | `+0x14` | DESALINEACION | mm/s |
+| 4 | `+0x18` | HOLGURAS | mm/s |
+| 5 | `+0x1C` | 11-40 X RPM | mm/s |
+| 6 | `+0x20` | 1-20 KHz | sin confirmar (gold vacío) |
+
+**Validación del overall**: 62 lecturas decodificadas para M1H AG-100; los
+primeros 47 coinciden **EXACTO** (fecha + valor) con la tabla gold de AMS
+(PLOTDATA "Valore Globale"), incluido el duplicado del 13-jul-2017 (6.01 y
+36.43 mm/s el mismo día). Anclas: `slot +0x04 = 0.6038 → 15.34 mm/s`
+(20-abr-2017), `… = 1.4341 → 36.43 mm/s` (13-jul-2017, pico del trend).
+
+**Implementado** (2026-05-30): `records/trend.py`, `tree.walk_trends`,
+`models.Trend`, export (`__trend.parquet`, una fila por lectura) y CLI
+(`rbm extract --type trend`, `rbm export --types …,trend`). Hoy se emite
+**solo el overall**; emitir las bandas etiquetadas (con sus unidades mixtas)
+y los trends de aceleración queda pendiente.
 
 ## 6. Encoding y strings
 
