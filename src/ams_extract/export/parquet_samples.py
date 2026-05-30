@@ -22,18 +22,28 @@ from pathlib import Path
 import pyarrow as pa
 import pyarrow.parquet as pq
 
-from ams_extract.models import Point, Spectrum, Waveform
+from ams_extract.models import Point, Spectrum, Trend, Waveform
 
 
-def sample_id(point_record_num: int, sample_record_num: int, sample_type: str) -> str:
+def sample_id(
+    point_record_num: int,
+    sample_record_num: int,
+    sample_type: str,
+    discriminator: str = "",
+) -> str:
     """Return a deterministic, stable id for a single sample.
 
     The id is a 16-hex-char SHA-1 prefix over
-    ``"<point_record_num>:<sample_record_num>:<sample_type>"``. Determinism
-    lets the per-equipment Parquet and ``manifest.parquet`` reference the
-    same sample across runs without coordination.
+    ``"<point_record_num>:<sample_record_num>:<sample_type>"`` (plus an
+    optional ``":<discriminator>"`` suffix). Determinism lets the
+    per-equipment Parquet and ``manifest.parquet`` reference the same sample
+    across runs without coordination. The discriminator distinguishes rows
+    that share a source record — e.g. the individual readings of one trend
+    (``vddt``), which all carry the same ``record_num``.
     """
     raw = f"{point_record_num}:{sample_record_num}:{sample_type}"
+    if discriminator:
+        raw = f"{raw}:{discriminator}"
     return hashlib.sha1(raw.encode("ascii")).hexdigest()[:16]
 
 
@@ -135,6 +145,58 @@ def write_waveforms_parquet(
     pq.write_table(table, path)
 
 
+def write_trends_parquet(
+    items: Sequence[tuple[Trend, Point]],
+    path: Path,
+) -> None:
+    """Serialize a batch of ``(trend, point)`` pairs to one Parquet file.
+
+    Unlike FFT/waveform, a :class:`Trend` is a *series*: it is exploded to
+    ONE row per reading (timestamp + scalar ``overall``), so the file is
+    queryable by date like every other sample and joins to
+    ``manifest.parquet`` one-to-one. Each reading's ``sample_id`` carries
+    its index as the discriminator. Writing an empty ``items`` still
+    produces a valid zero-row file with the canonical schema.
+    """
+    flat: list[tuple[Trend, Point, int]] = [
+        (t, p, i) for t, p in items for i in range(len(t.overall))
+    ]
+    table = pa.table(
+        {
+            "sample_id": pa.array(
+                [
+                    sample_id(t.point_record_num, t.record_num, "TREND", str(i))
+                    for t, _, i in flat
+                ],
+                type=pa.string(),
+            ),
+            "point_record_num": pa.array(
+                [t.point_record_num for t, _, _ in flat], type=pa.int64()
+            ),
+            "point_long_name": pa.array(
+                [p.long_name for _, p, _ in flat], type=pa.string()
+            ),
+            "point_short_code": pa.array(
+                [p.short_code for _, p, _ in flat], type=pa.string()
+            ),
+            "trend_record_num": pa.array(
+                [t.record_num for t, _, _ in flat], type=pa.int64()
+            ),
+            "timestamp_utc": pa.array(
+                [t.timestamps_utc[i] for t, _, i in flat],
+                type=pa.timestamp("us", tz="UTC"),
+            ),
+            "sample_type": pa.array(["TREND"] * len(flat), type=pa.string()),
+            "units": pa.array([t.units for t, _, _ in flat], type=pa.string()),
+            "overall": pa.array(
+                [float(t.overall[i]) for t, _, i in flat], type=pa.float32()
+            ),
+        }
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(table, path)
+
+
 def write_spectrum_parquet(spectrum: Spectrum, point: Point, path: Path) -> None:
     """Serialize a single :class:`Spectrum` (one-row file). See ``extract``."""
     write_spectra_parquet([(spectrum, point)], path)
@@ -143,3 +205,8 @@ def write_spectrum_parquet(spectrum: Spectrum, point: Point, path: Path) -> None
 def write_waveform_parquet(waveform: Waveform, point: Point, path: Path) -> None:
     """Serialize a single :class:`Waveform` (one-row file). See ``extract``."""
     write_waveforms_parquet([(waveform, point)], path)
+
+
+def write_trend_parquet(trend: Trend, point: Point, path: Path) -> None:
+    """Serialize a single :class:`Trend` (one row per reading). See ``extract``."""
+    write_trends_parquet([(trend, point)], path)

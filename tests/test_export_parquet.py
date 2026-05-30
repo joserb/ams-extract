@@ -13,9 +13,10 @@ from ams_extract.export.parquet_samples import (
     sample_id,
     write_spectra_parquet,
     write_spectrum_parquet,
+    write_trends_parquet,
     write_waveforms_parquet,
 )
-from ams_extract.models import Point, Spectrum, Waveform
+from ams_extract.models import Point, Spectrum, Trend, Waveform
 
 
 def _point(record_num: int, name: str) -> Point:
@@ -113,6 +114,39 @@ class TestWriteWaveformsParquet:
         assert rows[0]["rpm"] == 1455.0
         assert rows[0]["sample_id"] == sample_id(100, 301, "WAVEFORM")
         assert len(rows[0]["samples"]) == 8
+
+
+def _trend(point_rec: int, rec: int, n: int) -> Trend:
+    base = datetime(2013, 2, 28, tzinfo=UTC)
+    return Trend(
+        record_num=rec,
+        point_record_num=point_rec,
+        units="mm/s",
+        timestamps_utc=tuple(base.replace(year=2013 + i) for i in range(n)),
+        overall=np.arange(1, n + 1, dtype=np.float32),
+    )
+
+
+class TestWriteTrendsParquet:
+    def test_explodes_one_row_per_reading(self, tmp_path: Path) -> None:
+        point = _point(100, "LA H")
+        items = [(_trend(100, 306, 3), point)]
+        out = tmp_path / "eq__trend.parquet"
+        write_trends_parquet(items, out)
+
+        rows = pq.read_table(out).to_pylist()
+        assert len(rows) == 3  # one row per reading, not one per series
+        assert all(r["sample_type"] == "TREND" for r in rows)
+        assert all(r["units"] == "mm/s" for r in rows)
+        assert [r["overall"] for r in rows] == [1.0, 2.0, 3.0]
+        # Each reading carries its index as the sample_id discriminator → unique.
+        assert len({r["sample_id"] for r in rows}) == 3
+        assert rows[0]["sample_id"] == sample_id(100, 306, "TREND", "0")
+
+    def test_empty_batch_writes_zero_row_file(self, tmp_path: Path) -> None:
+        out = tmp_path / "eq__trend.parquet"
+        write_trends_parquet([], out)
+        assert pq.read_table(out).num_rows == 0
 
 
 class TestWriteManifest:

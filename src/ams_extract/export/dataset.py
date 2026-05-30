@@ -34,17 +34,19 @@ from ams_extract.export.manifest import write_manifest
 from ams_extract.export.parquet_samples import (
     sample_id,
     write_spectra_parquet,
+    write_trends_parquet,
     write_waveforms_parquet,
 )
 from ams_extract.models import Area, Equipment, Point
 from ams_extract.reader import RbmReader
-from ams_extract.tree import walk_hierarchy, walk_spectra, walk_waveforms
+from ams_extract.tree import walk_hierarchy, walk_spectra, walk_trends, walk_waveforms
 
 _log = structlog.get_logger(__name__)
 
 FFT = "fft"
 WAVEFORM = "waveform"
-VALID_TYPES = frozenset({FFT, WAVEFORM})
+TREND = "trend"
+VALID_TYPES = frozenset({FFT, WAVEFORM, TREND})
 
 
 @dataclass(frozen=True)
@@ -56,6 +58,7 @@ class EquipmentResult:
     manifest_rows: list[dict[str, Any]]
     n_fft: int
     n_waveform: int
+    n_trend: int
     n_files: int
     error: str | None = None
 
@@ -70,6 +73,7 @@ class ExportSummary:
     equipment_failed: int
     fft_samples: int
     waveform_samples: int
+    trend_samples: int
     parquet_files: int
     manifest_rows: int
 
@@ -80,6 +84,10 @@ def _fft_relpath(area_short: str, equipment_short: str) -> str:
 
 def _waveform_relpath(area_short: str, equipment_short: str) -> str:
     return f"samples/area={area_short}/equipment={equipment_short}__waveform.parquet"
+
+
+def _trend_relpath(area_short: str, equipment_short: str) -> str:
+    return f"samples/area={area_short}/equipment={equipment_short}__trend.parquet"
 
 
 def _filter_areas(areas: Iterable[Area], area_filter: set[str] | None) -> list[Area]:
@@ -156,6 +164,36 @@ def _waveform_manifest_row(
     }
 
 
+def _trend_manifest_rows(
+    trend: Any, point: Point, *, area_short: str, area_long: str,
+    equipment_short: str, equipment_long: str, relpath: str,
+) -> list[dict[str, Any]]:
+    """One manifest row per trend reading (the file is exploded the same way)."""
+    return [
+        {
+            "sample_id": sample_id(point.record_num, trend.record_num, "TREND", str(i)),
+            "area": area_short,
+            "area_long_name": area_long,
+            "equipment": equipment_short,
+            "equipment_long_name": equipment_long,
+            "point_record_num": point.record_num,
+            "point_long_name": point.long_name,
+            "point_short_code": point.short_code,
+            "timestamp_utc": trend.timestamps_utc[i],
+            "sample_type": "TREND",
+            "units": trend.units,
+            "fmax_hz": None,
+            "n_lines": None,
+            "sample_rate_hz": None,
+            "rpm": None,
+            "n_samples": None,
+            "overall": float(trend.overall[i]),
+            "parquet_path": relpath,
+        }
+        for i in range(len(trend.overall))
+    ]
+
+
 def _process_equipment(
     reader: RbmReader,
     area_short: str,
@@ -168,6 +206,7 @@ def _process_equipment(
     try:
         spectra_items: list[tuple[Any, Point]] = []
         waveform_items: list[tuple[Any, Point]] = []
+        trend_items: list[tuple[Any, Point]] = []
         for point in equipment.points:
             if FFT in types:
                 spectra_items.extend(
@@ -176,6 +215,10 @@ def _process_equipment(
             if WAVEFORM in types:
                 waveform_items.extend(
                     (wf, point) for wf in walk_waveforms(reader, point)
+                )
+            if TREND in types:
+                trend_items.extend(
+                    (tr, point) for tr in walk_trends(reader, point)
                 )
 
         rows: list[dict[str, Any]] = []
@@ -207,12 +250,26 @@ def _process_equipment(
                 for wf, point in waveform_items
             )
 
+        if TREND in types and trend_items:
+            rel = _trend_relpath(area_short, equipment.short_code)
+            write_trends_parquet(trend_items, out_dir / rel)
+            n_files += 1
+            for tr, point in trend_items:
+                rows.extend(
+                    _trend_manifest_rows(
+                        tr, point, area_short=area_short, area_long=area_long,
+                        equipment_short=equipment.short_code,
+                        equipment_long=equipment.long_name, relpath=rel,
+                    )
+                )
+
         return EquipmentResult(
             area_short=area_short,
             equipment_short=equipment.short_code,
             manifest_rows=rows,
             n_fft=len(spectra_items),
             n_waveform=len(waveform_items),
+            n_trend=sum(len(tr.overall) for tr, _ in trend_items),
             n_files=n_files,
         )
     except Exception as exc:  # defensive: keep the run alive past a bad machine
@@ -228,6 +285,7 @@ def _process_equipment(
             manifest_rows=[],
             n_fft=0,
             n_waveform=0,
+            n_trend=0,
             n_files=0,
             error=str(exc),
         )
@@ -336,6 +394,7 @@ def export_dataset(
         equipment_failed=sum(1 for r in results if r.error is not None),
         fft_samples=sum(r.n_fft for r in results),
         waveform_samples=sum(r.n_waveform for r in results),
+        trend_samples=sum(r.n_trend for r in results),
         parquet_files=sum(r.n_files for r in results),
         manifest_rows=len(manifest_rows),
     )
@@ -345,6 +404,7 @@ def export_dataset(
         equipment_failed=summary.equipment_failed,
         fft_samples=summary.fft_samples,
         waveform_samples=summary.waveform_samples,
+        trend_samples=summary.trend_samples,
         parquet_files=summary.parquet_files,
     )
     return summary

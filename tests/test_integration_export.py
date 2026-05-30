@@ -103,3 +103,44 @@ def test_export_parallel_matches_serial(real_rbm: Path, tmp_path: Path) -> None:
     parallel_rows = pq.read_table(parallel / "manifest.parquet").num_rows
     assert serial_rows == parallel_rows
     assert serial_rows > 0
+
+
+def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
+    # --types trend exports the velocity "Valores Globales" series, one row
+    # per reading, in mm/s. M1H's first reading is the 1.58 mm/s gold value.
+    out = tmp_path / "dataset"
+    result = runner.invoke(
+        rbm_app,
+        [
+            "export",
+            str(real_rbm),
+            "--out", str(out),
+            "--types", "trend",
+            "--areas", "DEPURADORA",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+    manifest = pq.read_table(out / "manifest.parquet").to_pylist()
+    assert manifest, "expected trend rows in the manifest"
+    assert all(r["sample_type"] == "TREND" for r in manifest)
+    assert all(r["units"] == "mm/s" for r in manifest)
+
+    m1h = sorted(
+        (
+            r
+            for r in manifest
+            if r["point_long_name"] == "MOTOR LOA HORIZONTAL"
+            and "AG-100" in (r["equipment_long_name"] or "")
+        ),
+        key=lambda r: r["timestamp_utc"],
+    )
+    assert len(m1h) == 62, f"expected 62 M1H trend readings, got {len(m1h)}"
+    assert m1h[0]["timestamp_utc"].strftime("%Y-%m-%d") == "2013-02-28"
+    assert m1h[0]["overall"] == pytest.approx(1.58, abs=0.02)
+    assert max(r["overall"] for r in m1h) == pytest.approx(36.43, abs=0.02)
+    # FFT-only columns stay null for trend rows.
+    assert m1h[0]["fmax_hz"] is None
+
+    trend_path = out / m1h[0]["parquet_path"]
+    assert trend_path.exists(), trend_path

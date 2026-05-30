@@ -14,16 +14,18 @@ from ams_extract.export.dataset import VALID_TYPES, export_dataset
 from ams_extract.export.json_tree import build_tree_document, write_tree_json
 from ams_extract.export.parquet_samples import (
     write_spectrum_parquet,
+    write_trend_parquet,
     write_waveform_parquet,
 )
 from ams_extract.export.spectrum_plot import render_spectrum_png
+from ams_extract.export.trend_plot import render_trend_png
 from ams_extract.export.waveform_plot import render_waveform_png
 from ams_extract.logging_setup import LogFormat, LogLevel, configure_logging
 from ams_extract.models import Point
 from ams_extract.naming import NameSanitizer
 from ams_extract.reader import RbmFileError, RbmReader
 from ams_extract.records.header import parse_header
-from ams_extract.tree import walk_hierarchy, walk_spectra, walk_waveforms
+from ams_extract.tree import walk_hierarchy, walk_spectra, walk_trends, walk_waveforms
 
 app = typer.Typer(
     name="rbm",
@@ -40,6 +42,7 @@ class SampleKind(StrEnum):
 
     FFT = "fft"
     WAVEFORM = "waveform"
+    TREND = "trend"
     BOTH = "both"
 
 
@@ -222,6 +225,27 @@ def _extract_waveforms(
     return written
 
 
+def _extract_trend(
+    reader: RbmReader,
+    target: Point,
+    equipment_short: str,
+    point_slug: str,
+    out: Path,
+) -> int:
+    """Write the point's trend series (one file, one row per reading).
+
+    Returns the number of readings emitted. A trend is a single series per
+    point, so ``--limit`` does not apply; the whole series is written.
+    """
+    trend = next(walk_trends(reader, target), None)
+    if trend is None or trend.overall.size == 0:
+        return 0
+    base = out / f"{equipment_short}__{point_slug}__trend"
+    write_trend_parquet(trend, target, base.with_suffix(".parquet"))
+    render_trend_png(trend, target, base.with_suffix(".png"))
+    return int(trend.overall.size)
+
+
 @app.command("extract")
 def extract(
     file: Annotated[Path, typer.Argument(help="Path to a .rbm database file.")],
@@ -243,7 +267,7 @@ def extract(
         typer.Option("--out", help="Directory where Parquet + PNG outputs are written."),
     ] = Path("samples"),
 ) -> None:
-    """Extract a few FFT spectra and/or waveforms from a point as Parquet + PNG."""
+    """Extract FFT spectra, waveforms and/or the trend from a point as Parquet + PNG."""
     if not file.exists():
         raise _abort(f"file not found: {file}")
     if limit < 1:
@@ -251,6 +275,7 @@ def extract(
 
     want_fft = type_ in (SampleKind.FFT, SampleKind.BOTH)
     want_waveform = type_ in (SampleKind.WAVEFORM, SampleKind.BOTH)
+    want_trend = type_ is SampleKind.TREND
 
     try:
         with RbmReader(file) as reader:
@@ -280,10 +305,15 @@ def extract(
                 if want_waveform
                 else 0
             )
+            n_trend = (
+                _extract_trend(reader, target, equipment_short, point_slug, out)
+                if want_trend
+                else 0
+            )
     except RbmFileError as exc:
         raise _abort(str(exc)) from exc
 
-    if n_fft == 0 and n_waveform == 0:
+    if n_fft == 0 and n_waveform == 0 and n_trend == 0:
         _console.print(
             f"[yellow]no samples found for point[/yellow] {target.long_name!r} "
             f"(type={type_.value})"
@@ -294,6 +324,8 @@ def extract(
         parts.append(f"{n_fft} spectra")
     if want_waveform:
         parts.append(f"{n_waveform} waveforms")
+    if want_trend:
+        parts.append(f"{n_trend} trend readings")
     _console.print(
         f"wrote [bold]{' + '.join(parts)}[/bold] (parquet + png) for "
         f"[bold]{target.long_name}[/bold] under {out}"
@@ -306,7 +338,7 @@ def export(
     out: Annotated[Path, typer.Option("--out", help="Output dataset directory.")],
     types: Annotated[
         str,
-        typer.Option("--types", help="Comma-separated sample types: fft, waveform."),
+        typer.Option("--types", help="Comma-separated sample types: fft, waveform, trend."),
     ] = "fft,waveform",
     areas: Annotated[
         str | None,
@@ -330,7 +362,9 @@ def export(
 
     type_set = {t.strip().lower() for t in types.split(",") if t.strip()}
     if not type_set:
-        raise _abort("no sample types selected; --types must list fft and/or waveform")
+        raise _abort(
+            "no sample types selected; --types must list fft, waveform and/or trend"
+        )
     unknown = type_set - VALID_TYPES
     if unknown:
         raise _abort(
@@ -364,7 +398,8 @@ def export(
             else ""
         )
         + f"\n  samples: {summary.fft_samples} FFT + "
-        f"{summary.waveform_samples} waveform  "
+        f"{summary.waveform_samples} waveform + "
+        f"{summary.trend_samples} trend  "
         f"({summary.parquet_files} parquet files, "
         f"{summary.manifest_rows} manifest rows)"
     )

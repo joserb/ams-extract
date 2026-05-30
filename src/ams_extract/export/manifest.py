@@ -4,12 +4,12 @@ The manifest is the master index of the dataset: one row per sample, with
 NO amplitude arrays, so "what did I measure, where and when?" can be
 answered without loading a single spectrum. See PLAN.md §3.5.
 
-Rows are produced by the dataset orchestrator (one per emitted FFT or
-waveform sample) as plain dicts so they survive pickling across worker
-processes. :data:`MANIFEST_FIELDS` is the canonical, ordered schema; the
-type-specific numeric columns are nullable because a given row is either
-an FFT (``fmax_hz`` / ``n_lines``) or a waveform
-(``sample_rate_hz`` / ``rpm`` / ``n_samples``).
+Rows are produced by the dataset orchestrator (one per emitted FFT spectrum,
+waveform, or trend reading) as plain dicts so they survive pickling across
+worker processes. :data:`MANIFEST_FIELDS` is the canonical, ordered schema;
+the type-specific numeric columns are nullable because a given row is an FFT
+(``fmax_hz`` / ``n_lines``), a waveform (``sample_rate_hz`` / ``rpm`` /
+``n_samples``), or a trend reading (``overall``).
 """
 
 # pyright: reportUnknownMemberType=false
@@ -41,6 +41,7 @@ MANIFEST_FIELDS: list[tuple[str, pa.DataType]] = [
     ("sample_rate_hz", pa.float32()),
     ("rpm", pa.float32()),
     ("n_samples", pa.int32()),
+    ("overall", pa.float32()),
     ("parquet_path", pa.string()),
 ]
 
