@@ -3,9 +3,13 @@
 > Documento vivo. Se irá completando a medida que descubramos y verifiquemos
 > detalles del formato binario de RBMware / AMS Machinery Manager (MT4.00).
 
-Estado: Fase 2b completada — secciones §1, §2, §3 y §6 verificadas contra
-el fichero real `BUNGE CARTAGENA marzo 2.0.rbm`. Sample records (§5) y
-el catálogo exhaustivo de tags de 4 chars (§4) siguen pendientes.
+Estado: Fases 0–6 completadas + **calibración FFT resuelta (2026-05-30)**.
+Secciones §1, §2, §3, §5 y §6 verificadas contra el fichero real
+`BUNGE CARTAGENA marzo 2.0.rbm`. Los sample records (§5) están totalmente
+decodificados y calibrados: FFT velocidad (mm/s), FFT aceleración —PeakVue
++ alta frecuencia— (G's) y waveform (G's). Pendiente principal: el mapeo
+completo de `vddt` (series de tendencias) y el catálogo exhaustivo de tags
+poco frecuentes (§4).
 
 ## 1. Estructura general
 
@@ -210,7 +214,7 @@ verificada en cada fase:
 | `vdfw` | 157 055 | descriptor de un waveform individual (n_samples, sample_period, units) | Fase 5a |
 | `vdpm` | 6 141 | point descriptor (config: template, RPM, alarmas; incluye plantillas) | Fase 2b + 3a |
 | `pdcd` | (no listado por scan) | índice de tipos de medida por punto ("Set Colección Datos Primar") | Fase 3a |
-| `vddt` | pendiente medir | otro tipo de medida (Overall / PeakVue / bandas?) — pendiente | Fase 3b |
+| `vddt` | (no listado por scan) | series temporales de tendencias (Valores Globales + bandas con nombre). Parcialmente decodificado: chain + escala overall (in/s ÷25.4) conocidos; layout valor↔timestamp por muestra sin resolver | Fase 7 (parcial) |
 | `gdsc` | 6 504 | aún sin confirmar (¿descriptor general?) | — |
 | `gicm` | 26 | equipment list chunk (20 slots + continuation) | Fase 2b (ADR-0004) |
 | `gdcm` | 347 | equipment instance | Fase 2b (ADR-0003) |
@@ -480,21 +484,31 @@ Resueltas en sub-fase 3a:
 - ~~Layout interno de `vcps`~~: header de 24 bytes + 122 float32 LE
   consecutivos (ver §5.4).
 
+Resueltas en Fase 5 / calibración (2026-05-30):
+
+- ~~Estructura interna de `vcfw` y `vdfw` (waveforms)~~: RESUELTO (§5.5).
+  `vdfw` descriptor (timestamp 0x34, scale_factor 0x28, …); `vcfw` =
+  244 int16 LE/record. Calibrado a G's vía `vdfw.0x28`.
+- ~~Escalado/normalización de las amplitudes en `vcps` para casar con
+  el eje Y de AMS~~: RESUELTO (§5.6). Espectro completo = banda baja
+  `vdps[0xC8:0x200]` + cadena `vcps`; velocidad ×48.5 → mm/s,
+  aceleración ×1.30 → G's.
+- ~~Reconciliación entre `n_lines = 1600` y los 1586 floats de la
+  cadena `vcps`~~: RESUELTO (§5.6). El espectro real son 1664 bins
+  (78 baja + 1586 cadena), truncados a 1600.
+
 Pendientes:
 
 - Layout exacto de `0x22-0x2B` y `0x30-0x57` en la cabecera (Fase 1).
 - Función de los u32 LE en el "rebozado" de cada record (preámbulo
   `0x00-0x07`): timestamps, contadores, versión… aún sin confirmar.
-- Estructura interna de `vcfw` y `vdfw` (waveforms). Sub-fase 3b.
-- Estructura de `vddt` (otros tipos de medida: Overall, PeakVue,
-  bandas con nombre). Fase 3b o 5.
+- **`vddt` — mapeo completo** (series de tendencias: Valores Globales,
+  bandas con nombre). Parcialmente decodificado; falta el layout
+  valor↔timestamp por muestra. Fase 7.
 - Marker para distinguir un `vdpm` "real" de uno "plantilla". Hoy se
   filtran por construcción al recorrer sólo lo enlazado.
 - Significado preciso de los i32 signed deltas en `gicm.0x60+`,
   `vdpm.0x10+`, `vdps.0x0C`/`0x10` y `vcps.0x0C`/`0x10`. No bloquean
   ninguna fase actual.
-- Escalado/normalización de las amplitudes en `vcps` para casar con
-  el eje Y de AMS (sub-fase 3b).
-- Reconciliación entre `n_lines = 1600` y los 1586 floats que
-  realmente caben en una cadena `vcps` de 13 records.
+- Padding waveform 488 vs 512 (24 muestras "fantasma" en el descriptor).
 - Resto de la lista inicial en `docs/PLAN.md` §4.6.

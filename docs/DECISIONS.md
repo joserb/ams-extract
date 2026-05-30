@@ -339,3 +339,90 @@ lógicos sigue siendo el puntero `gicm.0x0C` → next gicm.
   "phase-2b-equipment-count-fix"`. Consumidores que viesen v2 detectan
   fácilmente que están leyendo un extracto incompleto y deben
   re-procesar.
+
+---
+
+## ADR-0005 — Reconstrucción y calibración del espectro FFT (banda baja + cadena + escala única por unidad)
+
+- **Fecha**: 2026-05-30
+- **Estado**: aceptada (cierre funcional de Fase 4)
+
+### Contexto
+
+Durante meses la calibración de amplitudes del FFT se registró como una
+"discrepancia estructural irrecuperable" (`FORMAT.md §5.6`): los ratios
+AMS/decoded parecían no constantes (16 a 2330) y el pico dominante de AMS
+(M1H 14.68 Hz) aparecía "ausente" del array decodificado. Se llegó a
+documentar como no recuperable. La hipótesis "AMS reconstruye la FFT desde
+la waveform" ya se había descartado en sub-5a (488 muestras / 0.19 s no
+dan 1600 líneas a 0.625 Hz/bin).
+
+El error real era doble: (1) comparábamos un espectro **incompleto**
+—sólo la cadena `vcps`, que arranca en la línea 78— contra el gold, que
+incluye las líneas 0–77 (1X/2X de giro, donde suele caer el pico mayor);
+y (2) no se aplicaba ninguna escala.
+
+### Decisión
+
+**Reconstrucción.** El espectro de display de AMS se ensambla en dos piezas:
+
+1. **Bins 0..77 (0–48.75 Hz)** — 78 float32 contiguos en la **cola del
+   propio record `vdps`**, offsets `0xC8..0x1FF` (`(0x200-0xC8)/4 = 78`).
+2. **Bins 78..1663** — la cadena `vcps` (≈1586 floats).
+
+`espectro = concat(vdps[0xC8:0x200], cadena_vcps)` truncado a `n_lines`
+(1600). Frecuencia del bin `i` = `i · Fmax / n_lines` (sin offset una vez
+antepuesta la banda baja).
+
+**Calibración — una escala constante por tipo de unidad**, no por-muestra:
+
+- **Velocidad** (units crudas `plg/segs` / `in/sec` / `pul/sg`):
+  `mm/s = 48.5 · raw` (`VELOCITY_SCALE_MM_S`). Pooled median 48.8 sobre 72
+  picos; ≈ 25.4 pulgadas→mm × ~1.9 ventana/normalización. Valores tipo PC.
+- **Aceleración** (units `G's`; puntos PeakVue fmax 1000 + alta frecuencia
+  fmax 6000): `G's = 1.30 · raw` (`ACCEL_SCALE_G`). Sin conversión de unidad;
+  valores RMS (de ahí que el factor difiera del de velocidad). El mismo
+  ×1.30 vale para PeakVue y HF → es una constante de digitización del
+  formato, independiente de Fmax.
+
+Implementado en `records/sample.py` (`read_vdps_low_band`,
+`assemble_spectrum`, `VELOCITY_SCALE_MM_S`, `ACCEL_SCALE_G`) y aplicado en
+`tree.walk_spectra`. Las units se emiten ya calibradas (`mm/s`, `G's`).
+
+### Cómo se validó
+
+- **Test de nulidad del offset**: barriendo offsets 0..160 bins al
+  anteponer la banda baja, **78 es el único** con logcorr > 0.90 contra el
+  gold. Confirma que la cadena empieza exactamente en la línea 78.
+- **Velocidad, 3 máquinas / 3 RPM** (gold = "Lista de Picos" de AMS):
+  AG-100 M1H (1455 rpm, logcorr +0.999, escala 48.0), PM-6901-A M1H
+  (3000 rpm, +0.999, 48.7), AR-1211 M1H (1500 rpm, +0.998, 47.9). Picos
+  por pico ±5–10%.
+- **Aceleración, dos tipos**: PM-6901-A M2P/B1P (PeakVue, fmax 1000,
+  median 0.998, logcorr +0.995) y PM-6901-B M1F (alta frecuencia,
+  fmax 6000, median 1.009, 24/24 picos ±10%, logcorr +0.998).
+
+Registro completo en `docs/VERIFICATION.md §5`.
+
+### Alternativas consideradas
+
+- **"FFT reconstruida desde la waveform"**: descartada en sub-5a — la
+  waveform almacenada no tiene resolución para 1600 líneas a 0.625 Hz/bin.
+- **Escala por-muestra (factor en algún offset del `vdps`, análogo a
+  `vdfw.0x28` de la waveform)**: investigada (script throwaway
+  `scripts/investigate_fft_calibration.py`, que también barrió cadenas
+  `vcps` vecinas y canales `pdcd` alternativos) y descartada — una sola
+  constante por unidad reproduce el gold en todas las máquinas probadas.
+- **Marcar la calibración como no recuperable**: era la conclusión previa,
+  refutada al detectar la banda baja faltante.
+
+### Consecuencias
+
+- El FFT deja de tener deuda de calibración: `rbm extract` y `rbm export`
+  emiten mm/s (velocidad) y G's (aceleración) directamente.
+- AMS muestra para puntos de velocidad una "aceleración" derivada
+  (`a = v·2πf`, ratio constante 0.716 ≈ 1/√2 RMS-vs-pico) que **no** está
+  almacenada; no la emitimos (sería una columna derivada de la velocidad).
+- Si aparece un `.rbm` con otra digitización, las escalas 48.5 / 1.30
+  podrían no transferir; están aisladas como constantes en `sample.py`
+  para recalibrar con un gold nuevo.

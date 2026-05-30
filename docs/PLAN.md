@@ -4,10 +4,12 @@
 > (ficheros `.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM Windows XP
 > ni del software AMS original.
 
-Versión del documento: 0.9 (post Fase 6 + **calibración FFT resuelta**:
+Versión del documento: 1.0 (post Fase 6 + **calibración FFT completa**:
 `rbm export` produce el dataset completo —hierarchy.json + manifest.parquet
-+ samples por equipo/tipo— con paralelización opcional; el espectro de
-velocidad sale completo y calibrado en mm/s, validado contra 3 máquinas)
++ samples por equipo/tipo— con paralelización opcional; los espectros de
+velocidad salen calibrados en mm/s y los de aceleración —PeakVue + alta
+frecuencia— en G's, validados contra varias máquinas; las waveforms en G's.
+No queda deuda de calibración funcional)
 Última actualización: 2026-05-30
 
 Repo: `git@github.com:joserb/ams-extract.git` (privado)
@@ -22,8 +24,8 @@ Repo: `git@github.com:joserb/ams-extract.git` (privado)
 | 1 — Reader + header | ✅ completada | `rbm info` extrae firma/descripción/timestamp; ADR-0001 (base-0) |
 | 2a — Áreas + CI | ✅ completada | 15 áreas verificadas; CI matrix listo; ADR-0002 |
 | 2b — Equipos y Puntos | ✅ completada | 15 áreas, 347 equipos, 5203 puntos, 1198 PEAKVUE (tras el fix gicm 20-slot del 2026-05-28); `rbm-dev scan --tags`; ADR-0003 |
-| 3 — Sample reader FFT | ✅ completada | Sub-3a + sub-3b: `rbm extract --point NAME --equipment SUBSTR --limit N` emite Parquet + PNG. **Calibración RESUELTA (2026-05-30)**: espectro completo = banda baja (`vdps[0xC8:0x200]`, 78 bins) + cadena `vcps`, ×48.5 → mm/s. Validado a ±5–10% en 3 máquinas (§5.6). |
-| 4 — Verificación visual | ✅ parcial | 7/15 áreas visualmente verificadas; FFT (amplitudes mm/s y frecuencias) y waveform (Pc/Pk) dentro del ~5–10% del gold de AMS. La calibración FFT se resolvió leyendo la banda baja del `vdps` + escala ×48.5 (§5.6). |
+| 3 — Sample reader FFT | ✅ completada | Sub-3a + sub-3b: `rbm extract --point NAME --equipment SUBSTR --limit N` emite Parquet + PNG. **Calibración RESUELTA (2026-05-30)**: espectro completo = banda baja (`vdps[0xC8:0x200]`, 78 bins) + cadena `vcps`. Velocidad ×48.5 → mm/s; aceleración (PeakVue + alta frecuencia) ×1.30 → G's. Validado a ±5–10% en varias máquinas (§5.6). |
+| 4 — Verificación visual | ✅ parcial | 7/15 áreas visualmente verificadas; FFT (amplitudes mm/s y G's, frecuencias) y waveform (Pc/Pk) dentro del ~5–10% del gold de AMS. La calibración FFT se resolvió leyendo la banda baja del `vdps` + escala ×48.5 (velocidad) / ×1.30 (aceleración) (§5.6). |
 | 5 — Waveforms | ✅ completada | sub-5a (recon) + sub-5b (impl): `records/waveform.py`, `walk_waveforms`, `rbm extract --type fft\|waveform\|both`. **Calibración de amplitud RESUELTA** vía `vdfw.0x28` (Pc/Pk de M1H idénticos al gold de AMS). |
 | 6 — Export masivo | ✅ completada | `rbm export FILE --out dataset/ [--types fft,waveform] [--areas …] [--parallel N]` emite hierarchy.json + manifest.parquet + samples/area=X/equipment=Y__{fft,waveform}.parquet. Decisión: **ficheros separados por tipo**. Serial + ProcessPoolExecutor por equipo. |
 | 7 — Refinamientos | ⏳ pendiente | Plantillas, field notes, bandas de alarma, `vddt`, short codes nativos |
@@ -687,13 +689,13 @@ AG-100 con timestamps idénticos al gold de AMS y picos coincidentes
 en frecuencia (25 Hz fundamental, 50/100 Hz armónicos, picos a 540 y
 840 Hz como en el screenshot de AMS).
 
-**Aplazado a refinamientos** (no bloquea Fase 4):
+**Resuelto después (2026-05-30, ver §5.6)**:
 
-- Escalado de amplitudes: hoy emitimos los floats crudos de `vcps`
-  (units = "plg/segs" como string). El eje Y de AMS muestra mm/seg.
-  Falta el factor de conversión completo (probablemente vive en
-  algún offset todavía sin parsear del `vdps` o del template `ESTÁNDAR`).
-- Padding 14 bins (1586 vs 1600): sin afectar la forma del espectro.
+- ~~Escalado de amplitudes~~: RESUELTO. El espectro de display es la banda
+  baja `vdps[0xC8:0x200]` (78 bins) concatenada con la cadena `vcps`;
+  velocidad ×48.5 → mm/s, aceleración ×1.30 → G's. Ya no emitimos crudo.
+- ~~Padding 14 bins (1586 vs 1600)~~: RESUELTO — el espectro real son 1664
+  bins (78 baja + 1586 cadena), truncados a 1600; no faltaban bins.
 
 ### Fase 4 — Verificación visual contra AMS (≈ 0.5 sesión) — ✅ completada parcial 2026-05-29
 
@@ -712,16 +714,19 @@ HORIZONTAL de AG-100 en DEPURADORA):
   pendientes de verificación visual pero con conteos locked en tests.
 - **FFT M1H 2020-02-19**: frecuencias de picos cuadran (los 24 picos
   de la "Lista de Picos" de AMS están en los bins correctos de
-  nuestro `rbm extract`), units textuales correctas ("plg/segs"),
-  timestamps idénticos. **Amplitudes en una representación distinta**:
-  ratios AMS/decoded entre 16 y 2330, no constantes; deuda abierta
-  registrada en `FORMAT.md §5.6`.
-- **Waveform M1H 2020-02-19**: Pc(+) 0.482 vs AMS 0.483 (0.2% error),
-  Pk(-) -0.500 vs -0.510 (2%), sample_rate y units exactos.
+  nuestro `rbm extract`), units calibradas (mm/s), timestamps
+  idénticos. **Amplitudes RESUELTAS (2026-05-30)**: tras anteponer la
+  banda baja `vdps[0xC8:0x200]` y aplicar ×48.5, los 24 picos casan
+  con el gold a ±5–10% (logcorr +0.999); ver `FORMAT.md §5.6`.
+- **FFT aceleración (PeakVue + HF)**: validado en PM-6901-A (M2P/B1P,
+  PeakVue) y PM-6901-B (M1F, alta frecuencia fmax 6000) con escala ×1.30
+  → G's, residual median ≈1.00 y logcorr +0.995/+0.998.
+- **Waveform M1H 2020-02-19**: Pc(+) 0.483 vs AMS 0.483 (calibrado vía
+  `vdfw.0x28`), Pk(-) -0.510 vs -0.510, sample_rate y units exactos.
 
-**Definition of done**: parcialmente cumplida (extracción
-estructuralmente correcta para FFT y waveform; calibración absoluta
-de amplitudes FFT pendiente).
+**Definition of done**: cumplida — extracción estructuralmente correcta
+y calibrada para FFT (mm/s y G's) y waveform (G's). No queda deuda de
+calibración de amplitudes.
 
 ### Fase 5 — Waveforms (≈ 1-2 sesiones) — 🚧 sub-5a completada 2026-05-29
 
@@ -961,52 +966,64 @@ Resumen de lo cerrado en la conversación previa:
 
 ## 12. Para retomar la próxima sesión
 
-Última pausa: 2026-05-29 tras Fase 6 (export masivo). Commits por delante
-de `origin/master` esperando push manual.
+Última pausa: 2026-05-30 tras **resolver la calibración FFT completa**
+(velocidad mm/s + aceleración G's). Commits por delante de
+`origin/master` esperando push manual.
 
 ### Estado del repo
 
 - `master` es el branch de trabajo. Todas las fases 0–6 están
-  mergeadas. CI matrix corre en push/PR. Convención: trabajar directo
-  sobre master, sin `phase-NN-*` branches salvo experimentos arriesgados.
-- Working tree limpio.
-- Tests verdes: 127 unit + 22 integración (con `RBM_TEST_FILE`
-  definido) = 149 total. Ruff + `pyright src/` limpios.
+  mergeadas, más la calibración FFT (Fase 4 cerrada en lo funcional).
+  CI matrix corre en push/PR. Convención: trabajar directo sobre master,
+  sin `phase-NN-*` branches salvo experimentos arriesgados.
+- Working tree limpio salvo `scripts/investigate_fft_calibration.py`
+  (diagnóstico throwaway de la calibración FFT, ya resuelta; borrar o
+  no commitear).
+- Tests verdes (unit + integración con `RBM_TEST_FILE` definido),
+  incl. validación de PeakVue y alta frecuencia (fmax 6000) en G's.
+  Ruff + `pyright src/` limpios.
 - `rbm tree FILE --out tree.json` genera la jerarquía completa
   (`schema_version=3`, `phase="phase-2b-equipment-count-fix"`).
 - `rbm extract FILE --point NAME [--equipment SUBSTR] --type fft|waveform|both
   --limit N --out DIR` emite Parquet + PNG por espectro FFT y/o waveform.
-  Las waveforms salen calibradas (G's); el FFT sigue en crudo (deuda §5.6).
+  **Todo calibrado**: FFT velocidad en mm/s, FFT aceleración en G's,
+  waveform en G's. Sin deuda de calibración.
 - `rbm export FILE --out dataset/ [--types fft,waveform] [--areas …]
   [--parallel N]` genera el dataset completo (hierarchy.json +
   manifest.parquet + samples/area=X/equipment=Y__{fft,waveform}.parquet).
 
 ### Primer paso al volver
 
-Opción A (recomendada) — **Investigar calibración FFT (`vcps`) (§5.6)**:
-es la única deuda funcional grande que queda. Ahora con la waveform
-calibrada vía `vdfw.0x28`, mirar si `vdps` tiene un offset análogo de
-escala (no probado aún). Líneas no descartadas: escala en `vdps`/`vdpm`
-sin parsear, factor en records auxiliares. **NO probar** "FFT(waveform)
-→ comparar" — ya descartada en sub-5a (la waveform de 488 muestras no da
-1600 líneas).
+La calibración FFT (antigua Opción A) está **resuelta** — ver §5.6 de
+`FORMAT.md`. Lo que queda es **Fase 7 (refinamientos)**, por orden de valor:
 
-Opción B — **Fase 7 (refinamientos)**: benchmark del export total de
-BUNGE (1.86 GB), plantillas, bandas de alarma, `vddt`, short codes
-nativos, field notes.
+1. **`vddt` — series temporales de tendencias** (el siguiente bocado
+   grande). Decodificado parcialmente: Valores Globales + bandas con
+   trend; chain + escala overall conocidos (in/s ÷25.4), tabla de
+   valores capturada, pero el layout por-muestra valor↔timestamp sin
+   resolver. Necesita una sesión de layout enfocada.
+2. **Benchmark del export total de BUNGE** (1.86 GB) — medir tiempos
+   serial vs `--parallel N`.
+3. **Short codes nativos** de áreas/equipos/puntos (continuation block
+   `gicm.0xE0+`, stride 10 bytes; equivalentes para vdpm/gdcm).
+4. **Plantillas** (`DEP-M`, `IBL-REACC S1`, …): hoy filtradas; escanear
+   `vdpm` no alcanzados si se quieren exponer.
+5. **Bandas de alarma** y **field notes** (best effort).
 
 ### Preguntas abiertas
 
 Ninguna bloqueante. Para referencia:
 
-1. **Calibración amplitudes FFT**: la grande, documentada en `FORMAT.md §5.6`.
+1. ~~**Calibración amplitudes FFT**~~: RESUELTA (2026-05-30, `FORMAT.md §5.6`).
+   Velocidad ×48.5 → mm/s, aceleración ×1.30 → G's, banda baja `vdps[0xC8:0x200]`.
 2. **Padding waveform 488 vs 512**: 24 muestras "fantasma" en el descriptor.
 3. **Short codes nativos de áreas/equipos/puntos**: viven en el
    continuation block de `gicm` (`0xE0+`) y en zonas equivalentes
    para vdpm/gdcm. Cerrarían §4.6.
 4. **Plantillas (`DEP-M`, `IBL-REACC S1`, …)**: hoy filtradas. Fase 7.
 5. **`vddt` mapeo completo**: series temporales de tendencias
-   (Valores Globales / SUBSINCRONO / …). Fase 7.
+   (Valores Globales / SUBSINCRONO / …). Parcialmente decodificado;
+   falta el layout valor↔timestamp por muestra. Fase 7.
 6. **i32 signed deltas en `gicm.0x60+`, `vdps.0x0C-0x10`, `vcps.0x0C-0x10`,
    `vcfw.0x0C-0x10`**: pattern repetido en todos los records, sin
    función identificada.
