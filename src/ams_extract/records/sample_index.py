@@ -6,8 +6,8 @@ The ``pdcd`` acts as a per-point index of measurement chains:
 
 - ``pdcd.0x04`` → first ``vcfw`` (early hypothesis; superseded by the
   verified ``vdfw`` descriptor chain below — kept for reference)
-- ``pdcd.0x3C`` → first ``vddt`` (other measurement type — pending)
-- ``pdcd.0x40`` → first ``vddt`` (other measurement type — pending)
+- ``pdcd.0x3C`` → first ``vddt`` of the trend chain (oldest), FORMAT §5.7
+- ``pdcd.0x40`` → last  ``vddt`` of the trend chain (newest), FORMAT §5.7
 - ``pdcd.0x44`` → first ``vdps`` of the FFT chain (oldest spectrum)
 - ``pdcd.0x48`` → last  ``vdps`` of the FFT chain (newest spectrum)
 - ``pdcd.0x5C`` → first ``vdfw`` waveform descriptor (oldest), sub-fase 5a
@@ -29,6 +29,8 @@ from ams_extract.reader import RbmReader, decode_inner_pointer
 PDCD_TAG = b"pdcd"
 TAG_OFFSET = 0x08
 
+PDCD_TREND_FIRST_VDDT_OFFSET = 0x3C
+PDCD_TREND_LAST_VDDT_OFFSET = 0x40
 PDCD_FFT_FIRST_VDPS_OFFSET = 0x44
 PDCD_FFT_LAST_VDPS_OFFSET = 0x48
 PDCD_WAVEFORM_FIRST_OFFSET = 0x04
@@ -49,6 +51,8 @@ class PdcdLinks:
     """
 
     record_num: int
+    trend_first_vddt: int | None
+    trend_last_vddt: int | None
     fft_first_vdps: int | None
     fft_last_vdps: int | None
     waveform_first: int | None
@@ -79,6 +83,8 @@ def parse_pdcd_links(reader: RbmReader, pdcd_record: int) -> PdcdLinks:
 
     return PdcdLinks(
         record_num=pdcd_record,
+        trend_first_vddt=_pointer(PDCD_TREND_FIRST_VDDT_OFFSET),
+        trend_last_vddt=_pointer(PDCD_TREND_LAST_VDDT_OFFSET),
         fft_first_vdps=_pointer(PDCD_FFT_FIRST_VDPS_OFFSET),
         fft_last_vdps=_pointer(PDCD_FFT_LAST_VDPS_OFFSET),
         waveform_first=_pointer(PDCD_WAVEFORM_FIRST_OFFSET),

@@ -14,11 +14,12 @@ output.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import datetime
 
 import numpy as np
 import structlog
 
-from ams_extract.models import Area, Equipment, Point, Spectrum, Waveform
+from ams_extract.models import Area, Equipment, Point, Spectrum, Trend, Waveform
 from ams_extract.naming import NameSanitizer
 from ams_extract.reader import RbmReader
 from ams_extract.records.area import (
@@ -59,6 +60,13 @@ from ams_extract.records.sample_index import (
     PdcdLinks,
     SampleIndexError,
     parse_pdcd_links,
+)
+from ams_extract.records.trend import (
+    TREND_VELOCITY_SCALE_MM_S,
+    TrendChainError,
+    TrendLayoutError,
+    parse_vddt_record,
+    walk_vddt_chain,
 )
 from ams_extract.records.waveform import (
     WaveformChainError,
@@ -486,3 +494,73 @@ def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
             carga_pct=desc.carga_pct,
             samples=samples,
         )
+
+
+def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
+    """Yield the "Valores Globales" trend series for ``point`` (usually one).
+
+    Walks ``vdpm.0x10 → pdcd → 0x3C → vddt → (chain via 0x10)``, decodes
+    each ``vddt`` record's sample slots, and flattens the whole chain into a
+    single :class:`~ams_extract.models.Trend` with the overall calibrated to
+    mm/s (FORMAT §5.7). ``vddt`` records using an unsupported (non-velocity)
+    layout are logged and skipped; a missing pdcd or first-vddt yields no
+    trend. If every record was skipped the trend is omitted entirely.
+    """
+    links = _resolve_pdcd_links(reader, point)
+    if links is None:
+        return
+
+    if links.trend_first_vddt is None:
+        _log.info(
+            "point_has_no_trend_chain",
+            point=point.long_name,
+            pdcd_record=links.record_num,
+        )
+        return
+
+    try:
+        records = list(walk_vddt_chain(reader, links.trend_first_vddt))
+    except TrendChainError as exc:
+        _log.warning(
+            "vddt_chain_failed",
+            point=point.long_name,
+            first_vddt=links.trend_first_vddt,
+            error=str(exc),
+        )
+        return
+
+    timestamps: list[datetime] = []
+    overall: list[float] = []
+    for record_num in records:
+        try:
+            readings = parse_vddt_record(reader, record_num)
+        except TrendLayoutError as exc:
+            _log.info(
+                "vddt_layout_unsupported",
+                point=point.long_name,
+                vddt_record=record_num,
+                error=str(exc),
+            )
+            continue
+        except TrendChainError as exc:
+            _log.warning(
+                "vddt_record_failed",
+                point=point.long_name,
+                vddt_record=record_num,
+                error=str(exc),
+            )
+            continue
+        for reading in readings:
+            timestamps.append(reading.timestamp_utc)
+            overall.append(reading.overall_raw * TREND_VELOCITY_SCALE_MM_S)
+
+    if not timestamps:
+        return
+
+    yield Trend(
+        record_num=links.trend_first_vddt,
+        point_record_num=point.record_num,
+        units="mm/s",
+        timestamps_utc=tuple(timestamps),
+        overall=np.asarray(overall, dtype=np.float32),
+    )

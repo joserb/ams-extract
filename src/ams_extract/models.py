@@ -147,3 +147,32 @@ class Waveform:
     units: str
     carga_pct: float
     samples: NDArray[np.float32]
+
+
+@dataclass(frozen=True, slots=True)
+class Trend:
+    """The "Valores Globales" trend series for a point (overall RMS velocity).
+
+    Reached through ``vdpm.0x10 → pdcd → 0x3C → vddt → (chain via 0x10)``.
+    Each ``vddt`` record holds a run of 41-byte sample slots; the whole
+    chain is flattened into the parallel ``timestamps_utc`` / ``overall``
+    arrays, oldest reading first (FORMAT §5.7, ADR-0006). Only the velocity
+    template is decoded; PeakVue / acceleration trends use a different,
+    not-yet-supported layout and are skipped by the walker.
+
+    Attributes:
+        record_num: Zero-based record number of the first ``vddt`` in the chain.
+        point_record_num: Record number of the parent ``vdpm`` (point).
+        units: Display units of ``overall`` — ``"mm/s"`` for the calibrated
+            velocity trend.
+        timestamps_utc: Reading timestamps, one per element of ``overall``,
+            oldest first. Decoded via the off-by-one date rule (FORMAT §5.7).
+        overall: Calibrated overall value per reading (``raw * 25.4`` -> mm/s).
+            Validated 47/47 against the AMS PLOTDATA gold for M1H AG-100.
+    """
+
+    record_num: int
+    point_record_num: int
+    units: str
+    timestamps_utc: tuple[datetime, ...]
+    overall: NDArray[np.float32]

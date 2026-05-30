@@ -17,7 +17,7 @@ from typer.testing import CliRunner
 
 from ams_extract.cli import app as rbm_app
 from ams_extract.reader import RbmReader
-from ams_extract.tree import walk_hierarchy, walk_spectra
+from ams_extract.tree import walk_hierarchy, walk_spectra, walk_trends
 
 pytestmark = pytest.mark.integration
 
@@ -321,3 +321,47 @@ def test_extract_waveform_payload_matches_ams_gold(
     assert np.isfinite(samples).all()
     assert samples.max() == pytest.approx(0.483, abs=0.02)
     assert samples.min() == pytest.approx(-0.510, abs=0.02)
+
+
+# AMS PLOTDATA "Valore Globale" for AG-100 M1H, the overall RMS velocity
+# trend (mm/s) read top-to-bottom — the first 47 of 62 readings. The gold
+# the vddt layout was cracked against (FORMAT §5.7, ADR-0006).
+_M1H_TREND_GOLD_MM_S = (
+    1.58, 1.60, 1.88, 1.37, 2.24, 3.22, 2.10, 1.38, 2.08, 2.16, 6.54, 4.62,
+    4.51, 14.64, 6.98, 2.80, 5.53, 9.98, 6.54, 6.51, 9.56, 9.23, 11.40, 7.44,
+    6.91, 7.73, 4.79, 3.29, 3.34, 10.90, 15.54, 6.49, 7.68, 9.26, 15.34, 15.25,
+    18.05, 6.01, 36.43, 5.92, 4.34, 5.74, 3.10, 8.72, 4.05, 11.89, 15.24,
+)
+
+
+def test_trend_overall_matches_ams_gold(real_rbm: Path) -> None:
+    # The vddt "Valores Globales" trend for M1H must reproduce the AMS
+    # PLOTDATA table exactly (overall in mm/s = raw x 25.4), including the
+    # off-by-one date rule and the duplicate reading on 2017-07-13.
+    with RbmReader(real_rbm) as reader:
+        point = next(
+            p
+            for area in walk_hierarchy(reader)
+            if "DEPURADORA" in area.long_name
+            for eq in area.equipment
+            if "AG-100" in eq.long_name
+            for p in eq.points
+            if p.long_name == "MOTOR LOA HORIZONTAL"
+        )
+        trend = next(walk_trends(reader, point))
+
+    assert trend.units == "mm/s"
+    assert len(trend.overall) == len(trend.timestamps_utc)
+    assert len(trend.overall) >= len(_M1H_TREND_GOLD_MM_S)
+
+    for i, gold in enumerate(_M1H_TREND_GOLD_MM_S):
+        assert float(trend.overall[i]) == pytest.approx(gold, abs=0.02), (
+            f"reading {i} ({trend.timestamps_utc[i]:%Y-%m-%d}): "
+            f"decoded {float(trend.overall[i]):.2f} vs gold {gold:.2f}"
+        )
+
+    # First reading dated from the record's d0; the 36.43 peak falls on the
+    # 2017-07-13 duplicate (two readings share that date).
+    assert trend.timestamps_utc[0].strftime("%Y-%m-%d") == "2013-02-28"
+    assert trend.timestamps_utc[38].strftime("%Y-%m-%d") == "2017-07-13"
+    assert float(trend.overall[38]) == pytest.approx(36.43, abs=0.02)
