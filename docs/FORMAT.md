@@ -3,12 +3,13 @@
 > Documento vivo. Se irá completando a medida que descubramos y verifiquemos
 > detalles del formato binario de RBMware / AMS Machinery Manager (MT4.00).
 
-Estado: Fases 0–6 completadas + **calibración FFT resuelta (2026-05-30)**.
-Secciones §1, §2, §3, §5 y §6 verificadas contra el fichero real
-`BUNGE CARTAGENA marzo 2.0.rbm`. Los sample records (§5) están totalmente
-decodificados y calibrados: FFT velocidad (mm/s), FFT aceleración —PeakVue
-+ alta frecuencia— (G's) y waveform (G's). Pendiente principal: el mapeo
-completo de `vddt` (series de tendencias) y el catálogo exhaustivo de tags
+Estado: Fases 0–6 completadas + **calibración FFT resuelta (2026-05-30)** +
+**tendencias `vddt` resueltas (2026-05-30)**. Secciones §1, §2, §3, §5 y §6
+verificadas contra el fichero real `BUNGE CARTAGENA marzo 2.0.rbm`. Los
+sample records (§5) están totalmente decodificados y calibrados: FFT
+velocidad (mm/s), FFT aceleración —PeakVue + alta frecuencia— (G's),
+waveform (G's) y tendencias de Valores Globales (mm/s, §5.7). Pendiente
+menor: etiquetar las 7 bandas del `vddt` y el catálogo exhaustivo de tags
 poco frecuentes (§4).
 
 ## 1. Estructura general
@@ -214,7 +215,7 @@ verificada en cada fase:
 | `vdfw` | 157 055 | descriptor de un waveform individual (n_samples, sample_period, units) | Fase 5a |
 | `vdpm` | 6 141 | point descriptor (config: template, RPM, alarmas; incluye plantillas) | Fase 2b + 3a |
 | `pdcd` | (no listado por scan) | índice de tipos de medida por punto ("Set Colección Datos Primar") | Fase 3a |
-| `vddt` | (no listado por scan) | series temporales de tendencias (Valores Globales + bandas con nombre). Parcialmente decodificado: chain + escala overall (in/s ÷25.4) conocidos; layout valor↔timestamp por muestra sin resolver | Fase 7 (parcial) |
+| `vddt` | (no listado por scan) | series temporales de tendencias (Valores Globales + 7 bandas). **RESUELTO**: slots de 41 B (marcador `d3faff00`), overall en `+0x04` ×25.4 → mm/s, ts de la muestra siguiente en `+0x24`. Validado 47/47 vs gold (§5.7) | 2026-05-30 |
 | `gdsc` | 6 504 | aún sin confirmar (¿descriptor general?) | — |
 | `gicm` | 26 | equipment list chunk (20 slots + continuation) | Fase 2b (ADR-0004) |
 | `gdcm` | 347 | equipment instance | Fase 2b (ADR-0003) |
@@ -239,8 +240,8 @@ vdpm (point)
   └── 0x10 → pdcd ("Set Colección Datos Primar" — índice del punto)
         ├── 0x04 → vcfw (waveform chain head — pendiente §5.5)
         ├── 0x38 → vdpm (back-ref al propio punto)
-        ├── 0x3C → vddt (otro tipo de medida, p.ej. global/overall — pendiente)
-        ├── 0x40 → vddt (otro tipo de medida — pendiente)
+        ├── 0x3C → vddt (primer record de tendencias; Valores Globales — §5.7)
+        ├── 0x40 → vddt (último record de tendencias — §5.7)
         ├── 0x44 → vdps (primer espectro FFT, el más antiguo)
         └── 0x48 → vdps (último espectro FFT, el más reciente)
 
@@ -277,8 +278,8 @@ afinar).
 | `0x04` | 4 | u32 LE (+1 encoded) — primer `vcfw` (waveform chain) |
 | `0x10` | 32 | descripción ASCII (`"Set Colección Datos Primar     "`) |
 | `0x38` | 4 | u32 LE (+1 encoded) — back-ref al `vdpm` del punto |
-| `0x3C` | 4 | u32 LE (+1 encoded) — `vddt` (otro tipo de medida) |
-| `0x40` | 4 | u32 LE (+1 encoded) — `vddt` (otro tipo de medida) |
+| `0x3C` | 4 | u32 LE (+1 encoded) — **primer `vddt`** (cadena de tendencias / Valores Globales, más antiguo) |
+| `0x40` | 4 | u32 LE (+1 encoded) — **último `vddt`** (más reciente) |
 | `0x44` | 4 | u32 LE (+1 encoded) — primer `vdps` de la cadena FFT (más antiguo) |
 | `0x48` | 4 | u32 LE (+1 encoded) — último `vdps` de la cadena FFT (más reciente) |
 
@@ -459,6 +460,68 @@ constante de digitización del formato, independiente de Fmax.
 - **Significado preciso de los i32 deltas en `vcps.0x0C`/`0x10` y
   `vdps.0x0C`/`0x10`**. No bloquea ninguna fase activa.
 
+### 5.7 `vddt` — series de tendencias (Valores Globales + bandas) — RESUELTO (2026-05-30)
+
+Los records `vddt` almacenan la **tendencia temporal** que AMS pinta como
+"Gráf. tendencia de Valores Globales": el overall RMS velocity (mm/s) más
+las bandas con nombre (SUBSINCRONO, DESEQUILIBRIO, DESALINEACION, HOLGURAS,
+11-40X RPM, 1-20KHz) muestreados a lo largo de años. El parámetro principal
+es "RMSVelocidad en mm/Seg".
+
+**Cadena**: `pdcd.0x3C` = primer `vddt` (más antiguo), `pdcd.0x40` = último
+(mismo patrón first/last que `vdps` 0x44/0x48). Los `vddt` se encadenan por
+`0x10` (+1-encoded, `0` = fin). Para M1H AG-100: 6 records (336987→336992).
+
+**Cabecera del record `vddt`**:
+
+| Offset | Tamaño | Campo |
+|---|---|---|
+| `0x00` | 8 | preámbulo |
+| `0x08` | 4 | tag ASCII `vddt` |
+| `0x10` | 4 | u32 LE (+1 encoded) — **siguiente `vddt`** (`0` = último) |
+| `0x14` | 4 | u32 LE (+1 encoded) — back-ref al `pdcd` |
+| `0x18` | 4 | u32 LE — Unix ts de la **primera** muestra del record (`d0`) |
+| `0x1C` | 4 | u32 LE — Unix ts de la **última** muestra del record (`d1`) |
+| `0x24` | 4 | u32 LE — `7` (≈ nº de columnas/bandas; **no** es nº de muestras) |
+| `0x2F` | … | inicio del primer **slot** de muestra (ver abajo) |
+
+**Slots de muestra** — secuencia de **slots de 41 bytes** (stride `0x29`),
+el primero en offset `0x2F`, cada uno precedido por el marcador `d3 fa ff 00`:
+
+| Offset (dentro del slot) | Tamaño | Campo |
+|---|---|---|
+| `+0x00` | 4 | marcador de slot `d3 fa ff 00` |
+| `+0x04` | 4 | **float32 overall** (Valores Globales). `mm/s = float × 25.4` (almacenado en in/s) |
+| `+0x08` | 28 | **7 × float32** — bandas con nombre (orden por confirmar con gold por-banda) |
+| `+0x24` | 4 | u32 LE — Unix ts de la muestra **SIGUIENTE** (ver regla de fechas) |
+
+Hay **11 slots** por record (el último de la cadena, menos). Pueden aparecer
+marcadores espurios antes de `0x2F` o slots con overall fuera de rango al
+final; se descartan filtrando por `0 < overall < ~50 mm/s`.
+
+**Regla de fechas (la clave del decode)**: el timestamp guardado en `+0x24`
+de un slot es la fecha de la muestra **siguiente**, no la suya. Por tanto:
+
+```
+fecha[0]  = vddt.0x18 (d0, primera muestra del record)
+fecha[k]  = timestamp en slot[k-1].+0x24   (para k ≥ 1)
+```
+
+La última muestra de cada record toma su fecha del `+0x24` del slot anterior;
+su propio `+0x24` suele ser `0`. La primera muestra del record siguiente
+toma su fecha del `d0` de ese record.
+
+**Validación**: decodificados 62 puntos para M1H AG-100; los primeros 47
+coinciden **EXACTO** (fecha + valor) con la tabla gold de AMS (PLOTDATA
+"Valore Globale", 47 filas 28-feb-2013 → 18-abr-2018), incluido el
+duplicado del 13-jul-2017 (6.01 y 36.43 mm/s el mismo día). Anclas:
+`slot@0x58 +0x04 = 0.6038 → 15.34 mm/s` (20-abr-2017),
+`slot@0xFC +0x04 = 1.4341 → 36.43 mm/s` (13-jul-2017, pico del trend).
+
+**Pendiente (menor)**: etiquetar cuál de las 7 bandas es SUBSINCRONO,
+DESEQUILIBRIO, etc. — requiere capturas gold del PLOTDATA **por banda**
+(no solo del overall). No bloquea emitir la tendencia de Valores Globales.
+
 ## 6. Encoding y strings
 
 - **cp1252 (Windows-1252)** confirmado en el fichero real: `0xC1 = 'Á'`
@@ -496,15 +559,18 @@ Resueltas en Fase 5 / calibración (2026-05-30):
 - ~~Reconciliación entre `n_lines = 1600` y los 1586 floats de la
   cadena `vcps`~~: RESUELTO (§5.6). El espectro real son 1664 bins
   (78 baja + 1586 cadena), truncados a 1600.
+- ~~**`vddt` — layout de muestras**~~: RESUELTO (§5.7). Slots de 41 B,
+  overall en `+0x04` (×25.4 → mm/s), ts de la muestra siguiente en
+  `+0x24`. Validado 47/47 vs gold.
 
 Pendientes:
 
 - Layout exacto de `0x22-0x2B` y `0x30-0x57` en la cabecera (Fase 1).
 - Función de los u32 LE en el "rebozado" de cada record (preámbulo
   `0x00-0x07`): timestamps, contadores, versión… aún sin confirmar.
-- **`vddt` — mapeo completo** (series de tendencias: Valores Globales,
-  bandas con nombre). Parcialmente decodificado; falta el layout
-  valor↔timestamp por muestra. Fase 7.
+- **`vddt` — etiquetado de las 7 bandas** (cuál es SUBSINCRONO,
+  DESEQUILIBRIO, …). Requiere gold del PLOTDATA por banda. No bloquea
+  emitir el overall (Valores Globales).
 - Marker para distinguir un `vdpm` "real" de uno "plantilla". Hoy se
   filtran por construcción al recorrer sólo lo enlazado.
 - Significado preciso de los i32 signed deltas en `gicm.0x60+`,

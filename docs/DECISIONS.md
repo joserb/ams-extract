@@ -426,3 +426,82 @@ Registro completo en `docs/VERIFICATION.md §5`.
 - Si aparece un `.rbm` con otra digitización, las escalas 48.5 / 1.30
   podrían no transferir; están aisladas como constantes en `sample.py`
   para recalibrar con un gold nuevo.
+
+---
+
+## ADR-0006 — Layout de las tendencias `vddt` (slots de 41 B, timestamp "del siguiente")
+
+- **Fecha**: 2026-05-30
+- **Estado**: aceptada (Fase 7)
+
+### Contexto
+
+Los records `vddt` (apuntados por `pdcd.0x3C`/`0x40`) almacenan la
+tendencia de **Valores Globales** (overall RMS velocity) + bandas con
+nombre que AMS pinta como serie temporal de años. La estructura de cadena
+ya se conocía (chain por `0x10`, rango de fechas en `0x18`/`0x1C`), y la
+escala del overall también (in/s × 25.4 → mm/s). Lo que llevaba meses sin
+resolver era el **layout interno**: cómo se indexan valor y timestamp por
+muestra. Intentos previos con stride fijo de 36 B fallaban, los timestamps
+parecían "off-by-one" respecto al valor, y `0x24 = 7` no cuadraba como
+número de muestras.
+
+El bloqueo era falta de gold suficiente. El 2026-05-30 el usuario aportó la
+tabla PLOTDATA "Valore Globale" completa de M1H AG-100 (47 filas
+fecha→valor), que permitió fuerza-bruta-alinear el layout.
+
+### Decisión
+
+Un `vddt` es una secuencia de **slots de 41 bytes** (stride `0x29`), el
+primero en offset `0x2F`, cada uno con marcador `d3 fa ff 00`:
+
+- `+0x00` marcador `d3 fa ff 00`
+- `+0x04` float32 **overall** (Valores Globales); `mm/s = float × 25.4`
+- `+0x08` 7 × float32 — bandas (etiquetado pendiente)
+- `+0x24` u32 — Unix timestamp de la muestra **siguiente**
+
+11 slots por record (el último de la cadena, menos). Se descartan
+marcadores espurios antes de `0x2F` y slots con overall fuera de rango.
+
+**Regla de fechas** (clave): el timestamp de un slot apunta a la muestra
+siguiente, no a la suya:
+
+```
+fecha[0] = vddt.0x18 (d0)               # primera muestra del record
+fecha[k] = slot[k-1].+0x24  (k ≥ 1)     # ts almacenado en el slot anterior
+```
+
+La primera muestra de cada record toma su fecha del `d0` de ese record;
+el `+0x24` del último slot es `0`.
+
+### Cómo se validó
+
+Decodificados 62 puntos para M1H AG-100 con la regla anterior; los
+primeros 47 coinciden **exacto** (fecha + valor) con el gold de AMS,
+incluido el duplicado del 13-jul-2017 (6.01 y 36.43 mm/s el mismo día).
+Anclas: `slot@0x58 +0x04 = 0.6038 → 15.34 mm/s` (20-abr-2017) y
+`slot@0xFC +0x04 = 1.4341 → 36.43 mm/s` (13-jul-2017, pico). Script de
+cracking: `scripts/investigate_vddt_layout.py`.
+
+### Alternativas consideradas
+
+- **Stride fijo de 36 B sin marcador**: descartada — parseaba unas muestras
+  y rompía otras; el stride real es 41 B y el marcador `d3 fa ff 00` lo
+  delimita de forma fiable.
+- **Timestamp del slot = fecha de su propio valor**: descartada — produce
+  un desfase sistemático de una muestra contra el gold. El ts es "del
+  siguiente"; la primera fecha viene de `d0`.
+- **`0x24` = número de muestras**: descartada — vale 7 constante mientras
+  hay 11 slots; es nº de columnas/bandas, no de muestras.
+- **Implementar a ciegas sin gold** (§7.4 del PLAN): se evitó a propósito;
+  se esperó a tener la tabla gold para no emitir tendencias mal alineadas.
+
+### Consecuencias
+
+- La tendencia de Valores Globales es ahora extraíble y verificada; queda
+  implementar `models.Trend` + `walk_trends` + emisión en `extract`/`export`
+  + tests, análogo a `walk_spectra`/`walk_waveforms`.
+- El etiquetado de las 7 bandas (cuál es SUBSINCRONO, etc.) queda pendiente
+  hasta tener gold del PLOTDATA por banda; no bloquea el overall.
+- El marcador `d3 fa ff 00` y el stride 41 B son específicos de esta
+  versión MT4.00; si aparece otro formato habría que re-derivarlos.

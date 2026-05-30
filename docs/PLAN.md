@@ -997,11 +997,13 @@ Resumen de lo cerrado en la conversación previa:
 La calibración FFT (antigua Opción A) está **resuelta** — ver §5.6 de
 `FORMAT.md`. Lo que queda es **Fase 7 (refinamientos)**, por orden de valor:
 
-1. **`vddt` — series temporales de tendencias** (el siguiente bocado
-   grande). Decodificado parcialmente: Valores Globales + bandas con
-   trend; chain + escala overall conocidos (in/s ÷25.4), tabla de
-   valores capturada, pero el layout por-muestra valor↔timestamp sin
-   resolver. Necesita una sesión de layout enfocada.
+1. **`vddt` — series temporales de tendencias**. Layout **RESUELTO**
+   (2026-05-30, validado 47/47 vs gold; ver `FORMAT.md §5.7` y ADR-0006):
+   slots de 41 B, overall en `+0x04` ×25.4 → mm/s, ts de la muestra
+   siguiente en `+0x24`. **Falta implementarlo en código**: `models.Trend`
+   + `walk_trends` + emisión en `extract`/`export` + tests (análogo a
+   `walk_spectra`/`walk_waveforms`). Etiquetar las 7 bandas queda aparte
+   (necesita gold por banda).
 2. **Benchmark del export total de BUNGE** (1.86 GB) — medir tiempos
    serial vs `--parallel N`.
 3. **Short codes nativos** de áreas/equipos/puntos (continuation block
