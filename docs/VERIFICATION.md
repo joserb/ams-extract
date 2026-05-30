@@ -3,10 +3,10 @@
 > Cómo validar que lo extraído por `ams-extract` coincide con lo que un
 > analista vería en AMS Machinery Manager para el mismo punto y timestamp.
 
-Estado: **Fase 4 ejecutada (parcial)**. Jerarquía verificada en 7/15 áreas;
-FFT (velocidad mm/s + aceleración G's) y waveform (G's) validados a ±5–10%
-contra el gold de AMS. Calibración cerrada el 2026-05-30. Registro de
-verificaciones concretas en §5.
+Estado: jerarquía verificada en 7/15 áreas; FFT (velocidad mm/s + aceleración
+G's), waveform (G's / mm/s) y tendencia "Valores Globales" (mm/s, 47/47)
+validados contra el gold de AMS. **Export completo validado end-to-end**
+(274.478 muestras, conteo exacto, 2026-05-31). Registro concreto en §5.
 
 ## 1. Objetivo
 
@@ -88,17 +88,31 @@ capturas de AMS.
 | 2026-05-30 | PM-6901-A B1P | PeakVue | 1000 | median 0.998 | +0.995 | ✓ |
 | 2026-05-30 | PM-6901-B M1F | HF (alta frec.) | 6000 | median 1.009 | +0.998 | ✓ 24/24 ±10% |
 
-### Waveform (G's)
+### Waveform
 
 | Fecha | Punto | Timestamp | Métrica | AMS | Decodificado | Match |
 |---|---|---|---|---|---|---|
 | 2026-05-29 | AG-100 M1H | 2020-02-19 | Pc(+) | 0.483 G | 0.483 G | ✓ <0.3% (calibrado `vdfw.0x28`) |
 | 2026-05-29 | AG-100 M1H | 2020-02-19 | Pk(-) | -0.510 G | -0.510 G | ✓ |
+| 2026-05-31 | CONTRA INCENDIOS PM-0CI/1 M LOA H | — | unidades | mm/s | mm/s | ✓ velocidad ×25.4 (regresión del leak in/s) |
+
+### Tendencia "Valores Globales" (`vddt`, mm/s)
+
+| Fecha | Punto | Gold | Resultado |
+|---|---|---|---|
+| 2026-05-30 | AG-100 M1H | PLOTDATA "Valore Globale" (47 filas) | **47/47** exacto (fecha + valor, incl. duplicado 13-jul-2017 y pico 36.43 mm/s) |
+| 2026-05-30 | AG-100 M1H (bandas) | PLOTDATA por banda (5 ficheros + Mp Wave) | **62/62** por banda (etiquetado de columnas) |
+
+### Export masivo (validación end-to-end)
+
+| Fecha | Alcance | Resultado |
+|---|---|---|
+| 2026-05-31 | BUNGE completo, `--parallel 4` | **18,6 s**; 15 áreas, 311/347 equipos con datos, **0 fallos**; **137.270 FFT + 137.208 waveform = 274.478** (cuadra exacto con AMS); 622 Parquet, 1,3 GB; carga Hive OK |
 
 ### Pendiente de verificación visual
 
 - 8 áreas grandes restantes (conteos locked en tests de integración, pero
   sin cotejo visual nombre-a-nombre): EXTRACCION, PREPARACION, REFINERIA,
   IMPULSIÓN DE MAR, PARQUE TANQUES, FULL-FAT, OBSOLETOS, OSMOSIS.
-- `vddt` (Valores Globales / tendencias): pendiente de decodificar antes de
-  poder verificar (Fase 7).
+- `pdpa`: umbrales/rangos por banda pendientes de gold (diálogo de bandas/
+  alarmas de AMS) para fijar offsets.

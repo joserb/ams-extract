@@ -9,28 +9,38 @@ See [docs/PLAN.md](docs/PLAN.md) for the project plan and roadmap, and
 
 ## Status
 
-Working end-to-end. The walker extracts the full hierarchy (areas → equipment →
-points), FFT spectra and time-domain waveforms, and a mass exporter writes the
-whole database to a partitioned Parquet dataset.
+Working end-to-end and validated on the full reference database. The walker
+extracts the complete hierarchy (areas → equipment → points), FFT spectra,
+time-domain waveforms and the "Valores Globales" trend, and a mass exporter
+writes the whole database to a partitioned Parquet dataset (the full 1.8 GiB
+BUNGE database exports in ~19 s with `--parallel 4`, with sample counts
+matching AMS exactly).
 
 - **Velocity FFT** is reconstructed in full and calibrated to **mm/s**
   (validated against AMS on 3 machines, ±5–10%).
 - **Acceleration FFT** (PeakVue + high-frequency points) is calibrated to **G's**
   (validated on PeakVue and HF spectra, ±10%).
-- **Waveforms** are calibrated to display units (G's), reproducing the AMS
-  peak/trough values within ~0.3%.
+- **Waveforms** are calibrated to display units — **G's** for acceleration
+  (AMS peak/trough within ~0.3%) and **mm/s** for velocity.
+- **Trends** ("Valores Globales", overall RMS velocity) are decoded to **mm/s**
+  (validated 47/47 against the AMS trend table for M1H AG-100).
 
 ## Commands
 
 ```bash
 rbm info   FILE                              # signature, description, counts
 rbm tree   FILE [--out tree.json]            # full Areas/Equipment/Points hierarchy
+rbm stats  summary  FILE [--area SUBSTR]     # machines + sp/wv/tn data totals
+rbm stats  machines FILE [--area SUBSTR] [--sort total|sp|wv|tn|name] [--limit N]
+rbm stats  points   FILE --equipment SUBSTR [--area SUBSTR]   # per-point counts
 rbm extract FILE --point NAME [--equipment SUBSTR] \
-                 --type fft|waveform|both --limit N --out DIR   # Parquet + PNG
-rbm export FILE --out dataset/ [--types fft,waveform] \
+                 --type fft|waveform|trend|both --limit N --out DIR   # Parquet + PNG
+rbm export FILE --out dataset/ [--types fft,waveform,trend] \
                 [--areas …] [--parallel N]    # full dataset (hierarchy.json +
                                               # manifest.parquet + per-equipment Parquet)
 ```
+
+`sp` = FFT spectra, `wv` = waveforms, `tn` = trend readings.
 
 ## Reference database
 
@@ -48,8 +58,12 @@ this tool:
 | &nbsp;&nbsp;— velocity (mm/s) | 85,698 |
 | &nbsp;&nbsp;— acceleration / PeakVue / HF (G's) | 51,572 |
 | Waveforms | 137,208 |
-| **Total samples** | **274,478** |
-| Time span | 2019-10 → 2026-03 (~7 years) |
+| **Total FFT + waveform** | **274,478** |
+| Trend readings ("Valores Globales", mm/s) | 151,691 |
+| Time span | 2013 → 2026 (~13 years; trends reach back furthest) |
+
+The FFT + waveform counts above match the full `rbm export` output (default
+types) exactly; trends are an opt-in type.
 
 Spectra come in several resolutions — Fmax mostly 1000 Hz (velocity + PeakVue),
 2000 Hz, and 6000 Hz (high-frequency acceleration), each 1600 lines.

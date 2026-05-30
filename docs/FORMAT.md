@@ -224,6 +224,8 @@ verificada en cada fase:
 | `gdts` | 16 | índice área → equipment chain | Fase 2b (ADR-0003) |
 | `gits` | 1 | área list "prefix-list" | Fase 2a (ADR-0002) |
 | `gddh` | 1 | database header tag (record 0) | Fase 1 |
+| `pdpa` | 41 | plantilla de análisis (bandas + rangos + umbrales de alarma); compartida entre puntos | §5.8 |
+| `gdnl` | (varios) | informes de alarma en texto literal (`"SUBSINCRONO - … - C Alarm"`) | §5.8 |
 
 ## 5. Sample records — FFT chain
 
@@ -349,7 +351,14 @@ aplicado a las muestras crudas (max=12862, min=-13575) da Pc(+)=0.483 G y
 Pk(-)=-0.510 G, idéntico al gold de AMS (error < 0.3%). El factor es
 **por-waveform** (varía entre adquisiciones: 3.84e-05 para 15-oct,
 3.7548e-05 para el resto). `walk_waveforms` aplica el factor y emite
-`Waveform.samples` ya en unidades de display (`units`, p.ej. G's).
+`Waveform.samples` ya en unidades de display.
+
+> **Unidad de display (2026-05-31)**: tras `scale_factor`, la waveform queda
+> en su unidad nativa — **G's** para aceleración (se deja tal cual) e
+> **in/s** para velocidad. AMS muestra velocidad en mm/s, así que
+> `walk_waveforms` aplica además **×25.4** a las waveforms de velocidad
+> (units `plg/segs`/`in/sec`) → `mm/s`, igual que el FFT/trend de velocidad.
+> En BUNGE: 503 waveforms son de velocidad (resto G's).
 
 Para M1H 19-feb-2020 BUNGE: 2 vcfw records → 488 muestras decoded
 (24 menos que las 512 nominales — pendiente entender el padding).
@@ -546,6 +555,41 @@ primeros 47 coinciden **EXACTO** (fecha + valor) con la tabla gold de AMS
 (`rbm extract --type trend`, `rbm export --types …,trend`). Hoy se emite
 **solo el overall**; emitir las bandas etiquetadas (con sus unidades mixtas)
 y los trends de aceleración queda pendiente.
+
+### 5.8 `pdpa` — config de análisis del punto (bandas / rangos / alarmas)
+
+Parcialmente mapeado (2026-05-31). Define qué bandas tiene un punto, sus
+rangos de frecuencia y sus umbrales de alarma — la "definición" de los
+indicadores que luego viven como columnas en el `vddt` (§5.7).
+
+**Son PLANTILLAS COMPARTIDAS**: en BUNGE solo hay **41 records `pdpa`** (de
+3,6M records), agrupados en ~records 120-160; los 5203 puntos referencian
+una de ellas. → la config de una máquina **generaliza** a todas las que
+comparten plantilla.
+
+| Offset | Campo |
+|---|---|
+| `0x08` | tag `pdpa` |
+| `0x10` | nombre de plantilla (`"Estandar 1500 rpm (S)"`, `"REDUCTORA <300 rpm (S)"`, `"Alta resolucion (HR)"`…) |
+| `0x34` | **nombres de banda**: 12 slots × 14 chars, relleno `INDEFINID`. **Mismo orden que las columnas del `vddt`** (validado: pdpa "Estandar 1500 rpm" = `[Mp Wave, SUBSINCRONO, DESEQUILIBRIO, DESALINEACION, HOLGURAS, 11-40 X RPM, 1-20 KHz]`) |
+| `~0xF0+` | floats de **umbrales de alarma** y **rangos de frecuencia**, intercalados |
+
+- **Umbrales**: tripletes recurrentes tipo `[0.7, 1.5, 2.5, 10.5]` =
+  (¿baseline?, **Alerta/C**, **Peligro/D**, ¿máx?). Gold-consistente:
+  SUBSINCRONO de M1H pasa a C ~1.44 y D ~2.24 ≈ alerta 1.5 / peligro 2.5.
+- **Rangos de frecuencia**: fijos (`1000`/`20000` Hz = banda 1-20 KHz) y
+  **rpm-escalados** (`0x164`/`0x17C` = 40×RPM, borde de "11-40 X RPM";
+  diff plantilla 1500 vs 3000 rpm los aísla).
+
+**Enlace punto→plantilla**: el `vdpm` lleva la familia de plantilla en `0x4B`
+(`:ESTÁNDAR`) y los **rodamientos** en `0x07E` (`6204`/`6208`, frecuencias de
+fallo). La variante rpm se casa por nombre + rpm del punto.
+
+**Pendiente**: segmentar el offset exacto por-banda de
+`[freq_lo, freq_hi, alerta, peligro]` y el índice numérico limpio
+punto→`pdpa`. Necesitaría una captura del diálogo de bandas/alarmas de AMS.
+También: los records `gdnl` guardan informes de alarma en texto literal
+(`"SUBSINCRONO - 1.986 mm/Seg - C Alarm"`).
 
 ## 6. Encoding y strings
 

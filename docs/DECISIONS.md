@@ -520,3 +520,40 @@ de AG-100. Corregido:
   col0 = Mp Wave (**G's**), col1 SUBSINCRONO, col2 DESEQUILIBRIO, col3
   DESALINEACION, col4 HOLGURAS, col5 11-40X RPM (mm/s), col6 1-20 KHz (sin
   confirmar). Unidades mixtas → emitir las bandas queda pendiente.
+
+---
+
+## ADR-0007 — Export de tendencias (una fila por lectura) y unidades de velocidad
+
+- **Fecha**: 2026-05-31
+- **Estado**: aceptada
+
+### Contexto
+
+Al cablear `vddt` (tendencias) al export había que elegir formato; y la
+validación del export completo destapó 503 waveforms de velocidad emitidas
+en pulgadas/segundo, inconsistentes con el FFT/trend (mm/s).
+
+### Decisión
+
+1. **Tendencias: una fila por lectura** (no una fila por serie con arrays).
+   Cada lectura del `vddt` = una fila `(timestamp_utc, overall, units)` en
+   `…__trend.parquet`, igual que cualquier otra muestra → filtrable por fecha
+   y join 1:1 con `manifest.parquet` (columna nullable `overall`). El
+   `sample_id` lleva el índice de lectura como discriminador.
+2. **Unidades de velocidad unificadas a mm/s**. Las waveforms de velocidad
+   (units `plg/segs`/`in/sec`) se convierten **×25.4 → mm/s** en
+   `walk_waveforms`, igual que el FFT y el trend de velocidad. Aceleración
+   (G's) se deja tal cual. Motivo: una migración no debe mezclar in/s y mm/s
+   para la misma magnitud física.
+3. **Solo se emiten tendencias de velocidad**. El layout `vddt` decodifica
+   también aceleración (PeakVue/HF), pero su escala de overall no está
+   validada contra gold, así que se salta con log (no emitir lo no validado).
+
+### Consecuencias
+
+- `rbm export --types …,trend` y `rbm extract --type trend` producen mm/s.
+- Tras el fix, 0 muestras salen en in/s; el export completo (274.478
+  FFT+wv) se validó end-to-end (ver `VERIFICATION.md`).
+- Pendiente: emitir bandas con nombre (unidades mixtas) y tendencias de
+  aceleración cuando haya gold.
