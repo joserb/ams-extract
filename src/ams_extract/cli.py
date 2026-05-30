@@ -25,7 +25,14 @@ from ams_extract.models import Point
 from ams_extract.naming import NameSanitizer
 from ams_extract.reader import RbmFileError, RbmReader
 from ams_extract.records.header import parse_header
-from ams_extract.tree import walk_hierarchy, walk_spectra, walk_trends, walk_waveforms
+from ams_extract.stats import collect_machine_stats, summarize
+from ams_extract.tree import (
+    count_point_samples,
+    walk_hierarchy,
+    walk_spectra,
+    walk_trends,
+    walk_waveforms,
+)
 
 app = typer.Typer(
     name="rbm",
@@ -33,6 +40,13 @@ app = typer.Typer(
     no_args_is_help=True,
     add_completion=False,
 )
+
+stats_app = typer.Typer(
+    name="stats",
+    help="Sample-count statistics (machines and FFT/waveform/trend data counts).",
+    no_args_is_help=True,
+)
+app.add_typer(stats_app)
 
 _console = Console()
 
@@ -403,3 +417,147 @@ def export(
         f"({summary.parquet_files} parquet files, "
         f"{summary.manifest_rows} manifest rows)"
     )
+
+
+@stats_app.command("summary")
+def stats_summary(
+    file: Annotated[Path, typer.Argument(help="Path to a .rbm database file.")],
+    area: Annotated[
+        str | None,
+        typer.Option("--area", help="Restrict to areas matching this substring."),
+    ] = None,
+) -> None:
+    """Print database-wide counts: machines, points and sp/wv/tn data totals."""
+    if not file.exists():
+        raise _abort(f"file not found: {file}")
+    try:
+        with RbmReader(file) as reader:
+            machines = collect_machine_stats(reader, area_filter=area)
+    except RbmFileError as exc:
+        raise _abort(str(exc)) from exc
+    s = summarize(machines)
+
+    table = Table(title=f"rbm stats — {file.name}", show_header=False, box=None)
+    table.add_column(style="bold cyan")
+    table.add_column(justify="right")
+    table.add_row("areas", f"{s.n_areas:,}")
+    table.add_row("machines", f"{s.n_machines:,}")
+    table.add_row("machines with data", f"{s.n_machines_with_data:,}")
+    table.add_row("measurement points", f"{s.n_points:,}")
+    table.add_row("FFT spectra (sp)", f"{s.n_spectra:,}")
+    table.add_row("waveforms (wv)", f"{s.n_waveforms:,}")
+    table.add_row("trend readings (tn)", f"{s.n_trend_readings:,}")
+    table.add_row("[bold]total data[/bold]", f"[bold]{s.total_samples:,}[/bold]")
+    _console.print(table)
+
+
+@stats_app.command("machines")
+def stats_machines(
+    file: Annotated[Path, typer.Argument(help="Path to a .rbm database file.")],
+    area: Annotated[
+        str | None,
+        typer.Option("--area", help="Restrict to areas matching this substring."),
+    ] = None,
+    sort: Annotated[
+        str,
+        typer.Option("--sort", help="Sort key: total | sp | wv | tn | name."),
+    ] = "total",
+    limit: Annotated[
+        int | None,
+        typer.Option("--limit", help="Show only the top N machines."),
+    ] = None,
+) -> None:
+    """Print a per-machine table of sp/wv/tn data counts."""
+    if not file.exists():
+        raise _abort(f"file not found: {file}")
+    try:
+        with RbmReader(file) as reader:
+            machines = collect_machine_stats(reader, area_filter=area)
+    except RbmFileError as exc:
+        raise _abort(str(exc)) from exc
+
+    if sort == "total":
+        machines.sort(key=lambda m: -m.total)
+    elif sort == "sp":
+        machines.sort(key=lambda m: -m.n_spectra)
+    elif sort == "wv":
+        machines.sort(key=lambda m: -m.n_waveforms)
+    elif sort == "tn":
+        machines.sort(key=lambda m: -m.n_trend_readings)
+    elif sort == "name":
+        machines.sort(key=lambda m: (m.area_short, m.equipment_short))
+    else:
+        raise _abort(f"invalid --sort {sort!r}; choose total, sp, wv, tn or name")
+    shown = machines[:limit] if limit else machines
+
+    table = Table(title=f"rbm stats machines — {file.name}")
+    table.add_column("Area", style="cyan")
+    table.add_column("Machine", style="bold")
+    table.add_column("Pts", justify="right")
+    table.add_column("sp", justify="right")
+    table.add_column("wv", justify="right")
+    table.add_column("tn", justify="right")
+    table.add_column("Total", justify="right", style="bold")
+    for m in shown:
+        table.add_row(
+            m.area_long, m.equipment_long, str(m.n_points),
+            f"{m.n_spectra:,}", f"{m.n_waveforms:,}",
+            f"{m.n_trend_readings:,}", f"{m.total:,}",
+        )
+    s = summarize(machines)
+    table.add_section()
+    table.add_row(
+        f"TOTAL ({s.n_machines} machines)", "", f"{s.n_points:,}",
+        f"{s.n_spectra:,}", f"{s.n_waveforms:,}",
+        f"{s.n_trend_readings:,}", f"{s.total_samples:,}",
+    )
+    _console.print(table)
+    if limit and len(machines) > limit:
+        _console.print(f"[dim](showing top {limit} of {len(machines)})[/dim]")
+
+
+@stats_app.command("points")
+def stats_points(
+    file: Annotated[Path, typer.Argument(help="Path to a .rbm database file.")],
+    equipment: Annotated[
+        str,
+        typer.Option("--equipment", help="Equipment long_name substring to drill into."),
+    ],
+    area: Annotated[
+        str | None,
+        typer.Option("--area", help="Restrict to areas matching this substring."),
+    ] = None,
+) -> None:
+    """Print per-point sp/wv/tn counts for the machine(s) matching --equipment."""
+    if not file.exists():
+        raise _abort(f"file not found: {file}")
+    needle = equipment.strip().lower()
+    rows: list[tuple[str, str, int, int, int]] = []
+    try:
+        with RbmReader(file) as reader:
+            for ar in walk_hierarchy(reader):
+                if area and area.strip().lower() not in (
+                    ar.long_name.lower() + " " + ar.short_code.lower()
+                ):
+                    continue
+                for eq in ar.equipment:
+                    if needle not in eq.long_name.lower():
+                        continue
+                    for pt in eq.points:
+                        sp, wv, tn = count_point_samples(reader, pt)
+                        rows.append((eq.long_name, pt.long_name, sp, wv, tn))
+    except RbmFileError as exc:
+        raise _abort(str(exc)) from exc
+
+    if not rows:
+        raise _abort(f"no equipment matched {equipment!r}")
+
+    table = Table(title=f"rbm stats points — {equipment}")
+    table.add_column("Machine", style="cyan")
+    table.add_column("Point", style="bold")
+    table.add_column("sp", justify="right")
+    table.add_column("wv", justify="right")
+    table.add_column("tn", justify="right")
+    for eq_name, pt_name, sp, wv, tn in rows:
+        table.add_row(eq_name, pt_name, f"{sp:,}", f"{wv:,}", f"{tn:,}")
+    _console.print(table)

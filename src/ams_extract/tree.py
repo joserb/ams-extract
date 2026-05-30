@@ -503,6 +503,69 @@ def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
         )
 
 
+def _count_spectra(reader: RbmReader, first_vdps: int | None) -> int:
+    """Count FFT spectra for a point without reading their vcps payloads."""
+    if first_vdps is None:
+        return 0
+    try:
+        return sum(
+            1 for d in walk_vdps_chain(reader, first_vdps) if d.first_vcps is not None
+        )
+    except SampleChainError:
+        return 0
+
+
+def _count_waveforms(reader: RbmReader, first_vdfw: int | None) -> int:
+    """Count waveforms for a point without reading their vcfw payloads."""
+    if first_vdfw is None:
+        return 0
+    try:
+        return sum(
+            1 for d in walk_vdfw_chain(reader, first_vdfw) if d.first_vcfw is not None
+        )
+    except WaveformChainError:
+        return 0
+
+
+def _count_trend_readings(
+    reader: RbmReader, links: PdcdLinks, point: Point
+) -> int:
+    """Count emitted (velocity) trend readings for a point."""
+    if links.trend_first_vddt is None:
+        return 0
+    if _point_spectrum_units(reader, links) not in VELOCITY_UNITS_RAW:
+        return 0
+    try:
+        records = list(walk_vddt_chain(reader, links.trend_first_vddt))
+    except TrendChainError:
+        return 0
+    total = 0
+    for record_num in records:
+        try:
+            total += len(parse_vddt_record(reader, record_num))
+        except (TrendLayoutError, TrendChainError):
+            continue
+    return total
+
+
+def count_point_samples(reader: RbmReader, point: Point) -> tuple[int, int, int]:
+    """Return ``(n_spectra, n_waveforms, n_trend_readings)`` for ``point``.
+
+    Mirrors what :func:`walk_spectra` / :func:`walk_waveforms` /
+    :func:`walk_trends` would emit, but counts via the descriptor chains
+    without materializing any amplitude/sample arrays — so ``rbm stats``
+    can tally the whole database quickly.
+    """
+    links = _resolve_pdcd_links(reader, point)
+    if links is None:
+        return (0, 0, 0)
+    return (
+        _count_spectra(reader, links.fft_first_vdps),
+        _count_waveforms(reader, links.waveform_first_vdfw),
+        _count_trend_readings(reader, links, point),
+    )
+
+
 def _point_spectrum_units(reader: RbmReader, links: PdcdLinks) -> str | None:
     """Return the units string of the point's first FFT spectrum, or ``None``.
 

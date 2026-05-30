@@ -164,3 +164,27 @@ class TestRbmDevScan:
             ["scan", str(tmp_path / "missing.rbm"), "--tags"],
         )
         assert result.exit_code == 1
+
+
+class TestStats:
+    def test_summary_runs_on_synthetic(self, synthetic_rbm: Path) -> None:
+        result = runner.invoke(rbm_app, ["stats", "summary", str(synthetic_rbm)])
+        assert result.exit_code == 0, result.output
+        assert "machines" in result.output
+
+    def test_machines_runs_on_synthetic(self, synthetic_rbm: Path) -> None:
+        result = runner.invoke(rbm_app, ["stats", "machines", str(synthetic_rbm)])
+        assert result.exit_code == 0, result.output
+        assert "TOTAL" in result.output
+
+    def test_machines_rejects_bad_sort(self, synthetic_rbm: Path) -> None:
+        result = runner.invoke(
+            rbm_app, ["stats", "machines", str(synthetic_rbm), "--sort", "nope"]
+        )
+        assert result.exit_code == 1
+
+    def test_missing_file_exits_nonzero(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            rbm_app, ["stats", "summary", str(tmp_path / "missing.rbm")]
+        )
+        assert result.exit_code == 1
