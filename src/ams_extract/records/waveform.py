@@ -62,6 +62,11 @@ VCFW_NEXT_OFFSET = 0x14
 VCFW_DATA_OFFSET = 0x18
 VCFW_DATA_SAMPLES = (RECORD_SIZE - VCFW_DATA_OFFSET) // 2  # 244 int16 LE
 
+# Velocity waveforms are stored (after the vdfw.0x28 scale) in inches/sec;
+# AMS displays mm/s. Pure inch->mm conversion, same factor as the velocity
+# trend (and distinct from the FFT's 48.5, which folds in window terms).
+WAVEFORM_VELOCITY_SCALE_MM_S = 25.4
+
 # Safety caps to bound traversal of malformed chains.
 VDFW_CHAIN_MAX_LENGTH = 4096
 VCFW_CHAIN_MAX_LENGTH = 256

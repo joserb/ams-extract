@@ -17,7 +17,12 @@ from typer.testing import CliRunner
 
 from ams_extract.cli import app as rbm_app
 from ams_extract.reader import RbmReader
-from ams_extract.tree import walk_hierarchy, walk_spectra, walk_trends
+from ams_extract.tree import (
+    walk_hierarchy,
+    walk_spectra,
+    walk_trends,
+    walk_waveforms,
+)
 
 pytestmark = pytest.mark.integration
 
@@ -365,3 +370,25 @@ def test_trend_overall_matches_ams_gold(real_rbm: Path) -> None:
     assert trend.timestamps_utc[0].strftime("%Y-%m-%d") == "2013-02-28"
     assert trend.timestamps_utc[38].strftime("%Y-%m-%d") == "2017-07-13"
     assert float(trend.overall[38]) == pytest.approx(36.43, abs=0.02)
+
+
+def test_velocity_waveform_calibrated_to_mm_s(real_rbm: Path) -> None:
+    # Velocity waveforms (vdfw units plg/segs / in/sec) must be converted to
+    # mm/s (x25.4), like the velocity FFT/trend — not leaked in inches/sec.
+    with RbmReader(real_rbm) as reader:
+        point = next(
+            p
+            for area in walk_hierarchy(reader)
+            if "CONTRA INCENDIOS" in area.long_name
+            for eq in area.equipment
+            if "PM-0CI/1" in eq.long_name
+            for p in eq.points
+            if p.long_name == "MOTOR LOA HORIZONTAL"
+        )
+        waveforms = list(walk_waveforms(reader, point))
+
+    assert waveforms, "expected velocity waveforms for this point"
+    assert all(w.units == "mm/s" for w in waveforms)
+    # Sanity: a calibrated velocity waveform peak is well above the raw in/s
+    # magnitude (which would be < ~1); mm/s peaks are a few-to-tens.
+    assert max(abs(float(w.samples.max())) for w in waveforms) > 1.0

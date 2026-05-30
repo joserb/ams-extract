@@ -69,6 +69,7 @@ from ams_extract.records.trend import (
     walk_vddt_chain,
 )
 from ams_extract.records.waveform import (
+    WAVEFORM_VELOCITY_SCALE_MM_S,
     WaveformChainError,
     read_vcfw_samples,
     walk_vdfw_chain,
@@ -481,8 +482,14 @@ def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
                 error=str(exc),
             )
             continue
-        # Calibrate raw int16 counts to display units via vdfw.0x28.
-        samples = (raw * desc.scale_factor).astype(np.float32)
+        # Calibrate raw int16 counts to display units via vdfw.0x28. Velocity
+        # waveforms come out in inches/sec; convert to mm/s (x25.4) so they
+        # match the velocity FFT/trend units instead of leaking plg/segs.
+        samples = raw * desc.scale_factor
+        units = desc.units
+        if desc.units in VELOCITY_UNITS_RAW:
+            samples = samples * WAVEFORM_VELOCITY_SCALE_MM_S
+            units = VELOCITY_UNITS_CALIBRATED
         yield Waveform(
             record_num=desc.record_num,
             point_record_num=point.record_num,
@@ -490,9 +497,9 @@ def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
             n_samples=desc.n_samples,
             sample_rate_hz=desc.sample_rate_hz,
             rpm=desc.rpm,
-            units=desc.units,
+            units=units,
             carga_pct=desc.carga_pct,
-            samples=samples,
+            samples=samples.astype(np.float32),
         )
 
 
