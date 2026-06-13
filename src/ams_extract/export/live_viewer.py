@@ -89,39 +89,49 @@ def render_point_sample_png(reader: RbmReader, point: Point, kind: str, sample_i
     return buf.getvalue()
 
 
+# Light theme only: the plots are rendered server-side on a white background,
+# so a dark page made them glare. A consistent light UI keeps the white PNGs
+# from standing out.
 _CSS = """
-:root { color-scheme: light dark; }
 * { box-sizing: border-box; }
-body { font: 14px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 1200px;
-  padding: 1.5rem; color: #1a1a1a; background: #fafafa; }
-@media (prefers-color-scheme: dark) {
-  body { color: #e6e6e6; background: #161616; }
-  details, header, #plot { background: #1f1f1f; border-color: #333; }
-  input { background: #262626; color: #e6e6e6; border-color: #444; }
-  .samples a, button.kind { background: #243; border-color: #465; color: #e6e6e6; }
-}
-h1 { font-size: 1.3rem; }
-header { background:#fff; border:1px solid #e2e2e2; border-radius:8px; padding:1rem; }
-input[type=search]{ width:100%; padding:.5rem .75rem; font-size:1rem;
-  border:1px solid #ccc; border-radius:6px; margin:1rem 0; }
-details { background:#fff; border:1px solid #e2e2e2; border-radius:6px;
-  margin:.3rem 0; padding:0 .6rem; }
+body { font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  margin: 0 auto; max-width: 1200px; padding: 1.5rem;
+  color: #1f2328; background: #f4f5f7; }
+h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+header { background:#fff; border:1px solid #e2e4e8; border-radius:10px; padding:1rem 1.25rem; }
+header p { color:#57606a; margin:.25rem 0 0; }
+input[type=search]{ width:100%; padding:.55rem .8rem; font-size:1rem;
+  border:1px solid #d0d7de; border-radius:8px; margin:1rem 0; background:#fff; color:inherit; }
+details { background:#fff; border:1px solid #e2e4e8; border-radius:8px;
+  margin:.35rem 0; padding:0 .7rem; }
 details.area > summary { font-weight:700; }
 details.machine { margin-left:1rem; }
-summary { cursor:pointer; padding:.4rem .2rem; }
-.point { margin:.3rem 0 .6rem 1rem; padding:.3rem 0; border-top:1px solid #eee; }
-.point-name { font-weight:600; }
-button.kind { font:inherit; font-size:.8rem; margin:.15rem .3rem .15rem 0;
-  padding:.15rem .5rem; border:1px solid #ccd; border-radius:4px; background:#eef;
-  color:inherit; cursor:pointer; }
-button.kind[disabled]{ opacity:.4; cursor:default; }
-.samples { display:flex; flex-wrap:wrap; gap:.3rem; padding:.3rem 0 .3rem 1rem; }
-.samples a { font-size:.8rem; padding:.15rem .4rem; border:1px solid #ccd;
-  border-radius:4px; text-decoration:none; color:inherit; background:#eef; cursor:pointer; }
-.loading { color:#888; font-style:italic; padding:.3rem 1rem; }
-#plot { position:sticky; top:1rem; background:#fff; border:1px solid #e2e2e2;
-  border-radius:8px; padding:1rem; margin-top:1rem; text-align:center; min-height:60px; }
-#plot img { max-width:100%; height:auto; }
+summary { cursor:pointer; padding:.45rem .2rem; }
+summary:hover { color:#0969da; }
+.point { margin:.3rem 0 .5rem 1rem; padding:.4rem 0; border-top:1px solid #eef0f2; }
+.point-name { font-weight:600; margin-bottom:.25rem; }
+button.kind { font:inherit; font-size:.8rem; margin:.1rem .35rem .1rem 0; padding:.2rem .6rem;
+  border:1px solid #d0d7de; border-radius:6px; background:#f6f8fa; color:#1f2328; cursor:pointer; }
+button.kind:hover:not([disabled]){ background:#eaeef2; }
+button.kind[disabled]{ opacity:.45; cursor:default; }
+.samples { display:flex; flex-wrap:wrap; gap:.35rem; padding:.4rem 0 .3rem 1rem; }
+.samples a { font-size:.8rem; padding:.2rem .5rem; border:1px solid #d0d7de; border-radius:6px;
+  text-decoration:none; color:#1f2328; background:#fff; cursor:pointer; }
+.samples a:hover { border-color:#0969da; color:#0969da; }
+.samples a.active { background:#0969da; border-color:#0969da; color:#fff; }
+.loading { color:#8b949e; font-style:italic; padding:.3rem 1rem; }
+#panel { position:sticky; top:1rem; z-index:5; background:#fff; border:1px solid #e2e4e8;
+  border-radius:10px; margin:1rem 0; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+#panel-bar { display:flex; align-items:center; gap:.5rem; padding:.5rem .75rem;
+  border-bottom:1px solid #eef0f2; }
+#panel-title { font-weight:600; font-size:.9rem; flex:1; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+#panel-close { border:1px solid #d0d7de; background:#f6f8fa; border-radius:6px;
+  cursor:pointer; font:inherit; padding:.2rem .6rem; color:#57606a; }
+#panel-close:hover { background:#eaeef2; color:#1f2328; }
+#plot { text-align:center; padding:.75rem; min-height:80px; }
+#plot img { max-width:100%; height:auto; border-radius:6px; }
+#plot .placeholder { color:#8b949e; font-style:italic; padding:1rem; }
 .hidden { display:none !important; }
 """
 
@@ -129,23 +139,38 @@ _KIND_LABELS = (("fft", "Espectros"), ("waveform", "Ondas"), ("trend", "Tendenci
 
 _JS = """
 (function(){
+  var panel=document.getElementById('panel');
   var plot=document.getElementById('plot');
+  var titleEl=document.getElementById('panel-title');
   var box=document.getElementById('filter');
+  var active=null;
 
-  function showPlot(href){
-    plot.innerHTML='<em>cargando…</em>';
+  function closePlot(){
+    panel.classList.add('hidden'); plot.innerHTML='';
+    if(active){ active.classList.remove('active'); active=null; }
+  }
+  document.getElementById('panel-close').addEventListener('click', closePlot);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closePlot(); });
+
+  function showPlot(href, title, chip){
+    if(active) active.classList.remove('active');
+    active=chip||null; if(active) active.classList.add('active');
+    titleEl.textContent=title||'Gráfica';
+    panel.classList.remove('hidden');
+    plot.innerHTML='<div class="placeholder">cargando…</div>';
     var img=new Image();
     img.onload=function(){ plot.innerHTML=''; plot.appendChild(img); };
-    img.onerror=function(){ plot.innerHTML='<em>error al renderizar</em>'; };
+    img.onerror=function(){ plot.innerHTML='<div class="placeholder">error al renderizar</div>'; };
     img.src=href;
+    panel.scrollIntoView({block:'nearest'});
   }
 
-  function kindButton(pt, kind, label, count){
+  function kindButton(pt, name, kind, label, count){
     var b=document.createElement('button');
     b.className='kind'; b.textContent=label+' ('+count+')';
     if(count<1){ b.disabled=true; return b; }
     b.addEventListener('click', function(){
-      if(kind==='trend'){ showPlot('/plot/'+pt+'/trend/0.png'); return; }
+      if(kind==='trend'){ showPlot('/plot/'+pt+'/trend/0.png', name+' · '+label, b); return; }
       var holder=b.parentNode.querySelector('.samples[data-kind="'+kind+'"]');
       if(holder){ holder.classList.toggle('hidden'); return; }
       holder=document.createElement('div');
@@ -160,7 +185,7 @@ _JS = """
           var a=document.createElement('a');
           a.textContent=s.ts; a.href='#';
           a.addEventListener('click', function(e){ e.preventDefault();
-            showPlot('/plot/'+pt+'/'+kind+'/'+s.id+'.png'); });
+            showPlot('/plot/'+pt+'/'+kind+'/'+s.id+'.png', name+' · '+label+' · '+s.ts, a); });
           holder.appendChild(a);
         });
       }).catch(function(){ holder.innerHTML='<span class="loading">error</span>'; });
@@ -180,7 +205,8 @@ _JS = """
         var row=document.createElement('div'); row.className='point';
         var name=document.createElement('div'); name.className='point-name';
         name.textContent=p.name; row.appendChild(name);
-        _KINDS.forEach(function(k){ row.appendChild(kindButton(p.rec, k[0], k[1], p[k[0]])); });
+        _KINDS.forEach(function(k){
+          row.appendChild(kindButton(p.rec, p.name, k[0], k[1], p[k[0]])); });
         body.appendChild(row);
       });
     }).catch(function(){ body.innerHTML='<div class="loading">error al cargar</div>'; });
@@ -246,9 +272,15 @@ def build_live_html(areas: Sequence[Area], *, title: str = "Base de datos") -> s
 <body>
 <header><h1>{escape(title)}</h1>
 <p>{len(areas):,} áreas · {n_machines:,} máquinas. Despliega una máquina para
-cargar sus puntos y muestras; haz clic en una muestra para renderizar su gráfica.</p></header>
+cargar sus puntos y muestras; haz clic en una muestra para ver su gráfica.</p></header>
 <input type="search" id="filter" placeholder="Filtrar máquinas…" autocomplete="off">
-<div id="plot"><em>Selecciona una muestra…</em></div>
+<div id="panel" class="hidden">
+  <div id="panel-bar">
+    <span id="panel-title">Gráfica</span>
+    <button id="panel-close" title="Cerrar (Esc)">✕ Cerrar</button>
+  </div>
+  <div id="plot"></div>
+</div>
 <main>
 {areas_html}
 </main>

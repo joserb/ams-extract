@@ -153,49 +153,74 @@ def render_sample_png(dataset_dir: Path, row: dict[str, Any]) -> bytes:
     raise ViewerError(f"unknown sample type {sample_type!r}")
 
 
+# Light theme only: plots render server-side on a white background, so a dark
+# page made them glare. Matches the live viewer (ams_extract.export.live_viewer).
 _VIEWER_CSS = """
-:root { color-scheme: light dark; }
 * { box-sizing: border-box; }
-body { font: 14px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 1200px;
-  padding: 1.5rem; color: #1a1a1a; background: #fafafa; }
-@media (prefers-color-scheme: dark) {
-  body { color: #e6e6e6; background: #161616; }
-  details, header, #plot { background: #1f1f1f; border-color: #333; }
-  input { background: #262626; color: #e6e6e6; border-color: #444; }
-}
-h1 { font-size: 1.3rem; }
-header { background:#fff; border:1px solid #e2e2e2; border-radius:8px; padding:1rem; }
-input[type=search]{ width:100%; padding:.5rem .75rem; font-size:1rem;
-  border:1px solid #ccc; border-radius:6px; margin:1rem 0; }
-details { background:#fff; border:1px solid #e2e2e2; border-radius:6px;
-  margin:.3rem 0; padding:0 .6rem; }
+body { font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  margin: 0 auto; max-width: 1200px; padding: 1.5rem;
+  color: #1f2328; background: #f4f5f7; }
+h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+header { background:#fff; border:1px solid #e2e4e8; border-radius:10px; padding:1rem 1.25rem; }
+header p { color:#57606a; margin:.25rem 0 0; }
+input[type=search]{ width:100%; padding:.55rem .8rem; font-size:1rem;
+  border:1px solid #d0d7de; border-radius:8px; margin:1rem 0; background:#fff; color:inherit; }
+details { background:#fff; border:1px solid #e2e4e8; border-radius:8px;
+  margin:.35rem 0; padding:0 .7rem; }
 details.area > summary { font-weight:700; }
 details.machine { margin-left:1rem; }
 details.point { margin-left:1rem; }
-summary { cursor:pointer; padding:.4rem .2rem; }
-.samples { display:flex; flex-wrap:wrap; gap:.3rem; padding:.3rem 0 .6rem 1rem; }
-.samples a { font-size:.8rem; padding:.15rem .4rem; border:1px solid #ccd;
-  border-radius:4px; text-decoration:none; color:inherit; background:#eef; }
-@media (prefers-color-scheme: dark){ .samples a{ background:#243; border-color:#465; } }
-.kind { font-weight:600; color:#666; font-size:.8rem; margin-left:1rem; }
-#plot { position:sticky; top:1rem; background:#fff; border:1px solid #e2e2e2;
-  border-radius:8px; padding:1rem; margin-top:1rem; text-align:center; min-height:60px; }
-#plot img { max-width:100%; height:auto; }
+summary { cursor:pointer; padding:.45rem .2rem; }
+summary:hover { color:#0969da; }
+.kind { font-weight:600; color:#57606a; font-size:.8rem; margin-left:1rem; }
+.samples { display:flex; flex-wrap:wrap; gap:.35rem; padding:.4rem 0 .5rem 1rem; }
+.samples a { font-size:.8rem; padding:.2rem .5rem; border:1px solid #d0d7de; border-radius:6px;
+  text-decoration:none; color:#1f2328; background:#fff; cursor:pointer; }
+.samples a:hover { border-color:#0969da; color:#0969da; }
+.samples a.active { background:#0969da; border-color:#0969da; color:#fff; }
+#panel { position:sticky; top:1rem; z-index:5; background:#fff; border:1px solid #e2e4e8;
+  border-radius:10px; margin:1rem 0; box-shadow:0 1px 4px rgba(0,0,0,.07); }
+#panel-bar { display:flex; align-items:center; gap:.5rem; padding:.5rem .75rem;
+  border-bottom:1px solid #eef0f2; }
+#panel-title { font-weight:600; font-size:.9rem; flex:1; overflow:hidden;
+  text-overflow:ellipsis; white-space:nowrap; }
+#panel-close { border:1px solid #d0d7de; background:#f6f8fa; border-radius:6px;
+  cursor:pointer; font:inherit; padding:.2rem .6rem; color:#57606a; }
+#panel-close:hover { background:#eaeef2; color:#1f2328; }
+#plot { text-align:center; padding:.75rem; min-height:80px; }
+#plot img { max-width:100%; height:auto; border-radius:6px; }
+#plot .placeholder { color:#8b949e; font-style:italic; padding:1rem; }
 .hidden { display:none !important; }
 """
 
 _VIEWER_JS = """
 (function(){
   var box=document.getElementById('filter');
+  var panel=document.getElementById('panel');
   var plot=document.getElementById('plot');
+  var titleEl=document.getElementById('panel-title');
+  var active=null;
+
+  function closePlot(){
+    panel.classList.add('hidden'); plot.innerHTML='';
+    if(active){ active.classList.remove('active'); active=null; }
+  }
+  document.getElementById('panel-close').addEventListener('click', closePlot);
+  document.addEventListener('keydown', function(e){ if(e.key==='Escape') closePlot(); });
+
   document.addEventListener('click',function(e){
     var a=e.target.closest('a.sample'); if(!a) return;
     e.preventDefault();
-    plot.innerHTML='<em>cargando…</em>';
+    if(active) active.classList.remove('active');
+    active=a; a.classList.add('active');
+    titleEl.textContent=a.getAttribute('data-title')||'Gráfica';
+    panel.classList.remove('hidden');
+    plot.innerHTML='<div class="placeholder">cargando…</div>';
     var img=new Image();
     img.onload=function(){ plot.innerHTML=''; plot.appendChild(img); };
-    img.onerror=function(){ plot.innerHTML='<em>error al renderizar</em>'; };
+    img.onerror=function(){ plot.innerHTML='<div class="placeholder">error al renderizar</div>'; };
     img.src=a.getAttribute('href');
+    panel.scrollIntoView({block:'nearest'});
   });
   if(box){
     var machines=Array.prototype.slice.call(document.querySelectorAll('details.machine'));
@@ -220,11 +245,13 @@ _VIEWER_JS = """
 _KINDS = (("FFT", "Espectros"), ("WAVEFORM", "Ondas"), ("TREND", "Tendencia"))
 
 
-def _sample_link(row: dict[str, Any]) -> str:
+def _sample_link(row: dict[str, Any], title_prefix: str) -> str:
     ts = row["timestamp_utc"]
     label = ts.strftime("%Y-%m-%d %H:%M") if ts is not None else row["sample_id"]
+    title = f"{title_prefix} · {label}"
     return (
-        f'<a class="sample" href="/plot/{escape(row["sample_id"], quote=True)}.png">'
+        f'<a class="sample" href="/plot/{escape(row["sample_id"], quote=True)}.png"'
+        f' data-title="{escape(title, quote=True)}">'
         f"{escape(label)}</a>"
     )
 
@@ -254,15 +281,16 @@ def build_viewer_html(rows: Sequence[_SampleRow], *, title: str = "Dataset") -> 
                     samples = kinds.get(kind, [])
                     if not samples:
                         continue
+                    prefix = f"{pt_long} · {kind_label}"
                     if kind == "TREND":
                         # One link per point for the whole series.
                         links = _sample_link(
-                            min(samples, key=lambda r: r["timestamp_utc"])
+                            min(samples, key=lambda r: r["timestamp_utc"]), prefix
                         )
                         count_label = f"{kind_label} ({len(samples)} lecturas)"
                     else:
                         ordered = sorted(samples, key=lambda r: r["timestamp_utc"])
-                        links = "".join(_sample_link(r) for r in ordered)
+                        links = "".join(_sample_link(r, prefix) for r in ordered)
                         count_label = f"{kind_label} ({len(samples)})"
                     kind_html.append(
                         f'<div class="kind">{count_label}</div>'
@@ -294,7 +322,13 @@ def build_viewer_html(rows: Sequence[_SampleRow], *, title: str = "Dataset") -> 
 <header><h1>{escape(title)}</h1>
 <p>{len(rows):,} muestras. Haz clic en una para ver su gráfica.</p></header>
 <input type="search" id="filter" placeholder="Filtrar máquinas…" autocomplete="off">
-<div id="plot"><em>Selecciona una muestra…</em></div>
+<div id="panel" class="hidden">
+  <div id="panel-bar">
+    <span id="panel-title">Gráfica</span>
+    <button id="panel-close" title="Cerrar (Esc)">✕ Cerrar</button>
+  </div>
+  <div id="plot"></div>
+</div>
 <main>
 {areas_html}
 </main>
