@@ -29,6 +29,7 @@ from rich.progress import (
     TimeElapsedColumn,
 )
 
+from ams_extract.export.html_report import write_inventory_html
 from ams_extract.export.json_tree import build_tree_document, write_tree_json
 from ams_extract.export.manifest import write_manifest
 from ams_extract.export.parquet_samples import (
@@ -39,6 +40,7 @@ from ams_extract.export.parquet_samples import (
 )
 from ams_extract.models import Area, Equipment, Point
 from ams_extract.reader import RbmReader
+from ams_extract.report import collect_inventory
 from ams_extract.tree import walk_hierarchy, walk_spectra, walk_trends, walk_waveforms
 
 _log = structlog.get_logger(__name__)
@@ -336,7 +338,13 @@ def export_dataset(
     with RbmReader(file) as reader:
         areas = walk_hierarchy(reader)
         document = build_tree_document(reader, areas, source_path=file)
+        inventory = collect_inventory(reader, source_path=file)
     write_tree_json(document, out / "hierarchy.json")
+    # The dataset's own report links to the on-demand viewer; ``rbm serve``
+    # binds 127.0.0.1:8000 by default, which is where the link points.
+    write_inventory_html(
+        inventory, out / "report.html", viewer_url="http://localhost:8000/"
+    )
 
     selected = _filter_areas(areas, area_filter)
     work: list[tuple[Area, Equipment]] = [

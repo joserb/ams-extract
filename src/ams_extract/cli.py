@@ -11,6 +11,7 @@ from rich.console import Console
 from rich.table import Table
 
 from ams_extract.export.dataset import VALID_TYPES, export_dataset
+from ams_extract.export.html_report import write_inventory_html
 from ams_extract.export.json_tree import build_tree_document, write_tree_json
 from ams_extract.export.parquet_samples import (
     write_spectrum_parquet,
@@ -25,6 +26,7 @@ from ams_extract.models import Point
 from ams_extract.naming import NameSanitizer
 from ams_extract.reader import RbmFileError, RbmReader
 from ams_extract.records.header import parse_header
+from ams_extract.report import collect_inventory
 from ams_extract.stats import collect_machine_stats, summarize
 from ams_extract.tree import (
     count_point_samples,
@@ -166,6 +168,52 @@ def tree(
             f"{meta['equipment_count']} equipment, "
             f"{meta['point_count']} points)"
         )
+
+
+@app.command("report")
+def report(
+    file: Annotated[Path, typer.Argument(help="Path to a .rbm database file.")],
+    out: Annotated[
+        Path | None,
+        typer.Option("--out", help="Write the interactive HTML report to this path."),
+    ] = None,
+    area: Annotated[
+        str | None,
+        typer.Option("--area", help="Restrict to areas matching this substring."),
+    ] = None,
+) -> None:
+    """Build an interactive HTML inventory: locations → machines, counts and dates.
+
+    Reads the ``.rbm`` directly (no extraction needed). Each machine shows how
+    many FFT spectra, waveforms and trend readings it holds and the date span
+    (first → last) of each type.
+    """
+    if not file.exists():
+        raise _abort(f"file not found: {file}")
+    try:
+        with RbmReader(file) as reader:
+            inventory = collect_inventory(reader, area_filter=area, source_path=file)
+    except RbmFileError as exc:
+        raise _abort(str(exc)) from exc
+
+    if out is None:
+        _console.print(
+            f"[bold]{inventory.n_areas} areas[/bold]  "
+            f"{inventory.n_machines} machines  "
+            f"{inventory.n_points} points  "
+            f"[dim]({inventory.spectra.count:,} sp / "
+            f"{inventory.waveforms.count:,} wv / "
+            f"{inventory.trend.count:,} tn)[/dim]\n"
+            f"[dim]pass --out report.html to write the interactive report[/dim]"
+        )
+        return
+    write_inventory_html(inventory, out)
+    _console.print(
+        f"wrote [bold]{out}[/bold]  "
+        f"({inventory.n_areas} areas, {inventory.n_machines} machines, "
+        f"{inventory.spectra.count:,} sp / {inventory.waveforms.count:,} wv / "
+        f"{inventory.trend.count:,} tn)"
+    )
 
 
 def _find_points_by_name(
@@ -417,6 +465,49 @@ def export(
         f"({summary.parquet_files} parquet files, "
         f"{summary.manifest_rows} manifest rows)"
     )
+
+
+@app.command("serve")
+def serve(
+    dataset: Annotated[
+        Path, typer.Argument(help="Path to an exported dataset directory.")
+    ],
+    host: Annotated[
+        str, typer.Option("--host", help="Interface to bind (default loopback only).")
+    ] = "127.0.0.1",
+    port: Annotated[int, typer.Option("--port", help="TCP port to listen on.")] = 8000,
+    no_browser: Annotated[
+        bool, typer.Option("--no-browser", help="Do not open a web browser.")
+    ] = False,
+) -> None:
+    """Serve an interactive viewer over an exported dataset.
+
+    Reads ``manifest.parquet`` for the location → machine → point → sample
+    tree and renders each spectrum/waveform/trend plot **on demand** from the
+    local Parquet (the ``.rbm`` is never touched). Press Ctrl-C to stop.
+    """
+    import webbrowser
+
+    from ams_extract.export.viewer import ViewerError
+    from ams_extract.export.viewer import serve as build_server
+
+    if not dataset.is_dir():
+        raise _abort(f"dataset directory not found: {dataset}")
+    try:
+        server = build_server(dataset, host=host, port=port)
+    except ViewerError as exc:
+        raise _abort(str(exc)) from exc
+
+    url = f"http://{host}:{port}/"
+    _console.print(f"serving [bold]{dataset}[/bold] at [bold]{url}[/bold]  (Ctrl-C to stop)")
+    if not no_browser:
+        webbrowser.open(url)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        _console.print("\nstopped")
+    finally:
+        server.server_close()
 
 
 @stats_app.command("summary")
