@@ -529,6 +529,19 @@ class TypeSummary:
 
 
 @dataclass(frozen=True, slots=True)
+class SampleRef:
+    """A lightweight handle to one sample: its descriptor record and time.
+
+    Lets the on-demand viewer list a point's samples without reading any
+    amplitude/sample payloads; the chosen one is rendered later by matching
+    ``record_num`` against :func:`walk_spectra` / :func:`walk_waveforms`.
+    """
+
+    record_num: int
+    timestamp_utc: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class PointSampleSummary:
     """Per-type counts and date ranges for one point.
 
@@ -611,6 +624,46 @@ def point_sample_summary(reader: RbmReader, point: Point) -> PointSampleSummary:
         waveforms=_summarize_waveforms(reader, links.waveform_first_vdfw),
         trend=_summarize_trend(reader, links),
     )
+
+
+def point_sample_refs(reader: RbmReader, point: Point, kind: str) -> list[SampleRef]:
+    """Return descriptor refs (record_num + timestamp) for one sample kind.
+
+    ``kind`` is ``"fft"`` or ``"waveform"``. Reads only the descriptor chains
+    (no payloads), so the on-demand viewer can list a point's samples cheaply
+    and render the chosen one by matching ``record_num`` against
+    :func:`walk_spectra` / :func:`walk_waveforms`. Trends are a single
+    per-point series and are not enumerated here.
+
+    Raises:
+        ValueError: If ``kind`` is neither ``"fft"`` nor ``"waveform"``.
+    """
+    if kind not in ("fft", "waveform"):
+        raise ValueError(f"unknown sample kind {kind!r}; expected 'fft' or 'waveform'")
+    links = _resolve_pdcd_links(reader, point)
+    if links is None:
+        return []
+    if kind == "fft":
+        if links.fft_first_vdps is None:
+            return []
+        try:
+            return [
+                SampleRef(d.record_num, d.timestamp_utc)
+                for d in walk_vdps_chain(reader, links.fft_first_vdps)
+                if d.first_vcps is not None
+            ]
+        except SampleChainError:
+            return []
+    if links.waveform_first_vdfw is None:
+        return []
+    try:
+        return [
+            SampleRef(d.record_num, d.timestamp_utc)
+            for d in walk_vdfw_chain(reader, links.waveform_first_vdfw)
+            if d.first_vcfw is not None
+        ]
+    except WaveformChainError:
+        return []
 
 
 def count_point_samples(reader: RbmReader, point: Point) -> tuple[int, int, int]:
