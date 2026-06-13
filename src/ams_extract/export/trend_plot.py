@@ -11,6 +11,7 @@ applied in :func:`ams_extract.tree.walk_trends`), the X-axis is time.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import BinaryIO
 
 import matplotlib
 
@@ -18,15 +19,20 @@ matplotlib.use("Agg")  # headless backend; no display required
 import matplotlib.pyplot as plt
 import numpy as np
 
+from ams_extract.export._plot_io import save_png
 from ams_extract.models import Point, Trend
 
 
 def render_trend_png(
     trend: Trend,
     point: Point,
-    path: Path,
+    path: Path | BinaryIO,
 ) -> None:
-    """Plot ``trend`` as overall-vs-time and write a PNG to ``path``."""
+    """Plot ``trend`` as overall-vs-time and write a PNG.
+
+    ``path`` may be a filesystem path or a binary file-like object (see
+    :func:`ams_extract.export._plot_io.save_png`).
+    """
     if trend.overall.size == 0:
         raise ValueError(
             f"cannot plot trend at record {trend.record_num}: no readings"
@@ -36,7 +42,6 @@ def render_trend_png(
     dates = np.array(
         [t.replace(tzinfo=None) for t in trend.timestamps_utc], dtype="datetime64[s]"
     )
-    path.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(10, 4))
     try:
         ax.plot(dates, trend.overall, marker="o", markersize=3, linewidth=0.8)
@@ -52,6 +57,6 @@ def render_trend_png(
         ax.set_ylim(bottom=0.0)
         fig.autofmt_xdate()
         fig.tight_layout()
-        fig.savefig(path, dpi=120)
+        save_png(fig, path)
     finally:
         plt.close(fig)

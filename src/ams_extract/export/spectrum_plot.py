@@ -11,6 +11,7 @@ chain, scaled to mm/s for velocity); the Y-axis is in ``spectrum.units``
 from __future__ import annotations
 
 from pathlib import Path
+from typing import BinaryIO
 
 import matplotlib
 
@@ -18,15 +19,21 @@ matplotlib.use("Agg")  # headless backend; no display required
 import matplotlib.pyplot as plt
 import numpy as np
 
+from ams_extract.export._plot_io import save_png
 from ams_extract.models import Point, Spectrum
 
 
 def render_spectrum_png(
     spectrum: Spectrum,
     point: Point,
-    path: Path,
+    path: Path | BinaryIO,
 ) -> None:
-    """Plot ``spectrum`` as amplitude-vs-frequency and write a PNG to ``path``."""
+    """Plot ``spectrum`` as amplitude-vs-frequency and write a PNG.
+
+    ``path`` may be a filesystem path or a binary file-like object (e.g. an
+    in-memory ``BytesIO``), which lets ``rbm serve`` render plots on demand
+    without touching disk.
+    """
     amplitude = spectrum.amplitude
     if amplitude.size == 0:
         raise ValueError(
@@ -36,7 +43,6 @@ def render_spectrum_png(
     bin_width = spectrum.fmax_hz / spectrum.n_lines if spectrum.n_lines else 0.0
     freq = (np.arange(amplitude.size, dtype=np.float32) * bin_width).astype(np.float32)
 
-    path.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(10, 4))
     try:
         ax.plot(freq, amplitude, linewidth=0.6)
@@ -49,6 +55,6 @@ def render_spectrum_png(
         ax.grid(True, alpha=0.3)
         ax.set_xlim(0, spectrum.fmax_hz)
         fig.tight_layout()
-        fig.savefig(path, dpi=120)
+        save_png(fig, path)
     finally:
         plt.close(fig)

@@ -12,6 +12,7 @@ calibration is still open (FORMAT §5.6).
 from __future__ import annotations
 
 from pathlib import Path
+from typing import BinaryIO
 
 import matplotlib
 
@@ -19,15 +20,20 @@ matplotlib.use("Agg")  # headless backend; no display required
 import matplotlib.pyplot as plt
 import numpy as np
 
+from ams_extract.export._plot_io import save_png
 from ams_extract.models import Point, Waveform
 
 
 def render_waveform_png(
     waveform: Waveform,
     point: Point,
-    path: Path,
+    path: Path | BinaryIO,
 ) -> None:
-    """Plot ``waveform`` as amplitude-vs-time and write a PNG to ``path``."""
+    """Plot ``waveform`` as amplitude-vs-time and write a PNG.
+
+    ``path`` may be a filesystem path or a binary file-like object (see
+    :func:`ams_extract.export._plot_io.save_png`).
+    """
     samples = waveform.samples
     if samples.size == 0:
         raise ValueError(
@@ -40,7 +46,6 @@ def render_waveform_png(
         duration = float(samples.size)
     time_s = np.linspace(0.0, duration, num=samples.size, endpoint=False, dtype=np.float32)
 
-    path.parent.mkdir(parents=True, exist_ok=True)
     fig, ax = plt.subplots(figsize=(10, 4))
     try:
         ax.plot(time_s, samples, linewidth=0.6)
@@ -54,6 +59,6 @@ def render_waveform_png(
         ax.grid(True, alpha=0.3)
         ax.set_xlim(0, duration)
         fig.tight_layout()
-        fig.savefig(path, dpi=120)
+        save_png(fig, path)
     finally:
         plt.close(fig)
