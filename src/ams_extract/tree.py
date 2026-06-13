@@ -14,6 +14,7 @@ output.
 from __future__ import annotations
 
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import datetime
 
 import numpy as np
@@ -503,66 +504,126 @@ def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
         )
 
 
-def _count_spectra(reader: RbmReader, first_vdps: int | None) -> int:
-    """Count FFT spectra for a point without reading their vcps payloads."""
+@dataclass(frozen=True, slots=True)
+class TypeSummary:
+    """Count and first/last timestamps for one sample type at a point.
+
+    ``first`` / ``last`` are ``None`` when ``count`` is zero. Timestamps are
+    the descriptor (sample) timestamps, oldest and newest, so ``rbm report``
+    can show the date span of each measurement type without reading payloads.
+    """
+
+    count: int
+    first: datetime | None
+    last: datetime | None
+
+    @classmethod
+    def empty(cls) -> TypeSummary:
+        return cls(count=0, first=None, last=None)
+
+    @classmethod
+    def of(cls, timestamps: list[datetime]) -> TypeSummary:
+        if not timestamps:
+            return cls.empty()
+        return cls(count=len(timestamps), first=min(timestamps), last=max(timestamps))
+
+
+@dataclass(frozen=True, slots=True)
+class PointSampleSummary:
+    """Per-type counts and date ranges for one point.
+
+    Mirrors what :func:`walk_spectra` / :func:`walk_waveforms` /
+    :func:`walk_trends` would emit, computed from the descriptor chains
+    without materializing any amplitude/sample arrays.
+    """
+
+    spectra: TypeSummary
+    waveforms: TypeSummary
+    trend: TypeSummary
+
+
+def _summarize_spectra(reader: RbmReader, first_vdps: int | None) -> TypeSummary:
+    """Summarize FFT spectra for a point without reading their vcps payloads."""
     if first_vdps is None:
-        return 0
+        return TypeSummary.empty()
     try:
-        return sum(
-            1 for d in walk_vdps_chain(reader, first_vdps) if d.first_vcps is not None
-        )
+        timestamps = [
+            d.timestamp_utc
+            for d in walk_vdps_chain(reader, first_vdps)
+            if d.first_vcps is not None
+        ]
     except SampleChainError:
-        return 0
+        return TypeSummary.empty()
+    return TypeSummary.of(timestamps)
 
 
-def _count_waveforms(reader: RbmReader, first_vdfw: int | None) -> int:
-    """Count waveforms for a point without reading their vcfw payloads."""
+def _summarize_waveforms(reader: RbmReader, first_vdfw: int | None) -> TypeSummary:
+    """Summarize waveforms for a point without reading their vcfw payloads."""
     if first_vdfw is None:
-        return 0
+        return TypeSummary.empty()
     try:
-        return sum(
-            1 for d in walk_vdfw_chain(reader, first_vdfw) if d.first_vcfw is not None
-        )
+        timestamps = [
+            d.timestamp_utc
+            for d in walk_vdfw_chain(reader, first_vdfw)
+            if d.first_vcfw is not None
+        ]
     except WaveformChainError:
-        return 0
+        return TypeSummary.empty()
+    return TypeSummary.of(timestamps)
 
 
-def _count_trend_readings(
-    reader: RbmReader, links: PdcdLinks, point: Point
-) -> int:
-    """Count emitted (velocity) trend readings for a point."""
+def _summarize_trend(reader: RbmReader, links: PdcdLinks) -> TypeSummary:
+    """Summarize emitted (velocity) trend readings for a point."""
     if links.trend_first_vddt is None:
-        return 0
+        return TypeSummary.empty()
     if _point_spectrum_units(reader, links) not in VELOCITY_UNITS_RAW:
-        return 0
+        return TypeSummary.empty()
     try:
         records = list(walk_vddt_chain(reader, links.trend_first_vddt))
     except TrendChainError:
-        return 0
-    total = 0
+        return TypeSummary.empty()
+    timestamps: list[datetime] = []
     for record_num in records:
         try:
-            total += len(parse_vddt_record(reader, record_num))
+            timestamps.extend(
+                r.timestamp_utc for r in parse_vddt_record(reader, record_num)
+            )
         except (TrendLayoutError, TrendChainError):
             continue
-    return total
+    return TypeSummary.of(timestamps)
+
+
+def point_sample_summary(reader: RbmReader, point: Point) -> PointSampleSummary:
+    """Return per-type counts and date ranges for ``point``.
+
+    Mirrors what :func:`walk_spectra` / :func:`walk_waveforms` /
+    :func:`walk_trends` would emit, but only via the descriptor chains
+    (no amplitude/sample payloads) so the whole database can be tallied
+    quickly. Backs both :func:`count_point_samples` (``rbm stats``) and the
+    inventory report (``rbm report``).
+    """
+    links = _resolve_pdcd_links(reader, point)
+    if links is None:
+        empty = TypeSummary.empty()
+        return PointSampleSummary(spectra=empty, waveforms=empty, trend=empty)
+    return PointSampleSummary(
+        spectra=_summarize_spectra(reader, links.fft_first_vdps),
+        waveforms=_summarize_waveforms(reader, links.waveform_first_vdfw),
+        trend=_summarize_trend(reader, links),
+    )
 
 
 def count_point_samples(reader: RbmReader, point: Point) -> tuple[int, int, int]:
     """Return ``(n_spectra, n_waveforms, n_trend_readings)`` for ``point``.
 
-    Mirrors what :func:`walk_spectra` / :func:`walk_waveforms` /
-    :func:`walk_trends` would emit, but counts via the descriptor chains
-    without materializing any amplitude/sample arrays — so ``rbm stats``
-    can tally the whole database quickly.
+    Thin wrapper over :func:`point_sample_summary` that drops the date
+    ranges — kept for ``rbm stats`` and existing callers.
     """
-    links = _resolve_pdcd_links(reader, point)
-    if links is None:
-        return (0, 0, 0)
+    summary = point_sample_summary(reader, point)
     return (
-        _count_spectra(reader, links.fft_first_vdps),
-        _count_waveforms(reader, links.waveform_first_vdfw),
-        _count_trend_readings(reader, links, point),
+        summary.spectra.count,
+        summary.waveforms.count,
+        summary.trend.count,
     )
 
 

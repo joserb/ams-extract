@@ -52,7 +52,7 @@ class DatabaseStats:
         return self.n_spectra + self.n_waveforms + self.n_trend_readings
 
 
-def _filter_areas(areas: Iterable[Area], area_filter: str | None) -> list[Area]:
+def filter_areas(areas: Iterable[Area], area_filter: str | None) -> list[Area]:
     """Return areas whose long_name/short_code contains ``area_filter`` (ci)."""
     area_list = list(areas)
     if not area_filter:
@@ -78,7 +78,7 @@ def collect_machine_stats(
     """
     eq_needle = equipment_filter.strip().lower() if equipment_filter else None
     stats: list[MachineStats] = []
-    for area in _filter_areas(walk_hierarchy(reader), area_filter):
+    for area in filter_areas(walk_hierarchy(reader), area_filter):
         for eq in area.equipment:
             if eq_needle is not None and eq_needle not in eq.long_name.lower():
                 continue
