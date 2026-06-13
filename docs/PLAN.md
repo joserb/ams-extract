@@ -37,8 +37,10 @@ Parquet por su API/loader. No es librería embebida ni escribe `.rbm`.
 | FFT aceleración (PeakVue + HF) → G's | ✅ ×1.30 (validado PeakVue y HF fmax 6000, ±10%) |
 | Waveforms → G's / mm/s | ✅ escala `vdfw.0x28`; velocidad ×25.4 → mm/s |
 | Tendencias "Valores Globales" → mm/s | ✅ `vddt`, off-by-one de fechas (validado 47/47) |
-| Export masivo (`rbm export`) | ✅ BUNGE entero (1,8 GiB) en **~19 s** `--parallel 4`; **274.478** muestras FFT+wv = conteo exacto AMS; 0 fallos; ~1,3 GB Parquet |
+| Export masivo (`rbm export`) | ✅ BUNGE entero (1,8 GiB) en **~19 s** `--parallel 4`; **274.478** muestras FFT+wv = conteo exacto AMS; 0 fallos; ~1,3 GB Parquet; ahora emite `report.html` |
 | Estadísticas (`rbm stats`) | ✅ summary / machines / points (sp/wv/tn) |
+| Inventario HTML (`rbm report`) | ✅ árbol localizaciones → máquinas con conteos + fechas (primera/última) por tipo, archivo único con filtro; leído del `.rbm` |
+| Viewer on-demand (`rbm serve`) | ✅ sirve un dataset exportado; gráficas FFT/onda/tendencia renderizadas bajo demanda desde Parquet (sin pregenerar PNG) |
 
 Calidad: `pytest` (unit + integración con `RBM_TEST_FILE`), `ruff` y
 `pyright src/` limpios. CI matrix Linux/macOS/Windows × Python 3.13.
@@ -48,15 +50,23 @@ Calidad: `pytest` (unit + integración con `RBM_TEST_FILE`), `ruff` y
 ```bash
 rbm info   FILE                                   # firma, descripción, conteos
 rbm tree   FILE [--out tree.json]                 # jerarquía Áreas/Equipos/Puntos
+rbm report FILE [--out report.html] [--area SUBSTR]   # inventario HTML interactivo
 rbm stats  summary  FILE [--area SUBSTR]          # máquinas + totales sp/wv/tn
 rbm stats  machines FILE [--area SUBSTR] [--sort total|sp|wv|tn|name] [--limit N]
 rbm stats  points   FILE --equipment SUBSTR [--area SUBSTR]
 rbm extract FILE --point NAME [--equipment SUBSTR] \
                  --type fft|waveform|trend|both --limit N --out DIR   # Parquet + PNG
 rbm export FILE --out dataset/ [--types fft,waveform,trend] \
-                [--areas …] [--parallel N]
+                [--areas …] [--parallel N]            # + report.html en el dataset
+rbm serve  dataset/ [--host H] [--port N] [--no-browser]   # viewer de gráficas on-demand
 # dev: rbm-dev scan --tags | dump-record --rec N | follow-chain --from N
 ```
+
+`rbm report` lee el `.rbm` directamente (sin extraer) y escribe un HTML
+autocontenido: árbol colapsable localizaciones → máquinas con nº de archivos por
+tipo y fechas primera/última, más un filtro de máquinas. `rbm serve` abre un
+viewer sobre un dataset ya exportado y renderiza cada espectro/onda/tendencia
+**bajo demanda** desde el Parquet local (no toca el `.rbm`, no pregenera PNG).
 
 `sp` = espectros FFT, `wv` = waveforms, `tn` = lecturas de tendencia.
 
@@ -68,6 +78,7 @@ Hive por área.
 ```
 dataset/
 ├── hierarchy.json                       # árbol completo (Área → Equipo → Punto)
+├── report.html                          # inventario HTML (= rbm report); base de rbm serve
 ├── manifest.parquet                     # índice global, una fila por muestra, sin arrays
 └── samples/
     └── area=<AREA>/

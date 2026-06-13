@@ -30,6 +30,7 @@ matching AMS exactly).
 ```bash
 rbm info   FILE                              # signature, description, counts
 rbm tree   FILE [--out tree.json]            # full Areas/Equipment/Points hierarchy
+rbm report FILE [--out report.html] [--area SUBSTR]   # interactive HTML inventory
 rbm stats  summary  FILE [--area SUBSTR]     # machines + sp/wv/tn data totals
 rbm stats  machines FILE [--area SUBSTR] [--sort total|sp|wv|tn|name] [--limit N]
 rbm stats  points   FILE --equipment SUBSTR [--area SUBSTR]   # per-point counts
@@ -37,10 +38,23 @@ rbm extract FILE --point NAME [--equipment SUBSTR] \
                  --type fft|waveform|trend|both --limit N --out DIR   # Parquet + PNG
 rbm export FILE --out dataset/ [--types fft,waveform,trend] \
                 [--areas …] [--parallel N]    # full dataset (hierarchy.json +
-                                              # manifest.parquet + per-equipment Parquet)
+                                              # report.html + manifest.parquet +
+                                              # per-equipment Parquet)
+rbm serve  dataset/ [--host H] [--port N] [--no-browser]   # on-demand plot viewer
 ```
 
 `sp` = FFT spectra, `wv` = waveforms, `tn` = trend readings.
+
+`rbm report` reads the `.rbm` directly (no extraction) and writes a single
+self-contained HTML file: a collapsible locations → machines tree where each
+machine shows how many spectra/waveforms/trends it holds and the date span
+(first → last) of each type, plus a live machine filter. `rbm export` drops the
+same `report.html` into the dataset directory.
+
+`rbm serve` opens an interactive viewer over an **exported** dataset: it reads
+`manifest.parquet` and renders each spectrum/waveform/trend plot **on demand**
+from the local Parquet (the `.rbm` is never touched, nothing is pre-rendered).
+It binds to loopback only by default.
 
 ## Reference database
 
