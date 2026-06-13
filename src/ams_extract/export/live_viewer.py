@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import io
 import json
+import threading
 from collections.abc import Sequence
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -100,6 +101,7 @@ body { font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
 h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
 header { background:#fff; border:1px solid #e2e4e8; border-radius:10px; padding:1rem 1.25rem; }
 header p { color:#57606a; margin:.25rem 0 0; }
+.totals b { color:#1f2328; font-variant-numeric:tabular-nums; }
 input[type=search]{ width:100%; padding:.55rem .8rem; font-size:1rem;
   border:1px solid #d0d7de; border-radius:8px; margin:1rem 0; background:#fff; color:inherit; }
 details { background:#fff; border:1px solid #e2e4e8; border-radius:8px;
@@ -218,6 +220,18 @@ _JS = """
     });
   });
 
+  // Sample totals are expensive (a full descriptor walk), so they are computed
+  // lazily on the server and filled in here once /api/totals responds.
+  fetch('/api/totals').then(function(r){return r.json();}).then(function(t){
+    var n=function(x){ return Number(x).toLocaleString('en-US'); };
+    document.getElementById('t-fft').textContent=n(t.fft);
+    document.getElementById('t-wv').textContent=n(t.waveform);
+    document.getElementById('t-tn').textContent=n(t.trend);
+  }).catch(function(){
+    ['t-fft','t-wv','t-tn'].forEach(function(id){
+      document.getElementById(id).textContent='?'; });
+  });
+
   if(box){
     var machines=Array.prototype.slice.call(document.querySelectorAll('details.machine'));
     box.addEventListener('input', function(){
@@ -260,6 +274,7 @@ def build_live_html(areas: Sequence[Area], *, title: str = "Base de datos") -> s
         )
 
     n_machines = sum(len(a.equipment) for a in areas)
+    n_points = sum(len(eq.points) for a in areas for eq in a.equipment)
     areas_html = "\n".join(area_blocks) or "<p><em>(base de datos vacía)</em></p>"
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -271,8 +286,10 @@ def build_live_html(areas: Sequence[Area], *, title: str = "Base de datos") -> s
 </head>
 <body>
 <header><h1>{escape(title)}</h1>
-<p>{len(areas):,} áreas · {n_machines:,} máquinas. Despliega una máquina para
-cargar sus puntos y muestras; haz clic en una muestra para ver su gráfica.</p></header>
+<p class="totals">{len(areas):,} áreas · {n_machines:,} máquinas · {n_points:,} puntos ·
+<b id="t-fft">…</b> espectros · <b id="t-wv">…</b> ondas · <b id="t-tn">…</b> tendencias</p>
+<p>Despliega una máquina para cargar sus puntos y muestras; haz clic en una
+muestra para ver su gráfica.</p></header>
 <input type="search" id="filter" placeholder="Filtrar máquinas…" autocomplete="off">
 <div id="panel" class="hidden">
   <div id="panel-bar">
@@ -296,6 +313,24 @@ def _make_handler(
     eq_points: dict[int, list[Point]],
     page_html: str,
 ) -> type[BaseHTTPRequestHandler]:
+    # Database-wide sample totals: a full descriptor walk, so compute once on
+    # first request and cache (guarded against concurrent requests racing it).
+    totals_cache: dict[str, int] = {}
+    totals_lock = threading.Lock()
+
+    def compute_totals() -> dict[str, int]:
+        with totals_lock:
+            if not totals_cache:
+                fft = wv = tn = 0
+                for pts in eq_points.values():
+                    for pt in pts:
+                        s = point_sample_summary(reader, pt)
+                        fft += s.spectra.count
+                        wv += s.waveforms.count
+                        tn += s.trend.count
+                totals_cache.update(fft=fft, waveform=wv, trend=tn)
+            return totals_cache
+
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format: str, *args: Any) -> None:
             pass  # silence the default stderr access log
@@ -362,13 +397,16 @@ def _make_handler(
             self._send(200, "image/png", png)
 
         def do_GET(self) -> None:
-            # path is one of: / | /api/machine/<rec> | /api/point/<rec>/<kind>
-            #                 | /plot/<rec>/<kind>/<id>.png
+            # path is one of: / | /api/totals | /api/machine/<rec>
+            #                 | /api/point/<rec>/<kind> | /plot/<rec>/<kind>/<id>.png
             parts = [p for p in self.path.split("?", 1)[0].split("/") if p]
             if not parts:
                 self._send(200, "text/html; charset=utf-8", page_html.encode())
                 return
             try:
+                if parts == ["api", "totals"]:
+                    self._json(compute_totals())
+                    return
                 if parts[0] == "api" and len(parts) == 3 and parts[1] == "machine":
                     self._machine_points(int(parts[2]))
                     return

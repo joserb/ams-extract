@@ -99,6 +99,11 @@ def test_live_serve_end_to_end(real_rbm: Path) -> None:
             samples = json.loads(resp.read())["samples"]
         assert any(s["id"] == sid for s in samples)
 
+        with urlopen(f"{base}/api/totals") as resp:
+            totals = json.loads(resp.read())
+        assert totals["fft"] > 0
+        assert set(totals) == {"fft", "waveform", "trend"}
+
         with urlopen(f"{base}/plot/{pt_rec}/fft/{sid}.png") as resp:
             body = resp.read()
         assert body.startswith(_PNG_MAGIC)
