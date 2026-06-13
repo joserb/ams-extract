@@ -469,8 +469,9 @@ def export(
 
 @app.command("serve")
 def serve(
-    dataset: Annotated[
-        Path, typer.Argument(help="Path to an exported dataset directory.")
+    source: Annotated[
+        Path,
+        typer.Argument(help="A .rbm database file, or an exported dataset directory."),
     ],
     host: Annotated[
         str, typer.Option("--host", help="Interface to bind (default loopback only).")
@@ -480,26 +481,41 @@ def serve(
         bool, typer.Option("--no-browser", help="Do not open a web browser.")
     ] = False,
 ) -> None:
-    """Serve an interactive viewer over an exported dataset.
+    """Serve an interactive on-demand viewer over a .rbm file or a dataset.
 
-    Reads ``manifest.parquet`` for the location → machine → point → sample
-    tree and renders each spectrum/waveform/trend plot **on demand** from the
-    local Parquet (the ``.rbm`` is never touched). Press Ctrl-C to stop.
+    Two backends, picked automatically from ``SOURCE``:
+
+    * a **.rbm file** → renders straight from the database, walking the
+      hierarchy on startup and rendering each plot on demand (no export
+      needed; machines/points/samples load lazily as you drill in);
+    * an **exported dataset directory** → reads ``manifest.parquet`` and
+      renders each plot on demand from the local Parquet.
+
+    Either way the plots are built on the fly. Press Ctrl-C to stop.
     """
     import webbrowser
 
-    from ams_extract.export.viewer import ViewerError
-    from ams_extract.export.viewer import serve as build_server
+    if source.is_dir():
+        from ams_extract.export.viewer import ViewerError
+        from ams_extract.export.viewer import serve as build_server
 
-    if not dataset.is_dir():
-        raise _abort(f"dataset directory not found: {dataset}")
-    try:
-        server = build_server(dataset, host=host, port=port)
-    except ViewerError as exc:
-        raise _abort(str(exc)) from exc
+        try:
+            server = build_server(source, host=host, port=port)
+        except ViewerError as exc:
+            raise _abort(str(exc)) from exc
+    elif source.is_file():
+        from ams_extract.export.live_viewer import LiveViewerError
+        from ams_extract.export.live_viewer import serve as build_live_server
+
+        try:
+            server = build_live_server(source, host=host, port=port)
+        except LiveViewerError as exc:
+            raise _abort(str(exc)) from exc
+    else:
+        raise _abort(f"not a .rbm file or dataset directory: {source}")
 
     url = f"http://{host}:{port}/"
-    _console.print(f"serving [bold]{dataset}[/bold] at [bold]{url}[/bold]  (Ctrl-C to stop)")
+    _console.print(f"serving [bold]{source}[/bold] at [bold]{url}[/bold]  (Ctrl-C to stop)")
     if not no_browser:
         webbrowser.open(url)
     try:
