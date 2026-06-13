@@ -40,7 +40,7 @@ rbm export FILE --out dataset/ [--types fft,waveform,trend] \
                 [--areas …] [--parallel N]    # full dataset (hierarchy.json +
                                               # report.html + manifest.parquet +
                                               # per-equipment Parquet)
-rbm serve  dataset/ [--host H] [--port N] [--no-browser]   # on-demand plot viewer
+rbm serve  FILE.rbm | dataset/ [--host H] [--port N] [--no-browser]  # on-demand viewer
 ```
 
 `sp` = FFT spectra, `wv` = waveforms, `tn` = trend readings.
@@ -51,10 +51,17 @@ machine shows how many spectra/waveforms/trends it holds and the date span
 (first → last) of each type, plus a live machine filter. `rbm export` drops the
 same `report.html` into the dataset directory.
 
-`rbm serve` opens an interactive viewer over an **exported** dataset: it reads
-`manifest.parquet` and renders each spectrum/waveform/trend plot **on demand**
-from the local Parquet (the `.rbm` is never touched, nothing is pre-rendered).
-It binds to loopback only by default.
+`rbm serve` opens an interactive on-demand viewer and picks its backend from
+the argument:
+
+- a **`.rbm` file** → renders straight from the database. Startup only walks
+  the area → machine hierarchy (instant, even on a full database); machines,
+  points and samples load lazily as you drill in, and each plot is rendered on
+  the fly from the `.rbm`. No `export` needed.
+- an **exported dataset directory** → reads `manifest.parquet` and renders each
+  plot on demand from the local Parquet.
+
+Either way nothing is pre-rendered, and it binds to loopback only by default.
 
 ## Reference database
 

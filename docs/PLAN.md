@@ -40,7 +40,7 @@ Parquet por su API/loader. No es librería embebida ni escribe `.rbm`.
 | Export masivo (`rbm export`) | ✅ BUNGE entero (1,8 GiB) en **~19 s** `--parallel 4`; **274.478** muestras FFT+wv = conteo exacto AMS; 0 fallos; ~1,3 GB Parquet; ahora emite `report.html` |
 | Estadísticas (`rbm stats`) | ✅ summary / machines / points (sp/wv/tn) |
 | Inventario HTML (`rbm report`) | ✅ árbol localizaciones → máquinas con conteos + fechas (primera/última) por tipo, archivo único con filtro; leído del `.rbm` |
-| Viewer on-demand (`rbm serve`) | ✅ sirve un dataset exportado; gráficas FFT/onda/tendencia renderizadas bajo demanda desde Parquet (sin pregenerar PNG) |
+| Viewer on-demand (`rbm serve`) | ✅ sirve un `.rbm` directo (arranque solo jerarquía; puntos/muestras lazy; render desde el `.rbm`) o un dataset Parquet exportado; FFT/onda/tendencia bajo demanda (sin pregenerar PNG) |
 
 Calidad: `pytest` (unit + integración con `RBM_TEST_FILE`), `ruff` y
 `pyright src/` limpios. CI matrix Linux/macOS/Windows × Python 3.13.
@@ -58,15 +58,17 @@ rbm extract FILE --point NAME [--equipment SUBSTR] \
                  --type fft|waveform|trend|both --limit N --out DIR   # Parquet + PNG
 rbm export FILE --out dataset/ [--types fft,waveform,trend] \
                 [--areas …] [--parallel N]            # + report.html en el dataset
-rbm serve  dataset/ [--host H] [--port N] [--no-browser]   # viewer de gráficas on-demand
+rbm serve  FILE.rbm | dataset/ [--host H] [--port N] [--no-browser]  # viewer on-demand
 # dev: rbm-dev scan --tags | dump-record --rec N | follow-chain --from N
 ```
 
 `rbm report` lee el `.rbm` directamente (sin extraer) y escribe un HTML
 autocontenido: árbol colapsable localizaciones → máquinas con nº de archivos por
 tipo y fechas primera/última, más un filtro de máquinas. `rbm serve` abre un
-viewer sobre un dataset ya exportado y renderiza cada espectro/onda/tendencia
-**bajo demanda** desde el Parquet local (no toca el `.rbm`, no pregenera PNG).
+viewer on-demand y elige backend según el argumento: un **`.rbm`** (renderiza
+directo de la BD; arranque solo con la jerarquía, puntos/muestras cargados lazy)
+o un **dataset exportado** (lee `manifest.parquet`). En ambos casos las gráficas
+se renderizan **bajo demanda** y nunca se pregenera PNG.
 
 `sp` = espectros FFT, `wv` = waveforms, `tn` = lecturas de tendencia.
 
