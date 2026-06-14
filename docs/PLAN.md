@@ -4,7 +4,7 @@
 > Manager (`.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM
 > Windows XP ni del software AMS original.
 
-Última actualización: 2026-05-31 · Repo: `git@github.com:joserb/ams-extract.git`
+Última actualización: 2026-06-14 · Repo: `git@github.com:joserb/ams-extract.git`
 (privado) · Branch de trabajo: `master`.
 
 > **Nota histórica**: este documento fue originalmente un plan por fases (0–7)
@@ -121,7 +121,7 @@ Python 3.13 + `uv`; layout `src/`; acceso por **`mmap`** (no se cargan 1,8 GB
 en RAM) con lectura lazy de muestras; `structlog` JSON desde el día uno;
 política **saltar-con-log** (no abortar) salvo `--strict`; export paralelo con
 `ProcessPoolExecutor` (un equipo por proceso). Encoding cp1252 → cp850 →
-latin-1. Detalle y justificación en [`DECISIONS.md`](DECISIONS.md) (ADR-0001…0006).
+latin-1. Detalle y justificación en [`DECISIONS.md`](DECISIONS.md) (ADR-0001…0008).
 
 ## 7. Trabajo restante / opcional
 

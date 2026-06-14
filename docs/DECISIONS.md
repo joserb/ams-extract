@@ -557,3 +557,45 @@ en pulgadas/segundo, inconsistentes con el FFT/trend (mm/s).
   FFT+wv) se validó end-to-end (ver `VERIFICATION.md`).
 - Pendiente: emitir bandas con nombre (unidades mixtas) y tendencias de
   aceleración cuando haya gold.
+
+---
+
+## ADR-0008 — Viewer interactivo: render bajo demanda y `rbm serve` directo del `.rbm`
+
+- **Fecha**: 2026-06-13
+- **Estado**: aceptada
+
+### Contexto
+
+Tras tener el export validado faltaba una forma de **inspeccionar** la base sin
+abrir AMS ni cargar los Parquet en otra herramienta. Las opciones eran
+pregenerar PNG de cada muestra (inviable: 274.478+ gráficas), exportar siempre a
+Parquet antes de mirar, o renderizar al vuelo. Además el inventario (`rbm
+report`) y el viewer (`rbm serve`) comparten la misma reconstrucción de
+jerarquía/muestras que el export.
+
+### Decisión
+
+1. **Nada se pregenera**. Las gráficas (FFT/onda/tendencia) se renderizan
+   **bajo demanda** cuando el usuario abre un punto, reutilizando los mismos
+   plotters del export (`spectrum_plot`/`waveform_plot`/`trend_plot`), que
+   pueden escribir a un path o a un buffer en memoria.
+2. **`rbm serve` autodetecta el backend** según el argumento: un **`.rbm`**
+   renderiza directo de la BD (arranque solo con la jerarquía área→máquina;
+   puntos/muestras cargados lazy al drillear, cada plot al vuelo desde el
+   `.rbm`) o un **dataset exportado** (lee `manifest.parquet`). No hace falta
+   `export` para mirar una base.
+3. **`rbm report` lee el `.rbm` directamente** y escribe un HTML autocontenido
+   (árbol localizaciones→máquinas con conteos + fechas por tipo y filtro de
+   máquinas); el mismo `report.html` se deja en el dataset por `rbm export` y
+   sirve de base al viewer.
+4. **Solo loopback por defecto** (`--host` para exponer); tema claro.
+
+### Consecuencias
+
+- Inspección instantánea de una base de 1,8 GiB sin paso de export ni PNG en
+  disco; arranque acotado a la jerarquía gracias a la carga lazy.
+- `report.html`, viewer y export comparten una sola ruta de reconstrucción y
+  de plotting (menos divergencia, una sola cosa que validar).
+- Capa de presentación pura: no toca el formato binario ni la calibración, así
+  que `FORMAT.md`/`VERIFICATION.md` no cambian.
