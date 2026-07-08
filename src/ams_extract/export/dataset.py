@@ -1,25 +1,26 @@
-"""Full-database export to the standard dataset layout (Fase 6).
+"""Full-database export to the VibDataset layout.
 
-``export_dataset`` walks the hierarchy once, writes ``hierarchy.json``,
-then for every equipment emits a per-type Parquet file under
-``samples/area=<area>/equipment=<equipment>__<type>.parquet`` and a global
-``manifest.parquet`` index. See PLAN.md §3.5.
-
-Equipment are independent work units: serial by default, or one
-``ProcessPoolExecutor`` task per equipment with ``parallel > 1`` (each
-worker re-opens the mmap, keeping the memory footprint bounded). The walk
-functions already log-and-skip per-record failures; this module wraps each
-equipment so one bad machine never aborts the run.
+``rbm export`` writes a local copy of the VibDataset exchange format imported
+from ``vibsynth-contracts``. The previous ``manifest.parquet`` + ``samples/``
+layout is obsolete; ``rbm serve dataset/`` reads this layout directly.
 """
+
+# pyright: reportUnknownMemberType=false
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+import json
+import shutil
+from collections.abc import Iterable, Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
+import pyarrow as pa
+import pyarrow.parquet as pq
 import structlog
 from rich.progress import (
     BarColumn,
@@ -30,15 +31,24 @@ from rich.progress import (
 )
 
 from ams_extract.export.html_report import write_inventory_html
-from ams_extract.export.json_tree import build_tree_document, write_tree_json
-from ams_extract.export.manifest import write_manifest
-from ams_extract.export.parquet_samples import (
-    sample_id,
-    write_spectra_parquet,
-    write_trends_parquet,
-    write_waveforms_parquet,
+from ams_extract.export.json_tree import build_tree_document
+from ams_extract.export.vibdataset_contract import (
+    DATASET_FILE,
+    MACHINE_DOC_FILE,
+    MACHINE_PARTITION_PREFIX,
+    METRICS_COLUMNS,
+    METRICS_FILE,
+    SCHEMA_VERSION,
+    SPECTRA_COLUMNS,
+    SPECTRA_FILE,
+    TRENDS_COLUMNS,
+    TRENDS_FILE,
+    WAVES_COLUMNS,
+    WAVES_FILE,
+    ColumnSpec,
+    schema,
 )
-from ams_extract.models import Area, Equipment, Point
+from ams_extract.models import Area, Equipment, Point, Spectrum, Trend, Waveform
 from ams_extract.reader import RbmReader
 from ams_extract.report import collect_inventory
 from ams_extract.tree import walk_hierarchy, walk_spectra, walk_trends, walk_waveforms
@@ -49,15 +59,16 @@ FFT = "fft"
 WAVEFORM = "waveform"
 TREND = "trend"
 VALID_TYPES = frozenset({FFT, WAVEFORM, TREND})
+CONFIG_ID = ""
+TREND_METRIC_NAME = "overall_velocity_rms"
 
 
 @dataclass(frozen=True)
 class EquipmentResult:
-    """Outcome of exporting a single equipment."""
+    """Outcome of exporting a single asset/machine."""
 
     area_short: str
     equipment_short: str
-    manifest_rows: list[dict[str, Any]]
     n_fft: int
     n_waveform: int
     n_trend: int
@@ -77,202 +88,359 @@ class ExportSummary:
     waveform_samples: int
     trend_samples: int
     parquet_files: int
-    manifest_rows: int
+    manifest_rows: int = 0
 
 
-def _fft_relpath(area_short: str, equipment_short: str) -> str:
-    return f"samples/area={area_short}/equipment={equipment_short}__fft.parquet"
+def _extractor_name() -> str:
+    try:
+        return f"ams-extract {version('ams-extract')}"
+    except PackageNotFoundError:
+        return "ams-extract 0.0.0"
 
 
-def _waveform_relpath(area_short: str, equipment_short: str) -> str:
-    return f"samples/area={area_short}/equipment={equipment_short}__waveform.parquet"
+def _timestamp_us(ts: datetime) -> int:
+    """Return epoch microseconds UTC for ``ts``."""
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=UTC)
+    return int(ts.astimezone(UTC).timestamp() * 1_000_000)
 
 
-def _trend_relpath(area_short: str, equipment_short: str) -> str:
-    return f"samples/area={area_short}/equipment={equipment_short}__trend.parquet"
+def _json_default(value: object) -> str:
+    if isinstance(value, datetime):
+        return value.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    raise TypeError(f"object of type {type(value).__name__} is not JSON serializable")
+
+
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _pa_table(rows: Sequence[dict[str, Any]], columns: tuple[ColumnSpec, ...]) -> pa.Table:
+    pa_schema = schema(columns)
+    arrays = {
+        field.name: pa.array(
+            [row.get(field.name) for row in rows],
+            type=field.type,
+        )
+        for field in pa_schema
+    }
+    return pa.table(arrays, schema=pa_schema)
+
+
+def _write_parquet(
+    rows: Sequence[dict[str, Any]],
+    columns: tuple[ColumnSpec, ...],
+    path: Path,
+) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(_pa_table(rows, columns), path)
 
 
 def _filter_areas(areas: Iterable[Area], area_filter: set[str] | None) -> list[Area]:
-    """Return areas selected by ``area_filter`` (case-insensitive).
-
-    A token matches an area when it equals its ``long_name`` or its
-    ``short_code`` (both lowercased). ``None`` selects every area. Tokens
-    that match nothing are logged as a warning.
-    """
+    """Return areas selected by ``area_filter`` (case-insensitive)."""
     area_list = list(areas)
     if area_filter is None:
         return area_list
     wanted = {t.strip().lower() for t in area_filter if t.strip()}
     selected = [
-        a
-        for a in area_list
-        if a.long_name.lower() in wanted or a.short_code.lower() in wanted
+        a for a in area_list if a.long_name.lower() in wanted or a.short_code.lower() in wanted
     ]
-    matched = {a.long_name.lower() for a in selected} | {
-        a.short_code.lower() for a in selected
-    }
+    matched = {a.long_name.lower() for a in selected} | {a.short_code.lower() for a in selected}
     for token in wanted - matched:
         _log.warning("area_filter_no_match", token=token)
     return selected
 
 
-def _fft_manifest_row(
-    spectrum: Any, point: Point, *, area_short: str, area_long: str,
-    equipment_short: str, equipment_long: str, relpath: str,
+def _signal_family(unit: str) -> str:
+    if unit == "mm/s":
+        return "velocity"
+    if unit == "G's":
+        return "acceleration"
+    return "non_vibration"
+
+
+def _proc_prefix(unit: str) -> str:
+    family = _signal_family(unit)
+    if family == "velocity":
+        return "VEL"
+    if family == "acceleration":
+        return "ACC"
+    return "UNK"
+
+
+def _fmt_num(value: float) -> str:
+    if float(value).is_integer():
+        return str(int(value))
+    return f"{value:g}".replace(".", "p")
+
+
+def _spectrum_mode_id(spectrum: Spectrum) -> str:
+    return f"{_proc_prefix(spectrum.units)}_{_fmt_num(spectrum.fmax_hz)}"
+
+
+def _waveform_mode_id(waveform: Waveform) -> str:
+    return f"WAVE_{_proc_prefix(waveform.units)}_{_fmt_num(waveform.sample_rate_hz)}"
+
+
+def _trend_metric_id(point: Point) -> str:
+    return f"{TREND_METRIC_NAME}__{point.short_code}"
+
+
+def _machine_dir(out_dir: Path, equipment: Equipment) -> Path:
+    return out_dir / f"{MACHINE_PARTITION_PREFIX}{equipment.short_code}"
+
+
+def _build_machine_doc(
+    *,
+    source_path: str,
+    extracted_at: datetime,
+    area_long: str,
+    equipment: Equipment,
+    proc_modes: Sequence[dict[str, Any]],
 ) -> dict[str, Any]:
     return {
-        "sample_id": sample_id(point.record_num, spectrum.record_num, "FFT"),
-        "area": area_short,
-        "area_long_name": area_long,
-        "equipment": equipment_short,
-        "equipment_long_name": equipment_long,
-        "point_record_num": point.record_num,
-        "point_long_name": point.long_name,
-        "point_short_code": point.short_code,
-        "timestamp_utc": spectrum.timestamp_utc,
-        "sample_type": "FFT",
-        "units": spectrum.units,
+        "schema_version": SCHEMA_VERSION,
+        "source": {
+            "origin": "ams-rbm",
+            "extractor": _extractor_name(),
+            "extracted_at": extracted_at,
+            "source_ref": source_path,
+            "device": None,
+        },
+        "machine": {
+            "id": equipment.short_code,
+            "name": equipment.long_name,
+            "path": [area_long, equipment.long_name],
+            "fault_frequencies_order": {},
+            "definition": None,
+        },
+        "points": [
+            {
+                "id": point.short_code,
+                "name": point.long_name,
+                "location": None,
+                "direction": None,
+                "sensor": None,
+                "speed_source": None,
+            }
+            for point in equipment.points
+        ],
+        "proc_modes": list(proc_modes),
+        "config_generations": [
+            {
+                "config_id": CONFIG_ID,
+                "valid_from_us": None,
+                "valid_to_us": None,
+                "description": "AMS RBM export; configuration generation not decoded yet.",
+            }
+        ],
+        "states": [],
+        "ground_truth": None,
+    }
+
+
+def _add_proc_mode(
+    modes: dict[tuple[str, str], dict[str, Any]],
+    *,
+    point_id: str,
+    mode_id: str,
+    signal_family: str,
+    sample_rate_hz: float | None = None,
+    n_samples: int | None = None,
+    fmax_hz: float | None = None,
+    lines: int | None = None,
+) -> None:
+    key = (point_id, mode_id)
+    if key in modes:
+        return
+    modes[key] = {
+        "id": mode_id,
+        "point_id": point_id,
+        "signal_family": signal_family,
+        "sample_rate_hz": sample_rate_hz,
+        "n_samples": n_samples,
+        "fmin_hz": 0.0 if fmax_hz is not None else None,
+        "fmax_hz": fmax_hz,
+        "lines": lines,
+        "window": None,
+        "averages": None,
+        "overlap": None,
+        "spectrum_detector": "peak" if fmax_hz is not None else None,
+        "power": False if fmax_hz is not None else None,
+        "grid_kind": "hz_uniform",
+        "integrate_spectrum": None,
+        "integrate_waveform": None,
+        "hp_filter_freq_hz": None,
+        "hp_filter_order": None,
+        "notes": "Decoded from AMS RBM; detailed acquisition metadata not decoded yet.",
+    }
+
+
+def _spectrum_row(spectrum: Spectrum, point: Point) -> dict[str, Any]:
+    signal_family = _signal_family(spectrum.units)
+    return {
+        "t": _timestamp_us(spectrum.timestamp_utc),
+        "snap_t": None,
+        "point_id": point.short_code,
+        "proc_mode_id": _spectrum_mode_id(spectrum),
+        "fmin_hz": 0.0,
         "fmax_hz": spectrum.fmax_hz,
-        "n_lines": spectrum.n_lines,
-        "sample_rate_hz": None,
-        "rpm": None,
-        "n_samples": None,
-        "parquet_path": relpath,
+        "lines": spectrum.n_lines,
+        "window": None,
+        "averages": None,
+        "spectrum_detector": "peak",
+        "power": False,
+        "unit": spectrum.units,
+        "signal_family": signal_family,
+        "speed_hz": None,
+        "config_id": CONFIG_ID,
+        "data": spectrum.amplitude.tolist(),
     }
 
 
-def _waveform_manifest_row(
-    waveform: Any, point: Point, *, area_short: str, area_long: str,
-    equipment_short: str, equipment_long: str, relpath: str,
-) -> dict[str, Any]:
+def _waveform_row(waveform: Waveform, point: Point) -> dict[str, Any]:
+    rpm = float(waveform.rpm)
     return {
-        "sample_id": sample_id(point.record_num, waveform.record_num, "WAVEFORM"),
-        "area": area_short,
-        "area_long_name": area_long,
-        "equipment": equipment_short,
-        "equipment_long_name": equipment_long,
-        "point_record_num": point.record_num,
-        "point_long_name": point.long_name,
-        "point_short_code": point.short_code,
-        "timestamp_utc": waveform.timestamp_utc,
-        "sample_type": "WAVEFORM",
-        "units": waveform.units,
-        "fmax_hz": None,
-        "n_lines": None,
+        "t": _timestamp_us(waveform.timestamp_utc),
+        "snap_t": None,
+        "point_id": point.short_code,
+        "proc_mode_id": _waveform_mode_id(waveform),
         "sample_rate_hz": waveform.sample_rate_hz,
-        "rpm": waveform.rpm,
         "n_samples": waveform.n_samples,
-        "parquet_path": relpath,
+        "unit": waveform.units,
+        "signal_family": _signal_family(waveform.units),
+        "speed_hz": rpm / 60.0 if rpm > 0 else None,
+        "sync": None,
+        "tacho_rising": None,
+        "tacho_falling": None,
+        "config_id": CONFIG_ID,
+        "data": waveform.samples.tolist(),
     }
 
 
-def _trend_manifest_rows(
-    trend: Any, point: Point, *, area_short: str, area_long: str,
-    equipment_short: str, equipment_long: str, relpath: str,
-) -> list[dict[str, Any]]:
-    """One manifest row per trend reading (the file is exploded the same way)."""
+def _trend_rows(trend: Trend, point: Point) -> list[dict[str, Any]]:
+    metric_id = _trend_metric_id(point)
     return [
         {
-            "sample_id": sample_id(point.record_num, trend.record_num, "TREND", str(i)),
-            "area": area_short,
-            "area_long_name": area_long,
-            "equipment": equipment_short,
-            "equipment_long_name": equipment_long,
-            "point_record_num": point.record_num,
-            "point_long_name": point.long_name,
-            "point_short_code": point.short_code,
-            "timestamp_utc": trend.timestamps_utc[i],
-            "sample_type": "TREND",
-            "units": trend.units,
-            "fmax_hz": None,
-            "n_lines": None,
-            "sample_rate_hz": None,
-            "rpm": None,
-            "n_samples": None,
-            "overall": float(trend.overall[i]),
-            "parquet_path": relpath,
+            "t": _timestamp_us(trend.timestamps_utc[i]),
+            "metric_id": metric_id,
+            "value": float(trend.overall[i]),
+            "alarm": None,
+            "config_id": CONFIG_ID,
         }
         for i in range(len(trend.overall))
     ]
 
 
+def _metric_row(point: Point) -> dict[str, Any]:
+    metric_id = _trend_metric_id(point)
+    return {
+        "metric_id": metric_id,
+        "config_id": CONFIG_ID,
+        "point_id": point.short_code,
+        "proc_mode_id": None,
+        "name": TREND_METRIC_NAME,
+        "path": f"{point.short_code}:{TREND_METRIC_NAME}",
+        "statistic": "spectrum_rms",
+        "signal_family": "velocity",
+        "detector": "rms",
+        "unit": "mm/s",
+        "integrate": False,
+        "band_type": "none",
+        "band_low_hz": None,
+        "band_high_hz": None,
+        "band_low_order": None,
+        "band_high_order": None,
+        "frequency_role": None,
+        "harmonic_orders": None,
+        "n_sidebands": None,
+        "modulator": None,
+        "flags": [],
+        "canonical_metric": None,
+        "proxy_quality": None,
+        "mapping_rule": None,
+    }
+
+
 def _process_equipment(
     reader: RbmReader,
+    source_path: str,
+    extracted_at: datetime,
     area_short: str,
     area_long: str,
     equipment: Equipment,
     types: set[str],
     out_dir: Path,
 ) -> EquipmentResult:
-    """Export every sample of ``equipment``; never raises for one machine."""
+    """Export every sample of ``equipment`` as one VibDataset asset."""
     try:
-        spectra_items: list[tuple[Any, Point]] = []
-        waveform_items: list[tuple[Any, Point]] = []
-        trend_items: list[tuple[Any, Point]] = []
+        spectra_rows: list[dict[str, Any]] = []
+        wave_rows: list[dict[str, Any]] = []
+        trend_rows: list[dict[str, Any]] = []
+        metric_rows: dict[str, dict[str, Any]] = {}
+        proc_modes: dict[tuple[str, str], dict[str, Any]] = {}
+
         for point in equipment.points:
             if FFT in types:
-                spectra_items.extend(
-                    (sp, point) for sp in walk_spectra(reader, point)
-                )
-            if WAVEFORM in types:
-                waveform_items.extend(
-                    (wf, point) for wf in walk_waveforms(reader, point)
-                )
-            if TREND in types:
-                trend_items.extend(
-                    (tr, point) for tr in walk_trends(reader, point)
-                )
-
-        rows: list[dict[str, Any]] = []
-        n_files = 0
-
-        if FFT in types and spectra_items:
-            rel = _fft_relpath(area_short, equipment.short_code)
-            write_spectra_parquet(spectra_items, out_dir / rel)
-            n_files += 1
-            rows.extend(
-                _fft_manifest_row(
-                    sp, point, area_short=area_short, area_long=area_long,
-                    equipment_short=equipment.short_code,
-                    equipment_long=equipment.long_name, relpath=rel,
-                )
-                for sp, point in spectra_items
-            )
-
-        if WAVEFORM in types and waveform_items:
-            rel = _waveform_relpath(area_short, equipment.short_code)
-            write_waveforms_parquet(waveform_items, out_dir / rel)
-            n_files += 1
-            rows.extend(
-                _waveform_manifest_row(
-                    wf, point, area_short=area_short, area_long=area_long,
-                    equipment_short=equipment.short_code,
-                    equipment_long=equipment.long_name, relpath=rel,
-                )
-                for wf, point in waveform_items
-            )
-
-        if TREND in types and trend_items:
-            rel = _trend_relpath(area_short, equipment.short_code)
-            write_trends_parquet(trend_items, out_dir / rel)
-            n_files += 1
-            for tr, point in trend_items:
-                rows.extend(
-                    _trend_manifest_rows(
-                        tr, point, area_short=area_short, area_long=area_long,
-                        equipment_short=equipment.short_code,
-                        equipment_long=equipment.long_name, relpath=rel,
+                for spectrum in walk_spectra(reader, point):
+                    spectra_rows.append(_spectrum_row(spectrum, point))
+                    _add_proc_mode(
+                        proc_modes,
+                        point_id=point.short_code,
+                        mode_id=_spectrum_mode_id(spectrum),
+                        signal_family=_signal_family(spectrum.units),
+                        fmax_hz=spectrum.fmax_hz,
+                        lines=spectrum.n_lines,
                     )
-                )
+            if WAVEFORM in types:
+                for waveform in walk_waveforms(reader, point):
+                    wave_rows.append(_waveform_row(waveform, point))
+                    _add_proc_mode(
+                        proc_modes,
+                        point_id=point.short_code,
+                        mode_id=_waveform_mode_id(waveform),
+                        signal_family=_signal_family(waveform.units),
+                        sample_rate_hz=waveform.sample_rate_hz,
+                        n_samples=waveform.n_samples,
+                    )
+            if TREND in types:
+                for trend in walk_trends(reader, point):
+                    rows = _trend_rows(trend, point)
+                    if rows:
+                        trend_rows.extend(rows)
+                        metric_rows[_trend_metric_id(point)] = _metric_row(point)
+
+        machine_dir = _machine_dir(out_dir, equipment)
+        _write_json(
+            machine_dir / MACHINE_DOC_FILE,
+            _build_machine_doc(
+                source_path=source_path,
+                extracted_at=extracted_at,
+                area_long=area_long,
+                equipment=equipment,
+                proc_modes=sorted(proc_modes.values(), key=lambda m: (m["point_id"], m["id"])),
+            ),
+        )
+        _write_parquet(
+            sorted(metric_rows.values(), key=lambda r: r["metric_id"]),
+            METRICS_COLUMNS,
+            machine_dir / METRICS_FILE,
+        )
+        _write_parquet(spectra_rows, SPECTRA_COLUMNS, machine_dir / SPECTRA_FILE)
+        _write_parquet(wave_rows, WAVES_COLUMNS, machine_dir / WAVES_FILE)
+        _write_parquet(trend_rows, TRENDS_COLUMNS, machine_dir / TRENDS_FILE)
 
         return EquipmentResult(
             area_short=area_short,
             equipment_short=equipment.short_code,
-            manifest_rows=rows,
-            n_fft=len(spectra_items),
-            n_waveform=len(waveform_items),
-            n_trend=sum(len(tr.overall) for tr, _ in trend_items),
-            n_files=n_files,
+            n_fft=len(spectra_rows),
+            n_waveform=len(wave_rows),
+            n_trend=len(trend_rows),
+            n_files=5,
         )
     except Exception as exc:  # defensive: keep the run alive past a bad machine
         _log.warning(
@@ -284,7 +452,6 @@ def _process_equipment(
         return EquipmentResult(
             area_short=area_short,
             equipment_short=equipment.short_code,
-            manifest_rows=[],
             n_fft=0,
             n_waveform=0,
             n_trend=0,
@@ -294,13 +461,30 @@ def _process_equipment(
 
 
 def _export_equipment_worker(
-    job: tuple[str, str, str, Equipment, list[str], str],
+    job: tuple[str, str, str, str, str, Equipment, list[str], str],
 ) -> EquipmentResult:
     """ProcessPool entry point: re-open the mmap and export one equipment."""
-    file_str, area_short, area_long, equipment, type_list, out_str = job
+    (
+        file_str,
+        source_path,
+        extracted_at_iso,
+        area_short,
+        area_long,
+        equipment,
+        type_list,
+        out_str,
+    ) = job
+    extracted_at = datetime.fromisoformat(extracted_at_iso)
     with RbmReader(file_str) as reader:
         return _process_equipment(
-            reader, area_short, area_long, equipment, set(type_list), Path(out_str)
+            reader,
+            source_path,
+            extracted_at,
+            area_short,
+            area_long,
+            equipment,
+            set(type_list),
+            Path(out_str),
         )
 
 
@@ -313,6 +497,29 @@ def _make_progress() -> Progress:
     )
 
 
+def _assert_safe_output_dir(out: Path) -> None:
+    """Reject output paths where automatic cleanup would be dangerous."""
+    resolved = out.resolve()
+    cwd = Path.cwd().resolve()
+    home = Path.home().resolve()
+    forbidden = {Path("/").resolve(), cwd, home}
+    if resolved in forbidden:
+        raise ValueError(f"refusing to clear unsafe output directory: {out}")
+    if (resolved / ".git").exists() or resolved.name == ".git":
+        raise ValueError(f"refusing to clear git directory: {out}")
+    if resolved.parent == resolved:
+        raise ValueError(f"refusing to clear filesystem root: {out}")
+
+
+def _prepare_output_dir(out: Path) -> None:
+    _assert_safe_output_dir(out)
+    if out.exists():
+        if not out.is_dir():
+            raise ValueError(f"output path exists and is not a directory: {out}")
+        shutil.rmtree(out)
+    out.mkdir(parents=True, exist_ok=True)
+
+
 def export_dataset(
     file: Path,
     out: Path,
@@ -322,34 +529,32 @@ def export_dataset(
     parallel: int = 1,
     show_progress: bool = True,
 ) -> ExportSummary:
-    """Export the database under ``file`` to the dataset rooted at ``out``.
-
-    Args:
-        file: Path to the ``.rbm`` database.
-        types: Subset of ``{"fft", "waveform"}`` to emit.
-        area_filter: Area long-names / short-codes to include; ``None`` = all.
-        parallel: Worker processes (one equipment per task); ``<= 1`` = serial.
-        show_progress: Render a Rich progress bar.
-
-    Returns:
-        An :class:`ExportSummary` with aggregate counts.
-    """
+    """Export the database under ``file`` to VibDataset rooted at ``out``."""
     out = Path(out)
+    _prepare_output_dir(out)
+    extracted_at = datetime.now(UTC)
+
     with RbmReader(file) as reader:
         areas = walk_hierarchy(reader)
         document = build_tree_document(reader, areas, source_path=file)
         inventory = collect_inventory(reader, source_path=file)
-    write_tree_json(document, out / "hierarchy.json")
-    # The dataset's own report links to the on-demand viewer; ``rbm serve``
-    # binds 127.0.0.1:8000 by default, which is where the link points.
+
+    dataset_doc = {
+        "schema_version": SCHEMA_VERSION,
+        "name": Path(file).stem,
+        "generator": _extractor_name(),
+        "created_at": extracted_at,
+        "description": document["meta"].get("description") or "",
+    }
+    _write_json(out / DATASET_FILE, dataset_doc)
     write_inventory_html(
-        inventory, out / "report.html", viewer_url="http://localhost:8000/"
+        inventory,
+        out / "report.html",
+        viewer_url="http://localhost:8000/",
     )
 
     selected = _filter_areas(areas, area_filter)
-    work: list[tuple[Area, Equipment]] = [
-        (area, eq) for area in selected for eq in area.equipment
-    ]
+    work: list[tuple[Area, Equipment]] = [(area, eq) for area in selected for eq in area.equipment]
     _log.info(
         "export_start",
         areas=len(selected),
@@ -369,15 +574,32 @@ def export_dataset(
                 for area, eq in work:
                     results.append(
                         _process_equipment(
-                            reader, area.short_code, area.long_name, eq, types, out
+                            reader,
+                            str(file),
+                            extracted_at,
+                            area.short_code,
+                            area.long_name,
+                            eq,
+                            types,
+                            out,
                         )
                     )
                     if progress is not None and task_id is not None:
                         progress.advance(task_id)
         else:
             type_list = sorted(types)
+            extracted_at_iso = extracted_at.isoformat()
             jobs = [
-                (str(file), area.short_code, area.long_name, eq, type_list, str(out))
+                (
+                    str(file),
+                    str(file),
+                    extracted_at_iso,
+                    area.short_code,
+                    area.long_name,
+                    eq,
+                    type_list,
+                    str(out),
+                )
                 for area, eq in work
             ]
             with ProcessPoolExecutor(max_workers=parallel) as pool:
@@ -390,21 +612,17 @@ def export_dataset(
         if progress is not None:
             progress.stop()
 
-    # Deterministic manifest order regardless of completion order.
     results.sort(key=lambda r: (r.area_short, r.equipment_short))
-    manifest_rows = [row for r in results for row in r.manifest_rows]
-    write_manifest(manifest_rows, out / "manifest.parquet")
-
     summary = ExportSummary(
         areas=len(selected),
         equipment_total=len(work),
-        equipment_with_samples=sum(1 for r in results if r.n_files > 0),
+        equipment_with_samples=sum(1 for r in results if r.n_fft + r.n_waveform + r.n_trend > 0),
         equipment_failed=sum(1 for r in results if r.error is not None),
         fft_samples=sum(r.n_fft for r in results),
         waveform_samples=sum(r.n_waveform for r in results),
         trend_samples=sum(r.n_trend for r in results),
         parquet_files=sum(r.n_files for r in results),
-        manifest_rows=len(manifest_rows),
+        manifest_rows=0,
     )
     _log.info(
         "export_done",

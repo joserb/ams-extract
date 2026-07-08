@@ -1,11 +1,9 @@
-"""On-demand viewer over an exported Parquet dataset (``rbm serve``).
+"""On-demand viewer over an exported VibDataset (``rbm serve``).
 
 Unlike the inventory report (which reads the ``.rbm`` directly), the viewer
-serves an **already exported** dataset: it reads ``manifest.parquet`` for the
-location → machine → point → sample tree and, when the analyst clicks a
-sample, reconstructs the model from the per-equipment Parquet and renders the
-plot **on demand** to an in-memory PNG via the existing matplotlib renderers
-(no pre-generated images).
+serves an **already exported** dataset: it reads the VibDataset machine
+documents and per-asset Parquet tables, builds an in-memory sample index and
+renders each plot **on demand** via the existing matplotlib renderers.
 
 The pure helpers (:func:`build_viewer_html`, :func:`render_sample_png`) are
 socket-free so they can be unit-tested directly; :func:`serve` wraps them in a
@@ -16,9 +14,11 @@ socket-free so they can be unit-tested directly; :func:`serve` wraps them in a
 
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 from collections.abc import Sequence
+from datetime import UTC, datetime
 from html import escape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -31,6 +31,14 @@ import structlog
 
 from ams_extract.export.spectrum_plot import render_spectrum_png
 from ams_extract.export.trend_plot import render_trend_png
+from ams_extract.export.vibdataset_contract import (
+    DATASET_FILE,
+    MACHINE_DOC_FILE,
+    MACHINE_PARTITION_PREFIX,
+    SPECTRA_FILE,
+    TRENDS_FILE,
+    WAVES_FILE,
+)
 from ams_extract.export.waveform_plot import render_waveform_png
 from ams_extract.models import Point, Spectrum, Trend, Waveform
 
@@ -42,15 +50,153 @@ class ViewerError(ValueError):
 
 
 def load_manifest(dataset_dir: Path) -> list[dict[str, Any]]:
-    """Read ``manifest.parquet`` from ``dataset_dir`` into a list of row dicts.
+    """Read a VibDataset directory into viewer sample rows.
 
     Raises:
-        ViewerError: If the dataset is missing ``manifest.parquet``.
+        ViewerError: If the dataset is missing ``dataset.json``.
     """
-    manifest_path = dataset_dir / "manifest.parquet"
-    if not manifest_path.exists():
-        raise ViewerError(f"no manifest.parquet under {dataset_dir}")
-    return cast("list[dict[str, Any]]", pq.read_table(manifest_path).to_pylist())
+    dataset_path = dataset_dir / DATASET_FILE
+    if not dataset_path.exists():
+        raise ViewerError(f"no {DATASET_FILE} under {dataset_dir}")
+
+    rows: list[dict[str, Any]] = []
+    for machine_dir in sorted(dataset_dir.glob(f"{MACHINE_PARTITION_PREFIX}*")):
+        if not machine_dir.is_dir():
+            continue
+        rows.extend(_load_machine_rows(machine_dir))
+    return rows
+
+
+def _dt_from_us(value: int) -> datetime:
+    return datetime.fromtimestamp(value / 1_000_000, tz=UTC)
+
+
+def _viewer_sample_id(*parts: object) -> str:
+    raw = ":".join(str(part) for part in parts)
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    return cast("dict[str, Any]", json.loads(path.read_text(encoding="utf-8")))
+
+
+def _machine_context(machine_dir: Path) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    doc_path = machine_dir / MACHINE_DOC_FILE
+    if not doc_path.exists():
+        raise ViewerError(f"missing {MACHINE_DOC_FILE}: {doc_path}")
+    doc = _read_json(doc_path)
+    machine = cast("dict[str, Any]", doc["machine"])
+    points = {point["id"]: point for point in cast("list[dict[str, Any]]", doc.get("points", []))}
+    metrics = _load_metrics(machine_dir)
+    return machine, points, metrics
+
+
+def _load_metrics(machine_dir: Path) -> dict[str, dict[str, Any]]:
+    path = machine_dir / "metrics.parquet"
+    if not path.exists():
+        return {}
+    rows = cast("list[dict[str, Any]]", pq.read_table(path).to_pylist())
+    return {row["metric_id"]: row for row in rows}
+
+
+def _base_row(
+    *,
+    machine_dir: Path,
+    machine: dict[str, Any],
+    point: dict[str, Any],
+    sample_type: str,
+    timestamp_utc: datetime,
+    sample_id: str,
+    table_file: str,
+    row_index: int,
+) -> dict[str, Any]:
+    path = cast("list[str]", machine.get("path") or [])
+    area_long = path[0] if path else ""
+    machine_id = cast("str", machine["id"])
+    return {
+        "sample_id": sample_id,
+        "area": area_long,
+        "area_long_name": area_long,
+        "equipment": machine_id,
+        "equipment_long_name": machine.get("name") or machine_id,
+        "point_record_num": 0,
+        "point_long_name": point.get("name") or point["id"],
+        "point_short_code": point["id"],
+        "timestamp_utc": timestamp_utc,
+        "sample_type": sample_type,
+        "_machine_dir": str(machine_dir),
+        "_table_file": table_file,
+        "_row_index": row_index,
+    }
+
+
+def _load_machine_rows(machine_dir: Path) -> list[dict[str, Any]]:
+    machine, points, metrics = _machine_context(machine_dir)
+    rows: list[dict[str, Any]] = []
+
+    spectra_path = machine_dir / SPECTRA_FILE
+    if spectra_path.exists():
+        spectra_rows = cast(
+            "list[dict[str, Any]]",
+            pq.read_table(spectra_path).to_pylist(),
+        )
+        for idx, row in enumerate(spectra_rows):
+            point = points.get(row["point_id"], {"id": row["point_id"], "name": row["point_id"]})
+            rows.append(
+                _base_row(
+                    machine_dir=machine_dir,
+                    machine=machine,
+                    point=point,
+                    sample_type="FFT",
+                    timestamp_utc=_dt_from_us(row["t"]),
+                    sample_id=_viewer_sample_id(machine["id"], "FFT", idx),
+                    table_file=SPECTRA_FILE,
+                    row_index=idx,
+                )
+            )
+
+    waves_path = machine_dir / WAVES_FILE
+    if waves_path.exists():
+        wave_rows = cast(
+            "list[dict[str, Any]]",
+            pq.read_table(waves_path).to_pylist(),
+        )
+        for idx, row in enumerate(wave_rows):
+            point = points.get(row["point_id"], {"id": row["point_id"], "name": row["point_id"]})
+            rows.append(
+                _base_row(
+                    machine_dir=machine_dir,
+                    machine=machine,
+                    point=point,
+                    sample_type="WAVEFORM",
+                    timestamp_utc=_dt_from_us(row["t"]),
+                    sample_id=_viewer_sample_id(machine["id"], "WAVEFORM", idx),
+                    table_file=WAVES_FILE,
+                    row_index=idx,
+                )
+            )
+
+    trends_path = machine_dir / TRENDS_FILE
+    if trends_path.exists():
+        trend_rows = cast("list[dict[str, Any]]", pq.read_table(trends_path).to_pylist())
+        for idx, row in enumerate(trend_rows):
+            metric = metrics.get(row["metric_id"], {})
+            point_id = metric.get("point_id") or row["metric_id"]
+            point = points.get(point_id, {"id": point_id, "name": point_id})
+            rows.append(
+                _base_row(
+                    machine_dir=machine_dir,
+                    machine=machine,
+                    point=point,
+                    sample_type="TREND",
+                    timestamp_utc=_dt_from_us(row["t"]),
+                    sample_id=_viewer_sample_id(machine["id"], "TREND", row["metric_id"], idx),
+                    table_file=TRENDS_FILE,
+                    row_index=idx,
+                )
+                | {"metric_id": row["metric_id"]}
+            )
+    return rows
 
 
 def _make_point(row: dict[str, Any]) -> Point:
@@ -61,52 +207,50 @@ def _make_point(row: dict[str, Any]) -> Point:
     )
 
 
-def _spectrum_png(dataset_dir: Path, row: dict[str, Any]) -> bytes:
-    table = pq.read_table(
-        dataset_dir / row["parquet_path"],
-        filters=[("sample_id", "==", row["sample_id"])],
+def _read_table_row(dataset_dir: Path, row: dict[str, Any]) -> dict[str, Any]:
+    machine_dir = Path(row["_machine_dir"])
+    if not machine_dir.is_absolute():
+        machine_dir = dataset_dir / machine_dir
+    rows = cast(
+        "list[dict[str, Any]]",
+        pq.read_table(machine_dir / row["_table_file"]).to_pylist(),
     )
-    if table.num_rows == 0:
-        raise ViewerError(f"spectrum {row['sample_id']} not found in parquet")
-    pl = cast("list[dict[str, Any]]", table.to_pylist())
-    r = pl[0]
+    return rows[int(row["_row_index"])]
+
+
+def _spectrum_png(dataset_dir: Path, row: dict[str, Any]) -> bytes:
+    r = _read_table_row(dataset_dir, row)
     spectrum = Spectrum(
-        record_num=r["spectrum_record_num"],
-        point_record_num=r["point_record_num"],
-        timestamp_utc=r["timestamp_utc"],
+        record_num=0,
+        point_record_num=0,
+        timestamp_utc=_dt_from_us(r["t"]),
         fmax_hz=r["fmax_hz"],
-        n_lines=r["n_lines"],
-        units=r["units"],
-        carga_pct=r["carga_pct"],
-        amplitude=np.asarray(r["amplitude"], dtype=np.float32),
+        n_lines=r["lines"],
+        units=r["unit"],
+        carga_pct=0.0,
+        amplitude=np.asarray(r["data"], dtype=np.float32),
     )
     buf = io.BytesIO()
-    render_spectrum_png(spectrum, _make_point(r), buf)
+    render_spectrum_png(spectrum, _make_point(row), buf)
     return buf.getvalue()
 
 
 def _waveform_png(dataset_dir: Path, row: dict[str, Any]) -> bytes:
-    table = pq.read_table(
-        dataset_dir / row["parquet_path"],
-        filters=[("sample_id", "==", row["sample_id"])],
-    )
-    if table.num_rows == 0:
-        raise ViewerError(f"waveform {row['sample_id']} not found in parquet")
-    pl = cast("list[dict[str, Any]]", table.to_pylist())
-    r = pl[0]
+    r = _read_table_row(dataset_dir, row)
+    speed_hz = r["speed_hz"]
     waveform = Waveform(
-        record_num=r["waveform_record_num"],
-        point_record_num=r["point_record_num"],
-        timestamp_utc=r["timestamp_utc"],
+        record_num=0,
+        point_record_num=0,
+        timestamp_utc=_dt_from_us(r["t"]),
         n_samples=r["n_samples"],
         sample_rate_hz=r["sample_rate_hz"],
-        rpm=r["rpm"],
-        units=r["units"],
-        carga_pct=r["carga_pct"],
-        samples=np.asarray(r["samples"], dtype=np.float32),
+        rpm=float(speed_hz) * 60.0 if speed_hz is not None else 0.0,
+        units=r["unit"],
+        carga_pct=0.0,
+        samples=np.asarray(r["data"], dtype=np.float32),
     )
     buf = io.BytesIO()
-    render_waveform_png(waveform, _make_point(r), buf)
+    render_waveform_png(waveform, _make_point(row), buf)
     return buf.getvalue()
 
 
@@ -114,30 +258,36 @@ def _trend_png(dataset_dir: Path, row: dict[str, Any]) -> bytes:
     # A trend is a whole series per point: rebuild it from every reading row
     # of this point in the trend parquet (sorted oldest-first), not just the
     # clicked sample_id.
-    table = pq.read_table(
-        dataset_dir / row["parquet_path"],
-        filters=[("point_record_num", "==", row["point_record_num"])],
+    machine_dir = Path(row["_machine_dir"])
+    if not machine_dir.is_absolute():
+        machine_dir = dataset_dir / machine_dir
+    all_rows = cast(
+        "list[dict[str, Any]]",
+        pq.read_table(machine_dir / TRENDS_FILE).to_pylist(),
     )
-    pl = cast("list[dict[str, Any]]", table.to_pylist())
-    rows = sorted(pl, key=lambda x: x["timestamp_utc"])
+    metric_id = row["metric_id"]
+    rows = sorted(
+        (r for r in all_rows if r["metric_id"] == metric_id),
+        key=lambda x: x["t"],
+    )
     if not rows:
-        raise ViewerError(f"trend for point {row['point_record_num']} is empty")
+        raise ViewerError(f"trend {metric_id!r} is empty")
     trend = Trend(
-        record_num=rows[0]["trend_record_num"],
-        point_record_num=rows[0]["point_record_num"],
-        units=rows[0]["units"],
-        timestamps_utc=tuple(x["timestamp_utc"] for x in rows),
-        overall=np.asarray([x["overall"] for x in rows], dtype=np.float32),
+        record_num=0,
+        point_record_num=0,
+        units="mm/s",
+        timestamps_utc=tuple(_dt_from_us(x["t"]) for x in rows),
+        overall=np.asarray([x["value"] for x in rows], dtype=np.float32),
     )
     buf = io.BytesIO()
-    render_trend_png(trend, _make_point(rows[0]), buf)
+    render_trend_png(trend, _make_point(row), buf)
     return buf.getvalue()
 
 
 def render_sample_png(dataset_dir: Path, row: dict[str, Any]) -> bytes:
     """Reconstruct the sample described by ``row`` and render its PNG bytes.
 
-    ``row`` is a manifest row (carrying ``sample_type`` and ``parquet_path``).
+    ``row`` is a viewer row built from VibDataset tables.
     Trends are plotted as the whole per-point series.
 
     Raises:
@@ -284,17 +434,14 @@ def build_viewer_html(rows: Sequence[_SampleRow], *, title: str = "Dataset") -> 
                     prefix = f"{pt_long} · {kind_label}"
                     if kind == "TREND":
                         # One link per point for the whole series.
-                        links = _sample_link(
-                            min(samples, key=lambda r: r["timestamp_utc"]), prefix
-                        )
+                        links = _sample_link(min(samples, key=lambda r: r["timestamp_utc"]), prefix)
                         count_label = f"{kind_label} ({len(samples)} lecturas)"
                     else:
                         ordered = sorted(samples, key=lambda r: r["timestamp_utc"])
                         links = "".join(_sample_link(r, prefix) for r in ordered)
                         count_label = f"{kind_label} ({len(samples)})"
                     kind_html.append(
-                        f'<div class="kind">{count_label}</div>'
-                        f'<div class="samples">{links}</div>'
+                        f'<div class="kind">{count_label}</div><div class="samples">{links}</div>'
                     )
                 point_blocks.append(
                     '<details class="point"><summary>'
@@ -309,7 +456,7 @@ def build_viewer_html(rows: Sequence[_SampleRow], *, title: str = "Dataset") -> 
             f"{escape(area_long)}</summary>{''.join(machine_blocks)}</details>"
         )
 
-    areas_html = "\n".join(area_blocks) or '<p><em>(dataset vacío)</em></p>'
+    areas_html = "\n".join(area_blocks) or "<p><em>(dataset vacío)</em></p>"
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -363,10 +510,7 @@ def _make_handler(
                 return
             if path == "/api/manifest.json":
                 payload = json.dumps(
-                    [
-                        {k: v for k, v in r.items() if k != "amplitude"}
-                        for r in rows
-                    ],
+                    [{k: v for k, v in r.items() if k != "amplitude"} for r in rows],
                     default=str,
                 ).encode("utf-8")
                 self._send(200, "application/json", payload)
@@ -398,13 +542,13 @@ def serve(
 ) -> ThreadingHTTPServer:
     """Build and return a (not-yet-serving) HTTP server for ``dataset_dir``.
 
-    Validates the dataset, loads the manifest, pre-renders the page HTML and
+    Validates the dataset, builds a sample index, pre-renders the page HTML and
     returns a :class:`ThreadingHTTPServer`. The caller drives it with
     ``serve_forever`` (so tests can start/stop it). The ``.rbm`` is never
     touched — every plot is rebuilt from the local Parquet on demand.
 
     Raises:
-        ViewerError: If ``dataset_dir`` lacks ``manifest.parquet``.
+        ViewerError: If ``dataset_dir`` lacks ``dataset.json``.
     """
     dataset_dir = Path(dataset_dir)
     rows = load_manifest(dataset_dir)

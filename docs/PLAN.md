@@ -67,46 +67,43 @@ autocontenido: árbol colapsable localizaciones → máquinas con nº de archivo
 tipo y fechas primera/última, más un filtro de máquinas. `rbm serve` abre un
 viewer on-demand y elige backend según el argumento: un **`.rbm`** (renderiza
 directo de la BD; arranque solo con la jerarquía, puntos/muestras cargados lazy)
-o un **dataset exportado** (lee `manifest.parquet`). En ambos casos las gráficas
+o un **dataset exportado** (lee tablas VibDataset). En ambos casos las gráficas
 se renderizan **bajo demanda** y nunca se pregenera PNG.
 
 `sp` = espectros FFT, `wv` = waveforms, `tn` = lecturas de tendencia.
 
-## 4. Salida de `rbm export` (contrato de datos)
+## 4. Salida de `rbm export` (contrato VibDataset)
 
-Decisión: **un Parquet por equipo y por tipo de muestra**, particionado tipo
-Hive por área.
+Decisión vigente: `rbm export` escribe VibDataset, un formato parquet+JSON
+importado conceptualmente de `vibsynth-contracts.dataset` pero copiado
+localmente para no depender del monorepo `vibsynth` en runtime.
 
 ```
 dataset/
-├── hierarchy.json                       # árbol completo (Área → Equipo → Punto)
-├── report.html                          # inventario HTML (= rbm report); base de rbm serve
-├── manifest.parquet                     # índice global, una fila por muestra, sin arrays
-└── samples/
-    └── area=<AREA>/
-        ├── equipment=<EQUIPO>__fft.parquet
-        ├── equipment=<EQUIPO>__waveform.parquet
-        └── equipment=<EQUIPO>__trend.parquet
+├── dataset.json                         # metadata del dataset
+├── report.html                          # inventario HTML extra; base de rbm serve
+└── machine=<ASSET_ID>/                  # un directorio por asset AMS
+    ├── machine.json                     # metadata del asset, puntos y modos
+    ├── metrics.parquet                  # descriptores de métricas escalares
+    ├── spectra.parquet                  # FFT: eje derivado de fmin/fmax/lines
+    ├── waves.parquet                    # waveforms: eje derivado de sample_rate_hz
+    └── trends.parquet                   # tendencias escalares
 ```
 
-**Esquema por tipo** (una fila por muestra; el eje de frecuencia/tiempo se
-deriva de `fmax_hz`/`n_lines` o `sample_rate_hz`):
+**Esquema por tipo**:
 
-- **FFT**: `sample_id, point_record_num, point_long_name, point_short_code,
-  spectrum_record_num, timestamp_utc, sample_type="FFT", fmax_hz, n_lines,
-  units, carga_pct, amplitude: list<float32>`.
-- **Waveform**: `… waveform_record_num, timestamp_utc, sample_type="WAVEFORM",
-  sample_rate_hz, n_samples, rpm, units, carga_pct, samples: list<float32>`.
-- **Trend**: una fila **por lectura** — `… trend_record_num, timestamp_utc,
-  sample_type="TREND", units, overall: float32`.
+- **FFT** (`spectra.parquet`): `t`, `point_id`, `proc_mode_id`, `fmin_hz`,
+  `fmax_hz`, `lines`, `unit`, `signal_family`, `config_id`,
+  `data: list<float32>`.
+- **Waveform** (`waves.parquet`): `t`, `point_id`, `proc_mode_id`,
+  `sample_rate_hz`, `n_samples`, `unit`, `signal_family`, `speed_hz`,
+  `config_id`, `data: list<float32>`.
+- **Trend** (`trends.parquet`): una fila por lectura — `t`, `metric_id`,
+  `value`, `alarm`, `config_id`; el `metric_id` se resuelve contra
+  `metrics.parquet` y se emite único por punto (`overall_velocity_rms__<point_id>`).
 
-**`manifest.parquet`**: una fila por muestra sin arrays, con columnas
-type-específicas nullables (`fmax_hz`/`n_lines` para FFT; `sample_rate_hz`/
-`rpm`/`n_samples` para waveform; `overall` para trend) + `parquet_path`.
-
-`sample_id` = SHA-1 determinista de `point:sample_record:type[:idx]`.
-Sanitización de nombres en `naming.py`; el mapeo original ↔ sanitizado se
-persiste en `hierarchy.json`.
+El formato anterior (`manifest.parquet` + `samples/`) queda obsoleto. Los IDs
+de muestra del viewer se generan en memoria al cargar el VibDataset.
 
 ## 5. Modelo de datos
 
@@ -163,15 +160,14 @@ real (datos de cliente) **no** se commitea (`.gitignore`).
 
 ```python
 import polars as pl
-df = pl.scan_parquet("dataset/samples/", hive_partitioning=True)        # area como columna
-recent = (pl.scan_parquet("dataset/manifest.parquet")
-            .filter(pl.col("area") == "EXTRACCION")
-            .filter(pl.col("timestamp_utc") > "2024-01-01").collect())
+spectra = pl.scan_parquet("dataset/machine=*/spectra.parquet")
+waves = pl.scan_parquet("dataset/machine=*/waves.parquet")
+trends = pl.scan_parquet("dataset/machine=*/trends.parquet")
 ```
 
 ```sql
 -- DuckDB
-SELECT area, equipment, COUNT(*) AS samples
-FROM read_parquet('dataset/samples/**/*.parquet', hive_partitioning=true)
-GROUP BY area, equipment ORDER BY samples DESC;
+SELECT regexp_extract(filename, 'machine=([^/]+)', 1) AS asset, COUNT(*) AS samples
+FROM read_parquet('dataset/machine=*/spectra.parquet', filename=true)
+GROUP BY asset ORDER BY samples DESC;
 ```

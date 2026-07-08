@@ -38,7 +38,7 @@ from ams_extract.tree import (
 
 app = typer.Typer(
     name="rbm",
-    help="Read AMS Machinery Manager (.rbm) databases and export to Parquet + JSON.",
+    help="Read AMS Machinery Manager (.rbm) databases and export to VibDataset.",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -253,8 +253,7 @@ def _extract_spectra(
         if idx >= limit:
             break
         base = (
-            out
-            / f"{equipment_short}__{point_slug}__fft_{idx:02d}_"
+            out / f"{equipment_short}__{point_slug}__fft_{idx:02d}_"
             f"{spectrum.timestamp_utc.strftime('%Y%m%d_%H%M%S')}"
         )
         write_spectrum_parquet(spectrum, target, base.with_suffix(".parquet"))
@@ -277,8 +276,7 @@ def _extract_waveforms(
         if idx >= limit:
             break
         base = (
-            out
-            / f"{equipment_short}__{point_slug}__waveform_{idx:02d}_"
+            out / f"{equipment_short}__{point_slug}__waveform_{idx:02d}_"
             f"{waveform.timestamp_utc.strftime('%Y%m%d_%H%M%S')}"
         )
         write_waveform_parquet(waveform, target, base.with_suffix(".parquet"))
@@ -377,8 +375,7 @@ def extract(
 
     if n_fft == 0 and n_waveform == 0 and n_trend == 0:
         _console.print(
-            f"[yellow]no samples found for point[/yellow] {target.long_name!r} "
-            f"(type={type_.value})"
+            f"[yellow]no samples found for point[/yellow] {target.long_name!r} (type={type_.value})"
         )
         return
     parts: list[str] = []
@@ -411,11 +408,11 @@ def export(
         typer.Option("--parallel", help="Worker processes; 1 means serial."),
     ] = 1,
 ) -> None:
-    """Dump the full database to the standard dataset layout.
+    """Dump the full database to the VibDataset layout.
 
-    Writes ``hierarchy.json``, ``manifest.parquet`` and one Parquet file
-    per equipment and sample type under
-    ``samples/area=<area>/equipment=<equipment>__<type>.parquet``.
+    Writes ``dataset.json``, ``report.html`` and one ``machine=<asset_id>``
+    directory per AMS equipment, with ``machine.json`` plus spectra, waves,
+    trends and metrics Parquet tables.
     """
     if not file.exists():
         raise _abort(f"file not found: {file}")
@@ -424,9 +421,7 @@ def export(
 
     type_set = {t.strip().lower() for t in types.split(",") if t.strip()}
     if not type_set:
-        raise _abort(
-            "no sample types selected; --types must list fft, waveform and/or trend"
-        )
+        raise _abort("no sample types selected; --types must list fft, waveform and/or trend")
     unknown = type_set - VALID_TYPES
     if unknown:
         raise _abort(
@@ -434,9 +429,7 @@ def export(
             f"valid types are {', '.join(sorted(VALID_TYPES))}"
         )
 
-    area_filter = (
-        {a.strip() for a in areas.split(",") if a.strip()} if areas else None
-    )
+    area_filter = {a.strip() for a in areas.split(",") if a.strip()} if areas else None
 
     try:
         summary = export_dataset(
@@ -446,7 +439,7 @@ def export(
             area_filter=area_filter,
             parallel=parallel,
         )
-    except RbmFileError as exc:
+    except (RbmFileError, ValueError) as exc:
         raise _abort(str(exc)) from exc
 
     _console.print(
@@ -454,16 +447,11 @@ def export(
         f"  areas: {summary.areas}  "
         f"equipment: {summary.equipment_with_samples}/{summary.equipment_total} "
         f"with samples"
-        + (
-            f"  ([red]{summary.equipment_failed} failed[/red])"
-            if summary.equipment_failed
-            else ""
-        )
+        + (f"  ([red]{summary.equipment_failed} failed[/red])" if summary.equipment_failed else "")
         + f"\n  samples: {summary.fft_samples} FFT + "
         f"{summary.waveform_samples} waveform + "
         f"{summary.trend_samples} trend  "
-        f"({summary.parquet_files} parquet files, "
-        f"{summary.manifest_rows} manifest rows)"
+        f"({summary.parquet_files} parquet files)"
     )
 
 
@@ -488,7 +476,7 @@ def serve(
     * a **.rbm file** → renders straight from the database, walking the
       hierarchy on startup and rendering each plot on demand (no export
       needed; machines/points/samples load lazily as you drill in);
-    * an **exported dataset directory** → reads ``manifest.parquet`` and
+    * an **exported dataset directory** → reads the VibDataset tables and
       renders each plot on demand from the local Parquet.
 
     Either way the plots are built on the fly. Press Ctrl-C to stop.
@@ -607,16 +595,24 @@ def stats_machines(
     table.add_column("Total", justify="right", style="bold")
     for m in shown:
         table.add_row(
-            m.area_long, m.equipment_long, str(m.n_points),
-            f"{m.n_spectra:,}", f"{m.n_waveforms:,}",
-            f"{m.n_trend_readings:,}", f"{m.total:,}",
+            m.area_long,
+            m.equipment_long,
+            str(m.n_points),
+            f"{m.n_spectra:,}",
+            f"{m.n_waveforms:,}",
+            f"{m.n_trend_readings:,}",
+            f"{m.total:,}",
         )
     s = summarize(machines)
     table.add_section()
     table.add_row(
-        f"TOTAL ({s.n_machines} machines)", "", f"{s.n_points:,}",
-        f"{s.n_spectra:,}", f"{s.n_waveforms:,}",
-        f"{s.n_trend_readings:,}", f"{s.total_samples:,}",
+        f"TOTAL ({s.n_machines} machines)",
+        "",
+        f"{s.n_points:,}",
+        f"{s.n_spectra:,}",
+        f"{s.n_waveforms:,}",
+        f"{s.n_trend_readings:,}",
+        f"{s.total_samples:,}",
     )
     _console.print(table)
     if limit and len(machines) > limit:

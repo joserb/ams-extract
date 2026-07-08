@@ -599,3 +599,48 @@ jerarquía/muestras que el export.
   de plotting (menos divergencia, una sola cosa que validar).
 - Capa de presentación pura: no toca el formato binario ni la calibración, así
   que `FORMAT.md`/`VERIFICATION.md` no cambian.
+
+---
+
+## ADR-0009 — `rbm export` escribe VibDataset sin dependencia de vibsynth
+
+- **Fecha**: 2026-07-09
+- **Estado**: aceptada
+
+### Contexto
+
+El ecosistema `vibsynth` consolidó en `vibsynth-contracts.dataset` un formato
+estándar de intercambio de vibración: `dataset.json` en raíz y un directorio
+`machine=<id>` por asset con `machine.json`, `metrics.parquet`,
+`spectra.parquet`, `waves.parquet` y `trends.parquet`. `ams-extract` debe
+producir ese formato, pero no debe depender en runtime del monorepo
+`vibsynth`.
+
+### Decisión
+
+1. **Sustituir el export masivo**. `rbm export` deja de escribir
+   `manifest.parquet` + `samples/` y pasa a escribir VibDataset. El formato
+   anterior queda obsoleto.
+2. **Contrato local mínimo**. Se copian localmente las constantes de layout y
+   columnas necesarias desde `vibsynth-contracts.dataset`, con comentario de
+   procedencia. No se añade dependencia Python a `vibsynth-contracts`.
+3. **Carpetas por asset**. El `Equipment` de AMS se modela como asset/machine:
+   `machine=<equipment.short_code>`. El dispositivo de adquisición queda
+   desconocido (`SourceInfo.device = null`) hasta que AMS revele esa metadata.
+4. **Viewer actualizado**. `rbm serve dataset/` lee VibDataset directamente.
+   Los IDs de muestra para enlaces del viewer se generan en memoria; no forman
+   parte del contrato de intercambio.
+5. **`--out` se regenera completo**. `rbm export` borra siempre la carpeta de
+   salida antes de escribir, con guardas para evitar rutas peligrosas.
+
+### Consecuencias
+
+- El dataset exportado es compatible por estructura con el formato compartido
+  por `vibsynth`, sin acoplamiento runtime.
+- Los exports legacy deben regenerarse; el viewer de datasets ya no soporta
+  `manifest.parquet`.
+- `report.html` sigue escribiéndose como archivo extra de conveniencia, aunque
+  no forme parte del contrato VibDataset.
+- Gaps pendientes para enriquecer `machine.json`/`metrics.parquet`: sensores,
+  direcciones de puntos, modos reales de adquisición, configuración `pdpa`,
+  alarmas, RPM en FFT, tendencias por banda y contexto operativo.

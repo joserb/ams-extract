@@ -1,27 +1,32 @@
-"""Tests for the on-demand Parquet viewer (``rbm serve``).
-
-Builds a tiny dataset on disk with the real Parquet writers, then exercises
-the socket-free helpers (manifest load, HTML build, model reconstruction +
-PNG render) plus one live request against a ThreadingHTTPServer.
-"""
+"""Tests for the on-demand VibDataset viewer (``rbm serve``)."""
 
 from __future__ import annotations
 
+import json
 import threading
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.request import urlopen
 
-import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
 import pytest
 
-from ams_extract.export.manifest import write_manifest
-from ams_extract.export.parquet_samples import (
-    sample_id,
-    write_spectra_parquet,
-    write_trends_parquet,
-    write_waveforms_parquet,
+from ams_extract.export.vibdataset_contract import (
+    DATASET_FILE,
+    MACHINE_DOC_FILE,
+    METRICS_COLUMNS,
+    METRICS_FILE,
+    SCHEMA_VERSION,
+    SPECTRA_COLUMNS,
+    SPECTRA_FILE,
+    TRENDS_COLUMNS,
+    TRENDS_FILE,
+    WAVES_COLUMNS,
+    WAVES_FILE,
+    ColumnSpec,
+    schema,
 )
 from ams_extract.export.viewer import (
     ViewerError,
@@ -30,65 +35,164 @@ from ams_extract.export.viewer import (
     render_sample_png,
     serve,
 )
-from ams_extract.models import Point, Spectrum, Trend, Waveform
 
 _PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
 _TS = datetime(2020, 2, 19, 10, 2, 50, tzinfo=UTC)
+_T_US = int(_TS.timestamp() * 1_000_000)
 
 
-def _point() -> Point:
-    return Point(record_num=100, long_name="MOTOR LA H", short_code="MOTOR_LA_H")
+def _write_json(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def _write_table(path: Path, rows: list[dict[str, Any]], columns: tuple[ColumnSpec, ...]) -> None:
+    pa_schema = schema(columns)
+    arrays = {
+        field.name: pa.array([row.get(field.name) for row in rows], type=field.type)
+        for field in pa_schema
+    }
+    path.parent.mkdir(parents=True, exist_ok=True)
+    pq.write_table(pa.table(arrays, schema=pa_schema), path)
 
 
 def _build_dataset(tmp_path: Path) -> Path:
-    """Write a minimal but valid dataset (one machine, one of each type)."""
+    """Write a minimal VibDataset (one machine, one of each type)."""
     ds = tmp_path / "ds"
-    point = _point()
-    fft_rel = "samples/area=A/equipment=EQ__fft.parquet"
-    wv_rel = "samples/area=A/equipment=EQ__waveform.parquet"
-    tn_rel = "samples/area=A/equipment=EQ__trend.parquet"
-
-    spectrum = Spectrum(
-        record_num=101, point_record_num=100, timestamp_utc=_TS,
-        fmax_hz=1000.0, n_lines=8, units="mm/s", carga_pct=100.0,
-        amplitude=np.arange(8, dtype=np.float32),
+    machine = ds / "machine=EQ"
+    _write_json(
+        ds / DATASET_FILE,
+        {
+            "schema_version": SCHEMA_VERSION,
+            "name": "ds",
+            "generator": "test",
+            "created_at": "2020-01-01T00:00:00Z",
+            "description": "",
+        },
     )
-    waveform = Waveform(
-        record_num=201, point_record_num=100, timestamp_utc=_TS,
-        n_samples=8, sample_rate_hz=2560.0, rpm=1455.0, units="G's", carga_pct=100.0,
-        samples=np.linspace(-0.5, 0.5, 8, dtype=np.float32),
+    _write_json(
+        machine / MACHINE_DOC_FILE,
+        {
+            "schema_version": SCHEMA_VERSION,
+            "source": {
+                "origin": "ams-rbm",
+                "extractor": "test",
+                "extracted_at": "2020-01-01T00:00:00Z",
+                "source_ref": "fixture.rbm",
+                "device": None,
+            },
+            "machine": {
+                "id": "EQ",
+                "name": "Bomba EQ",
+                "path": ["AREA A", "Bomba EQ"],
+                "fault_frequencies_order": {},
+                "definition": None,
+            },
+            "points": [
+                {
+                    "id": "MOTOR_LA_H",
+                    "name": "MOTOR LA H",
+                    "location": None,
+                    "direction": None,
+                    "sensor": None,
+                    "speed_source": None,
+                }
+            ],
+            "proc_modes": [],
+            "config_generations": [
+                {
+                    "config_id": "",
+                    "valid_from_us": None,
+                    "valid_to_us": None,
+                    "description": "",
+                }
+            ],
+            "states": [],
+            "ground_truth": None,
+        },
     )
-    trend = Trend(
-        record_num=301, point_record_num=100, units="mm/s",
-        timestamps_utc=(_TS, datetime(2020, 3, 1, tzinfo=UTC)),
-        overall=np.asarray([1.0, 1.5], dtype=np.float32),
+    _write_table(
+        machine / METRICS_FILE,
+        [
+            {
+                "metric_id": "overall_velocity_rms__MOTOR_LA_H",
+                "config_id": "",
+                "point_id": "MOTOR_LA_H",
+                "proc_mode_id": None,
+                "name": "overall_velocity_rms",
+                "path": "MOTOR_LA_H:overall_velocity_rms",
+                "statistic": "spectrum_rms",
+                "signal_family": "velocity",
+                "detector": "rms",
+                "unit": "mm/s",
+                "integrate": False,
+                "band_type": "none",
+                "flags": [],
+            }
+        ],
+        METRICS_COLUMNS,
     )
-    write_spectra_parquet([(spectrum, point)], ds / fft_rel)
-    write_waveforms_parquet([(waveform, point)], ds / wv_rel)
-    write_trends_parquet([(trend, point)], ds / tn_rel)
-
-    def _row(stype: str, rec: int, relpath: str, disc: str = "") -> dict[str, Any]:
-        return {
-            "sample_id": sample_id(100, rec, stype, disc),
-            "area": "A", "area_long_name": "AREA A",
-            "equipment": "EQ", "equipment_long_name": "Bomba EQ",
-            "point_record_num": 100, "point_long_name": "MOTOR LA H",
-            "point_short_code": "MOTOR_LA_H", "timestamp_utc": _TS,
-            "sample_type": stype, "units": "mm/s", "parquet_path": relpath,
-        }
-
-    rows = [
-        _row("FFT", 101, fft_rel),
-        _row("WAVEFORM", 201, wv_rel),
-        _row("TREND", 301, tn_rel, "0"),
-        _row("TREND", 301, tn_rel, "1"),
-    ]
-    write_manifest(rows, ds / "manifest.parquet")
+    _write_table(
+        machine / SPECTRA_FILE,
+        [
+            {
+                "t": _T_US,
+                "point_id": "MOTOR_LA_H",
+                "proc_mode_id": "VEL_1000",
+                "fmin_hz": 0.0,
+                "fmax_hz": 1000.0,
+                "lines": 8,
+                "spectrum_detector": "peak",
+                "power": False,
+                "unit": "mm/s",
+                "signal_family": "velocity",
+                "config_id": "",
+                "data": [float(i) for i in range(8)],
+            }
+        ],
+        SPECTRA_COLUMNS,
+    )
+    _write_table(
+        machine / WAVES_FILE,
+        [
+            {
+                "t": _T_US,
+                "point_id": "MOTOR_LA_H",
+                "proc_mode_id": "WAVE_ACC_2560",
+                "sample_rate_hz": 2560.0,
+                "n_samples": 8,
+                "unit": "G's",
+                "signal_family": "acceleration",
+                "speed_hz": 24.25,
+                "config_id": "",
+                "data": [-0.5, -0.25, 0.0, 0.25, 0.5, 0.25, 0.0, -0.25],
+            }
+        ],
+        WAVES_COLUMNS,
+    )
+    _write_table(
+        machine / TRENDS_FILE,
+        [
+            {
+                "t": _T_US,
+                "metric_id": "overall_velocity_rms__MOTOR_LA_H",
+                "value": 1.0,
+                "config_id": "",
+            },
+            {
+                "t": _T_US + 86_400_000_000,
+                "metric_id": "overall_velocity_rms__MOTOR_LA_H",
+                "value": 1.5,
+                "config_id": "",
+            },
+        ],
+        TRENDS_COLUMNS,
+    )
     return ds
 
 
 class TestLoadManifest:
-    def test_missing_manifest_raises(self, tmp_path: Path) -> None:
+    def test_missing_dataset_json_raises(self, tmp_path: Path) -> None:
         with pytest.raises(ViewerError):
             load_manifest(tmp_path)
 
@@ -108,7 +212,6 @@ class TestBuildViewerHtml:
         assert "MOTOR LA H" in html
         assert 'class="sample"' in html
         assert "/plot/" in html
-        # FFT + waveform = 2 single-sample links; trend collapses to one link
         assert html.count('class="sample"') == 3
 
 

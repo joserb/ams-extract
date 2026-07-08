@@ -1,13 +1,8 @@
-"""Integration test for ``rbm export`` against the real BUNGE database.
-
-Gated on ``RBM_TEST_FILE``. Exports only the DEPURADORA area (which holds
-MECLADOR AGITADOR AG-100) to keep the run bounded, then checks the dataset
-layout and that M1H's 5 FFT + 5 waveform samples land in the manifest and
-in the per-equipment Parquet files.
-"""
+"""Integration tests for ``rbm export`` VibDataset output."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pyarrow.parquet as pq
@@ -21,64 +16,65 @@ pytestmark = pytest.mark.integration
 runner = CliRunner()
 
 
-def _export_depuradora(real_rbm: Path, out: Path) -> None:
+def _export_depuradora(real_rbm: Path, out: Path, types: str = "fft,waveform") -> None:
     result = runner.invoke(
         rbm_app,
         [
             "export",
             str(real_rbm),
-            "--out", str(out),
-            "--types", "fft,waveform",
-            "--areas", "DEPURADORA",
+            "--out",
+            str(out),
+            "--types",
+            types,
+            "--areas",
+            "DEPURADORA",
         ],
     )
     assert result.exit_code == 0, result.output
+
+
+def _find_machine_dir(out: Path, machine_name_substring: str) -> Path:
+    for machine_json in out.glob("machine=*/machine.json"):
+        doc = json.loads(machine_json.read_text(encoding="utf-8"))
+        if machine_name_substring in doc["machine"]["name"]:
+            return machine_json.parent
+    raise AssertionError(f"machine not found: {machine_name_substring}")
 
 
 def test_export_depuradora_layout(real_rbm: Path, tmp_path: Path) -> None:
     out = tmp_path / "dataset"
     _export_depuradora(real_rbm, out)
 
-    assert (out / "hierarchy.json").exists()
-    assert (out / "manifest.parquet").exists()
-    # Hive partition for the single exported area.
-    area_dir = out / "samples" / "area=DEPURADORA"
-    assert area_dir.is_dir()
-    assert list(area_dir.glob("*__fft.parquet")), "no FFT parquet files emitted"
-    assert list(area_dir.glob("*__waveform.parquet")), "no waveform parquet files"
+    assert (out / "dataset.json").exists()
+    assert (out / "report.html").exists()
+    machine_dirs = list(out.glob("machine=*"))
+    assert machine_dirs, "no machine asset directories emitted"
+    sample_machine = machine_dirs[0]
+    assert (sample_machine / "machine.json").exists()
+    assert (sample_machine / "metrics.parquet").exists()
+    assert (sample_machine / "spectra.parquet").exists()
+    assert (sample_machine / "waves.parquet").exists()
+    assert (sample_machine / "trends.parquet").exists()
 
 
-def test_export_m1h_samples_present_in_manifest(
-    real_rbm: Path, tmp_path: Path
-) -> None:
+def test_export_m1h_samples_present_in_asset_tables(real_rbm: Path, tmp_path: Path) -> None:
     out = tmp_path / "dataset"
     _export_depuradora(real_rbm, out)
 
-    manifest = pq.read_table(out / "manifest.parquet").to_pylist()
-    m1h = [
-        r
-        for r in manifest
-        if r["point_long_name"] == "MOTOR LOA HORIZONTAL"
-        and "AG-100" in (r["equipment_long_name"] or "")
-    ]
-    fft = [r for r in m1h if r["sample_type"] == "FFT"]
-    waveform = [r for r in m1h if r["sample_type"] == "WAVEFORM"]
-    assert len(fft) == 5, f"expected 5 M1H FFT rows, got {len(fft)}"
-    assert len(waveform) == 5, f"expected 5 M1H waveform rows, got {len(waveform)}"
+    machine_dir = _find_machine_dir(out, "AG-100")
+    doc = json.loads((machine_dir / "machine.json").read_text(encoding="utf-8"))
+    point = next(p for p in doc["points"] if p["name"] == "MOTOR LOA HORIZONTAL")
 
-    # The manifest path must point at a file that actually exists and holds
-    # the same number of rows for that equipment+type.
-    fft_path = out / fft[0]["parquet_path"]
-    assert fft_path.exists(), fft_path
-    fft_table = pq.read_table(fft_path).to_pylist()
-    m1h_in_file = [
-        r for r in fft_table if r["point_long_name"] == "MOTOR LOA HORIZONTAL"
-    ]
-    assert len(m1h_in_file) == 5
+    spectra = pq.read_table(machine_dir / "spectra.parquet").to_pylist()
+    waves = pq.read_table(machine_dir / "waves.parquet").to_pylist()
+    m1h_fft = [r for r in spectra if r["point_id"] == point["id"]]
+    m1h_waves = [r for r in waves if r["point_id"] == point["id"]]
 
-    # Manifest carries no amplitude arrays (it is a pure index).
-    assert "amplitude" not in manifest[0]
-    assert fft[0]["fmax_hz"] == pytest.approx(1000.0)
+    assert len(m1h_fft) == 5
+    assert len(m1h_waves) == 5
+    assert m1h_fft[0]["fmax_hz"] == pytest.approx(1000.0)
+    assert m1h_fft[0]["unit"] == "mm/s"
+    assert len(m1h_fft[0]["data"]) == 1600
 
 
 def test_export_parallel_matches_serial(real_rbm: Path, tmp_path: Path) -> None:
@@ -91,56 +87,49 @@ def test_export_parallel_matches_serial(real_rbm: Path, tmp_path: Path) -> None:
         [
             "export",
             str(real_rbm),
-            "--out", str(parallel),
-            "--types", "fft,waveform",
-            "--areas", "DEPURADORA",
-            "--parallel", "2",
+            "--out",
+            str(parallel),
+            "--types",
+            "fft,waveform",
+            "--areas",
+            "DEPURADORA",
+            "--parallel",
+            "2",
         ],
     )
     assert result.exit_code == 0, result.output
 
-    serial_rows = pq.read_table(serial / "manifest.parquet").num_rows
-    parallel_rows = pq.read_table(parallel / "manifest.parquet").num_rows
+    serial_rows = sum(
+        pq.read_table(path).num_rows for path in serial.glob("machine=*/spectra.parquet")
+    )
+    parallel_rows = sum(
+        pq.read_table(path).num_rows for path in parallel.glob("machine=*/spectra.parquet")
+    )
     assert serial_rows == parallel_rows
     assert serial_rows > 0
 
 
 def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
-    # --types trend exports the velocity "Valores Globales" series, one row
-    # per reading, in mm/s. M1H's first reading is the 1.58 mm/s gold value.
     out = tmp_path / "dataset"
-    result = runner.invoke(
-        rbm_app,
-        [
-            "export",
-            str(real_rbm),
-            "--out", str(out),
-            "--types", "trend",
-            "--areas", "DEPURADORA",
-        ],
-    )
-    assert result.exit_code == 0, result.output
+    _export_depuradora(real_rbm, out, types="trend")
 
-    manifest = pq.read_table(out / "manifest.parquet").to_pylist()
-    assert manifest, "expected trend rows in the manifest"
-    assert all(r["sample_type"] == "TREND" for r in manifest)
-    assert all(r["units"] == "mm/s" for r in manifest)
+    machine_dir = _find_machine_dir(out, "AG-100")
+    doc = json.loads((machine_dir / "machine.json").read_text(encoding="utf-8"))
+    point = next(p for p in doc["points"] if p["name"] == "MOTOR LOA HORIZONTAL")
 
-    m1h = sorted(
+    metrics = pq.read_table(machine_dir / "metrics.parquet").to_pylist()
+    metric = next(m for m in metrics if m["point_id"] == point["id"])
+    assert metric["name"] == "overall_velocity_rms"
+    assert metric["unit"] == "mm/s"
+
+    rows = sorted(
         (
             r
-            for r in manifest
-            if r["point_long_name"] == "MOTOR LOA HORIZONTAL"
-            and "AG-100" in (r["equipment_long_name"] or "")
+            for r in pq.read_table(machine_dir / "trends.parquet").to_pylist()
+            if r["metric_id"] == metric["metric_id"]
         ),
-        key=lambda r: r["timestamp_utc"],
+        key=lambda r: r["t"],
     )
-    assert len(m1h) == 62, f"expected 62 M1H trend readings, got {len(m1h)}"
-    assert m1h[0]["timestamp_utc"].strftime("%Y-%m-%d") == "2013-02-28"
-    assert m1h[0]["overall"] == pytest.approx(1.58, abs=0.02)
-    assert max(r["overall"] for r in m1h) == pytest.approx(36.43, abs=0.02)
-    # FFT-only columns stay null for trend rows.
-    assert m1h[0]["fmax_hz"] is None
-
-    trend_path = out / m1h[0]["parquet_path"]
-    assert trend_path.exists(), trend_path
+    assert len(rows) == 62
+    assert rows[0]["value"] == pytest.approx(1.58, abs=0.02)
+    assert max(r["value"] for r in rows) == pytest.approx(36.43, abs=0.02)
