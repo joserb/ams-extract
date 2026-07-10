@@ -11,7 +11,7 @@ El formato de intercambio se llama **VibFrame** (decisión 2026-07-10; antes
 - Spec: `../../vibsynth/vibsynth-contracts/docs/VIBFRAME.md` (relativo a este
   repo; monorepo vibsynth, github.com:twave-io/vibsynth, commit `4f9c3c1`+).
 - Contratos Pydantic normativos: `vibsynth_contracts/dataset/` en ese repo.
-- Diseño y decisiones: `~/wslprojects/RESONINS/tmp/docs/ESTUDIO-FORMATO-ESTANDAR.md`.
+- Diseño y decisiones: `~/wslprojects/RESONINS/t8-extract/docs/ESTUDIO-FORMATO-ESTANDAR.md` (repo github.com:joserb/t8-extract).
 
 `rbm export` ya escribe el layout VibDataset desde el commit `cf4b240`
 (2026-07-09, ver `docs/VIBDATASET_EXPORT_PLAN.md`, ya histórico): carpeta
