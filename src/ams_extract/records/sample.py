@@ -7,9 +7,10 @@ M1H of AG-100, BUNGE)::
                  │
                  ├── 0x14 → vdps (next FFT spectrum in time)
                  ├── 0x18 → vcps (first data record of this spectrum)
-                 ├── 0x20 → float32 Fmax (Hz)
-                 ├── 0x24 → u32 Unix timestamp UTC
-                 ├── 0x2C → float32 CARGA % (load)
+                ├── 0x20 → float32 Fmax (Hz)
+                ├── 0x24 → u32 Unix timestamp UTC
+                ├── 0x28 → float32 RPM x 2
+                ├── 0x2C → float32 CARGA % (load)
                  ├── 0x50 → u32 n_lines (nominal FFT bin count)
                  └── 0x78 → ASCII 8 bytes — units (e.g. "plg/segs")
 
@@ -49,6 +50,7 @@ VDPS_NEXT_OFFSET = 0x14
 VDPS_FIRST_VCPS_OFFSET = 0x18
 VDPS_FMAX_OFFSET = 0x20
 VDPS_TIMESTAMP_OFFSET = 0x24
+VDPS_RPM_X2_OFFSET = 0x28
 VDPS_CARGA_OFFSET = 0x2C
 VDPS_N_LINES_OFFSET = 0x50
 VDPS_UNITS_OFFSET = 0x78
@@ -101,6 +103,7 @@ class VdpsDescriptor:
     fmax_hz: float
     n_lines: int
     units: str
+    rpm: float
     carga_pct: float
     first_vcps: int | None
     next_vdps: int | None
@@ -138,6 +141,7 @@ def parse_vdps_descriptor(reader: RbmReader, vdps_record: int) -> VdpsDescriptor
         fmax_hz=_f32(VDPS_FMAX_OFFSET),
         n_lines=_u32(VDPS_N_LINES_OFFSET),
         units=decode_string(units_bytes),
+        rpm=_f32(VDPS_RPM_X2_OFFSET) / 2.0,
         carga_pct=_f32(VDPS_CARGA_OFFSET),
         first_vcps=decode_inner_pointer(_u32(VDPS_FIRST_VCPS_OFFSET)),
         next_vdps=decode_inner_pointer(_u32(VDPS_NEXT_OFFSET)),

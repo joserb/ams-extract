@@ -1,4 +1,4 @@
-"""Tests for the on-demand VibDataset viewer (``rbm serve``)."""
+"""Tests for the on-demand VibFrame viewer (``rbm serve``)."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 import pytest
 
-from ams_extract.export.vibdataset_contract import (
+from ams_extract.export.vibframe_contract import (
     DATASET_FILE,
     MACHINE_DOC_FILE,
     METRICS_COLUMNS,
@@ -57,7 +57,7 @@ def _write_table(path: Path, rows: list[dict[str, Any]], columns: tuple[ColumnSp
 
 
 def _build_dataset(tmp_path: Path) -> Path:
-    """Write a minimal VibDataset (one machine, one of each type)."""
+    """Write a minimal VibFrame dataset (one machine, one of each type)."""
     ds = tmp_path / "ds"
     machine = ds / "machine=EQ"
     _write_json(
@@ -99,14 +99,7 @@ def _build_dataset(tmp_path: Path) -> Path:
                 }
             ],
             "proc_modes": [],
-            "config_generations": [
-                {
-                    "config_id": "",
-                    "valid_from_us": None,
-                    "valid_to_us": None,
-                    "description": "",
-                }
-            ],
+            "config_generations": [],
             "states": [],
             "ground_truth": None,
         },
@@ -161,7 +154,7 @@ def _build_dataset(tmp_path: Path) -> Path:
                 "proc_mode_id": "WAVE_ACC_2560",
                 "sample_rate_hz": 2560.0,
                 "n_samples": 8,
-                "unit": "G's",
+                "unit": "g",
                 "signal_family": "acceleration",
                 "speed_hz": 24.25,
                 "config_id": "",

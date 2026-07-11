@@ -38,7 +38,7 @@ from ams_extract.tree import (
 
 app = typer.Typer(
     name="rbm",
-    help="Read AMS Machinery Manager (.rbm) databases and export to VibDataset.",
+    help="Read AMS Machinery Manager (.rbm) databases and export to VibFrame.",
     no_args_is_help=True,
     add_completion=False,
 )
@@ -408,7 +408,7 @@ def export(
         typer.Option("--parallel", help="Worker processes; 1 means serial."),
     ] = 1,
 ) -> None:
-    """Dump the full database to the VibDataset layout.
+    """Dump the full database to the VibFrame layout.
 
     Writes ``dataset.json``, ``report.html`` and one ``machine=<asset_id>``
     directory per AMS equipment, with ``machine.json`` plus spectra, waves,
@@ -476,7 +476,7 @@ def serve(
     * a **.rbm file** → renders straight from the database, walking the
       hierarchy on startup and rendering each plot on demand (no export
       needed; machines/points/samples load lazily as you drill in);
-    * an **exported dataset directory** → reads the VibDataset tables and
+    * an **exported dataset directory** → reads the VibFrame tables and
       renders each plot on demand from the local Parquet.
 
     Either way the plots are built on the fly. Press Ctrl-C to stop.

@@ -97,6 +97,7 @@ class Spectrum:
         n_lines: Nominal FFT bin count, from ``vdps.0x50`` (= amplitude length).
         units: Display units — ``"mm/s"`` for the calibrated velocity
             spectrum (the common case), else the raw ``vdps.0x78`` string.
+        rpm: Shaft speed in RPM, decoded from ``vdps.0x28`` (stored doubled).
         carga_pct: CARGA % field, from ``vdps.0x2C``.
         amplitude: Calibrated float32 amplitude buffer. For velocity
             spectra the raw values are scaled to mm/s (FORMAT §5.6);
@@ -109,6 +110,7 @@ class Spectrum:
     fmax_hz: float
     n_lines: int
     units: str
+    rpm: float
     carga_pct: float
     amplitude: NDArray[np.float32]
 

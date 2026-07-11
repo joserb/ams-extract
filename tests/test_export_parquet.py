@@ -31,6 +31,7 @@ def _spectrum(point_rec: int, rec: int, ts: datetime) -> Spectrum:
         fmax_hz=1000.0,
         n_lines=1600,
         units="plg/segs",
+        rpm=0.0,
         carga_pct=100.0,
         amplitude=np.arange(8, dtype=np.float32),
     )

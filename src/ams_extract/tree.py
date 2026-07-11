@@ -428,6 +428,7 @@ def walk_spectra(reader: RbmReader, point: Point) -> Iterator[Spectrum]:
             fmax_hz=desc.fmax_hz,
             n_lines=desc.n_lines,
             units=units,
+            rpm=desc.rpm,
             carga_pct=desc.carga_pct,
             amplitude=amplitude,
         )

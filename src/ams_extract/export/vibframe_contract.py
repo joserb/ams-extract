@@ -1,9 +1,10 @@
-"""Local VibDataset contract subset used by ``rbm export``.
+"""Local VibFrame contract subset used by ``rbm export``.
 
 These definitions were imported from ``vibsynth-contracts.dataset`` on
-2026-07-09 and intentionally copied here so ``ams-extract`` does not depend on
-the vibsynth monorepo at runtime. Keep this file small: it covers only the
-layout and columns needed to write AMS RBM exports.
+2026-07-10 (commit ``9e679d2e7689c9537f426c80bded1f5617b6058f``) and
+intentionally copied here so ``ams-extract`` does not depend on the vibsynth
+monorepo at runtime. Keep this file small: it covers only the layout and
+columns needed to write AMS RBM exports.
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ Dtype = Literal[
 
 @dataclass(frozen=True, slots=True)
 class ColumnSpec:
-    """Column descriptor for one VibDataset parquet table."""
+    """Column descriptor for one VibFrame parquet table."""
 
     name: str
     dtype: Dtype
@@ -120,7 +121,7 @@ METRICS_COLUMNS: tuple[ColumnSpec, ...] = (
 
 
 def pa_type(dtype: Dtype) -> pa.DataType:
-    """Return the PyArrow type for a VibDataset dtype string."""
+    """Return the PyArrow type for a VibFrame dtype string."""
     match dtype:
         case "int8":
             return pa.int8()
@@ -147,5 +148,5 @@ def pa_type(dtype: Dtype) -> pa.DataType:
 
 
 def schema(columns: tuple[ColumnSpec, ...]) -> pa.Schema:
-    """Build a PyArrow schema from VibDataset column specs."""
+    """Build a PyArrow schema from VibFrame column specs."""
     return pa.schema([(col.name, pa_type(col.dtype)) for col in columns])

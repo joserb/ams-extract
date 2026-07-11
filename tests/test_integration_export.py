@@ -1,4 +1,4 @@
-"""Integration tests for ``rbm export`` VibDataset output."""
+"""Integration tests for ``rbm export`` VibFrame output."""
 
 from __future__ import annotations
 

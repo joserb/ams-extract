@@ -602,7 +602,7 @@ jerarquía/muestras que el export.
 
 ---
 
-## ADR-0009 — `rbm export` escribe VibDataset sin dependencia de vibsynth
+## ADR-0009 — `rbm export` escribe VibFrame sin dependencia de vibsynth
 
 - **Fecha**: 2026-07-09
 - **Estado**: aceptada
@@ -619,7 +619,7 @@ producir ese formato, pero no debe depender en runtime del monorepo
 ### Decisión
 
 1. **Sustituir el export masivo**. `rbm export` deja de escribir
-   `manifest.parquet` + `samples/` y pasa a escribir VibDataset. El formato
+   `manifest.parquet` + `samples/` y pasa a escribir VibFrame. El formato
    anterior queda obsoleto.
 2. **Contrato local mínimo**. Se copian localmente las constantes de layout y
    columnas necesarias desde `vibsynth-contracts.dataset`, con comentario de
@@ -627,7 +627,7 @@ producir ese formato, pero no debe depender en runtime del monorepo
 3. **Carpetas por asset**. El `Equipment` de AMS se modela como asset/machine:
    `machine=<equipment.short_code>`. El dispositivo de adquisición queda
    desconocido (`SourceInfo.device = null`) hasta que AMS revele esa metadata.
-4. **Viewer actualizado**. `rbm serve dataset/` lee VibDataset directamente.
+4. **Viewer actualizado**. `rbm serve dataset/` lee VibFrame directamente.
    Los IDs de muestra para enlaces del viewer se generan en memoria; no forman
    parte del contrato de intercambio.
 5. **`--out` se regenera completo**. `rbm export` borra siempre la carpeta de
@@ -640,7 +640,7 @@ producir ese formato, pero no debe depender en runtime del monorepo
 - Los exports legacy deben regenerarse; el viewer de datasets ya no soporta
   `manifest.parquet`.
 - `report.html` sigue escribiéndose como archivo extra de conveniencia, aunque
-  no forme parte del contrato VibDataset.
+  no forme parte del contrato VibFrame.
 - Gaps pendientes para enriquecer `machine.json`/`metrics.parquet`: sensores,
   direcciones de puntos, modos reales de adquisición, configuración `pdpa`,
   alarmas, RPM en FFT, tendencias por banda y contexto operativo.

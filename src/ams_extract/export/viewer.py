@@ -1,7 +1,7 @@
-"""On-demand viewer over an exported VibDataset (``rbm serve``).
+"""On-demand viewer over an exported VibFrame dataset (``rbm serve``).
 
 Unlike the inventory report (which reads the ``.rbm`` directly), the viewer
-serves an **already exported** dataset: it reads the VibDataset machine
+serves an **already exported** dataset: it reads the VibFrame machine
 documents and per-asset Parquet tables, builds an in-memory sample index and
 renders each plot **on demand** via the existing matplotlib renderers.
 
@@ -31,7 +31,7 @@ import structlog
 
 from ams_extract.export.spectrum_plot import render_spectrum_png
 from ams_extract.export.trend_plot import render_trend_png
-from ams_extract.export.vibdataset_contract import (
+from ams_extract.export.vibframe_contract import (
     DATASET_FILE,
     MACHINE_DOC_FILE,
     MACHINE_PARTITION_PREFIX,
@@ -50,7 +50,7 @@ class ViewerError(ValueError):
 
 
 def load_manifest(dataset_dir: Path) -> list[dict[str, Any]]:
-    """Read a VibDataset directory into viewer sample rows.
+    """Read a VibFrame directory into viewer sample rows.
 
     Raises:
         ViewerError: If the dataset is missing ``dataset.json``.
@@ -227,6 +227,7 @@ def _spectrum_png(dataset_dir: Path, row: dict[str, Any]) -> bytes:
         fmax_hz=r["fmax_hz"],
         n_lines=r["lines"],
         units=r["unit"],
+        rpm=float(r["speed_hz"]) * 60.0 if r["speed_hz"] is not None else 0.0,
         carga_pct=0.0,
         amplitude=np.asarray(r["data"], dtype=np.float32),
     )
@@ -287,7 +288,7 @@ def _trend_png(dataset_dir: Path, row: dict[str, Any]) -> bytes:
 def render_sample_png(dataset_dir: Path, row: dict[str, Any]) -> bytes:
     """Reconstruct the sample described by ``row`` and render its PNG bytes.
 
-    ``row`` is a viewer row built from VibDataset tables.
+    ``row`` is a viewer row built from VibFrame tables.
     Trends are plotted as the whole per-point series.
 
     Raises:

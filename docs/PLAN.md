@@ -67,14 +67,14 @@ autocontenido: árbol colapsable localizaciones → máquinas con nº de archivo
 tipo y fechas primera/última, más un filtro de máquinas. `rbm serve` abre un
 viewer on-demand y elige backend según el argumento: un **`.rbm`** (renderiza
 directo de la BD; arranque solo con la jerarquía, puntos/muestras cargados lazy)
-o un **dataset exportado** (lee tablas VibDataset). En ambos casos las gráficas
+o un **dataset exportado** (lee tablas VibFrame). En ambos casos las gráficas
 se renderizan **bajo demanda** y nunca se pregenera PNG.
 
 `sp` = espectros FFT, `wv` = waveforms, `tn` = lecturas de tendencia.
 
-## 4. Salida de `rbm export` (contrato VibDataset)
+## 4. Salida de `rbm export` (contrato VibFrame)
 
-Decisión vigente: `rbm export` escribe VibDataset, un formato parquet+JSON
+Decisión vigente: `rbm export` escribe VibFrame, un formato parquet+JSON
 importado conceptualmente de `vibsynth-contracts.dataset` pero copiado
 localmente para no depender del monorepo `vibsynth` en runtime.
 
@@ -103,7 +103,7 @@ dataset/
   `metrics.parquet` y se emite único por punto (`overall_velocity_rms__<point_id>`).
 
 El formato anterior (`manifest.parquet` + `samples/`) queda obsoleto. Los IDs
-de muestra del viewer se generan en memoria al cargar el VibDataset.
+de muestra del viewer se generan en memoria al cargar el VibFrame.
 
 ## 5. Modelo de datos
 

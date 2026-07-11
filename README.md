@@ -37,7 +37,7 @@ rbm stats  points   FILE --equipment SUBSTR [--area SUBSTR]   # per-point counts
 rbm extract FILE --point NAME [--equipment SUBSTR] \
                  --type fft|waveform|trend|both --limit N --out DIR   # Parquet + PNG
 rbm export FILE --out dataset/ [--types fft,waveform,trend] \
-                [--areas …] [--parallel N]    # VibDataset (dataset.json +
+                [--areas …] [--parallel N]    # VibFrame (dataset.json +
                                               # machine=<asset>/... + report.html)
 rbm serve  FILE.rbm | dataset/ [--host H] [--port N] [--no-browser]  # on-demand viewer
 ```
@@ -57,7 +57,7 @@ the argument:
   the area → machine hierarchy (instant, even on a full database); machines,
   points and samples load lazily as you drill in, and each plot is rendered on
   the fly from the `.rbm`. No `export` needed.
-- an **exported dataset directory** → reads the VibDataset tables and renders
+- an **exported dataset directory** → reads the VibFrame tables and renders
   each plot on demand from the local Parquet.
 
 Either way nothing is pre-rendered, and it binds to loopback only by default.
@@ -96,7 +96,7 @@ uv run rbm --help
 uv run rbm tree "path/to/database.rbm" --out tree.json
 ```
 
-Load the exported VibDataset with any Parquet reader, e.g. Polars:
+Load the exported VibFrame with any Parquet reader, e.g. Polars:
 
 ```python
 import polars as pl

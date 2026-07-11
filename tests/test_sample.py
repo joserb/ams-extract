@@ -23,6 +23,7 @@ from ams_extract.records.sample import (
     VDPS_LOW_BAND_OFFSET,
     VDPS_N_LINES_OFFSET,
     VDPS_NEXT_OFFSET,
+    VDPS_RPM_X2_OFFSET,
     VDPS_TAG,
     VDPS_TIMESTAMP_OFFSET,
     VDPS_UNITS_LENGTH,
@@ -54,6 +55,7 @@ def _make_vdps(
     units: bytes,
     carga_pct: float,
     first_vcps_stored: int,
+    rpm: float = 0.0,
     next_vdps_stored: int = 0,
     low_band: list[float] | None = None,
 ) -> bytes:
@@ -63,6 +65,7 @@ def _make_vdps(
     struct.pack_into("<I", record, VDPS_FIRST_VCPS_OFFSET, first_vcps_stored)
     struct.pack_into("<f", record, VDPS_FMAX_OFFSET, fmax_hz)
     struct.pack_into("<I", record, VDPS_TIMESTAMP_OFFSET, timestamp_raw)
+    struct.pack_into("<f", record, VDPS_RPM_X2_OFFSET, rpm * 2.0)
     struct.pack_into("<f", record, VDPS_CARGA_OFFSET, carga_pct)
     struct.pack_into("<I", record, VDPS_N_LINES_OFFSET, n_lines)
     units_slot = bytearray(b" " * VDPS_UNITS_LENGTH)
@@ -80,9 +83,7 @@ def _make_vcps(
     next_vcps_stored: int = 0,
 ) -> bytes:
     if len(amplitudes) > VCPS_DATA_FLOATS:
-        raise AssertionError(
-            f"each vcps holds {VCPS_DATA_FLOATS} floats, got {len(amplitudes)}"
-        )
+        raise AssertionError(f"each vcps holds {VCPS_DATA_FLOATS} floats, got {len(amplitudes)}")
     record = _empty_record()
     record[TAG_OFFSET : TAG_OFFSET + 4] = VCPS_TAG
     struct.pack_into("<I", record, VCPS_NEXT_OFFSET, next_vcps_stored)
@@ -109,6 +110,7 @@ class TestParseVdpsDescriptor:
             fmax_hz=1000.0,
             n_lines=1600,
             units=b"plg/segs",
+            rpm=1455.0,
             carga_pct=100.0,
             first_vcps_stored=11,  # → rec 10
             next_vdps_stored=4,  # → rec 3
@@ -121,6 +123,7 @@ class TestParseVdpsDescriptor:
         assert desc.fmax_hz == pytest.approx(1000.0)
         assert desc.n_lines == 1600
         assert desc.units == "plg/segs"
+        assert desc.rpm == pytest.approx(1455.0)
         assert desc.carga_pct == pytest.approx(100.0)
         assert desc.first_vcps == 10
         assert desc.next_vdps == 3
@@ -152,18 +155,30 @@ class TestWalkVdpsChain:
         # Three vdps linked oldest → newer via 0x14 (stored +1).
         a = _make_vdps(
             timestamp_raw=1571150677,  # 2019-10-15
-            fmax_hz=1000.0, n_lines=1600, units=b"plg/segs",
-            carga_pct=100.0, first_vcps_stored=11, next_vdps_stored=3,
+            fmax_hz=1000.0,
+            n_lines=1600,
+            units=b"plg/segs",
+            carga_pct=100.0,
+            first_vcps_stored=11,
+            next_vdps_stored=3,
         )
         b = _make_vdps(
             timestamp_raw=1573574259,  # 2019-11-12
-            fmax_hz=1000.0, n_lines=1600, units=b"plg/segs",
-            carga_pct=100.0, first_vcps_stored=12, next_vdps_stored=4,
+            fmax_hz=1000.0,
+            n_lines=1600,
+            units=b"plg/segs",
+            carga_pct=100.0,
+            first_vcps_stored=12,
+            next_vdps_stored=4,
         )
         c = _make_vdps(
             timestamp_raw=1576159620,  # 2019-12-12
-            fmax_hz=1000.0, n_lines=1600, units=b"plg/segs",
-            carga_pct=100.0, first_vcps_stored=13, next_vdps_stored=0,
+            fmax_hz=1000.0,
+            n_lines=1600,
+            units=b"plg/segs",
+            carga_pct=100.0,
+            first_vcps_stored=13,
+            next_vdps_stored=0,
         )
         records = [_make_header(), a, b, c] + [_empty_record()] * 12
         with reader_factory(records) as reader:
@@ -176,13 +191,15 @@ class TestWalkVdpsChain:
         # vdps at rec 1 points back to itself (stored +1 = 2).
         looped = _make_vdps(
             timestamp_raw=1_700_000_000,
-            fmax_hz=1000.0, n_lines=1600, units=b"g",
-            carga_pct=0.0, first_vcps_stored=0, next_vdps_stored=2,
+            fmax_hz=1000.0,
+            n_lines=1600,
+            units=b"g",
+            carga_pct=0.0,
+            first_vcps_stored=0,
+            next_vdps_stored=2,
         )
         records = [_make_header(), looped] + [_empty_record()] * 5
-        with reader_factory(records) as reader, pytest.raises(
-            SampleChainError, match="cycle"
-        ):
+        with reader_factory(records) as reader, pytest.raises(SampleChainError, match="cycle"):
             list(walk_vdps_chain(reader, 1))
 
 
@@ -227,8 +244,12 @@ class TestReadVdpsLowBand:
         low = [float(i) for i in range(VDPS_LOW_BAND_FLOATS)]
         vdps = _make_vdps(
             timestamp_raw=1_700_000_000,
-            fmax_hz=1000.0, n_lines=1600, units=b"plg/segs",
-            carga_pct=100.0, first_vcps_stored=0, low_band=low,
+            fmax_hz=1000.0,
+            n_lines=1600,
+            units=b"plg/segs",
+            carga_pct=100.0,
+            first_vcps_stored=0,
+            low_band=low,
         )
         records = [_make_header(), vdps] + [_empty_record()] * 3
         with reader_factory(records) as reader:

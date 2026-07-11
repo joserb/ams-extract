@@ -1,19 +1,82 @@
-"""Tests for the VibDataset orchestration and the ``rbm export`` command."""
+"""Tests for the VibFrame orchestration and the ``rbm export`` command."""
 
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 
+import numpy as np
+import pytest
 from typer.testing import CliRunner
 
 from ams_extract.cli import app as rbm_app
-from ams_extract.export.dataset import export_dataset
+from ams_extract.export.dataset import (
+    _build_machine_doc,
+    _spectrum_row,
+    _waveform_row,
+    export_dataset,
+)
+from ams_extract.models import Equipment, Point, Spectrum, Waveform
 
 runner = CliRunner()
 
 
 class TestExportDataset:
+    def test_normalizes_units_speed_and_single_configuration(self) -> None:
+        point = Point(record_num=1, long_name="MOTOR", short_code="MOTOR")
+        spectrum = Spectrum(
+            record_num=2,
+            point_record_num=point.record_num,
+            timestamp_utc=datetime(2020, 1, 1, tzinfo=UTC),
+            fmax_hz=1_000.0,
+            n_lines=4,
+            units="G's",
+            rpm=1_500.0,
+            carga_pct=0.0,
+            amplitude=np.zeros(4, dtype=np.float32),
+        )
+        waveform = Waveform(
+            record_num=3,
+            point_record_num=point.record_num,
+            timestamp_utc=datetime(2020, 1, 1, tzinfo=UTC),
+            n_samples=4,
+            sample_rate_hz=1_000.0,
+            rpm=1_500.0,
+            units="G's",
+            carga_pct=0.0,
+            samples=np.zeros(4, dtype=np.float32),
+        )
+        equipment = Equipment(record_num=4, long_name="BOMBA", short_code="PUMP", points=(point,))
+
+        spectrum_row = _spectrum_row(spectrum, point)
+        waveform_row = _waveform_row(waveform, point)
+        machine_doc = _build_machine_doc(
+            source_path="fixture.rbm",
+            extracted_at=datetime(2020, 1, 1, tzinfo=UTC),
+            area_long="AREA",
+            equipment=equipment,
+            proc_modes=[],
+        )
+
+        assert spectrum_row["unit"] == waveform_row["unit"] == "g"
+        assert spectrum_row["speed_hz"] == waveform_row["speed_hz"] == 25.0
+        assert machine_doc["config_generations"] == []
+
+    def test_machine_doc_validates_against_optional_vibframe_contract(self) -> None:
+        contracts = pytest.importorskip("vibsynth_contracts.dataset")
+        point = Point(record_num=1, long_name="MOTOR", short_code="MOTOR")
+        equipment = Equipment(record_num=2, long_name="BOMBA", short_code="PUMP", points=(point,))
+        document = _build_machine_doc(
+            source_path="fixture.rbm",
+            extracted_at=datetime(2020, 1, 1, tzinfo=UTC),
+            area_long="AREA",
+            equipment=equipment,
+            proc_modes=[],
+        )
+
+        contracts.MachineDoc.model_validate(document)
+
     def test_writes_dataset_doc_and_report(self, synthetic_rbm: Path, tmp_path: Path) -> None:
         out = tmp_path / "dataset"
         summary = export_dataset(

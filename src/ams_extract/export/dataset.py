@@ -1,6 +1,6 @@
-"""Full-database export to the VibDataset layout.
+"""Full-database export to the VibFrame layout.
 
-``rbm export`` writes a local copy of the VibDataset exchange format imported
+``rbm export`` writes a local copy of the VibFrame exchange format imported
 from ``vibsynth-contracts``. The previous ``manifest.parquet`` + ``samples/``
 layout is obsolete; ``rbm serve dataset/`` reads this layout directly.
 """
@@ -32,7 +32,7 @@ from rich.progress import (
 
 from ams_extract.export.html_report import write_inventory_html
 from ams_extract.export.json_tree import build_tree_document
-from ams_extract.export.vibdataset_contract import (
+from ams_extract.export.vibframe_contract import (
     DATASET_FILE,
     MACHINE_DOC_FILE,
     MACHINE_PARTITION_PREFIX,
@@ -158,7 +158,7 @@ def _filter_areas(areas: Iterable[Area], area_filter: set[str] | None) -> list[A
 def _signal_family(unit: str) -> str:
     if unit == "mm/s":
         return "velocity"
-    if unit == "G's":
+    if unit in {"G's", "g"}:
         return "acceleration"
     return "non_vibration"
 
@@ -170,6 +170,11 @@ def _proc_prefix(unit: str) -> str:
     if family == "acceleration":
         return "ACC"
     return "UNK"
+
+
+def _canonical_unit(unit: str) -> str:
+    """Map AMS display-unit spellings to VibFrame canonical units."""
+    return "g" if unit == "G's" else unit
 
 
 def _fmt_num(value: float) -> str:
@@ -230,14 +235,7 @@ def _build_machine_doc(
             for point in equipment.points
         ],
         "proc_modes": list(proc_modes),
-        "config_generations": [
-            {
-                "config_id": CONFIG_ID,
-                "valid_from_us": None,
-                "valid_to_us": None,
-                "description": "AMS RBM export; configuration generation not decoded yet.",
-            }
-        ],
+        "config_generations": [],
         "states": [],
         "ground_truth": None,
     }
@@ -294,9 +292,9 @@ def _spectrum_row(spectrum: Spectrum, point: Point) -> dict[str, Any]:
         "averages": None,
         "spectrum_detector": "peak",
         "power": False,
-        "unit": spectrum.units,
+        "unit": _canonical_unit(spectrum.units),
         "signal_family": signal_family,
-        "speed_hz": None,
+        "speed_hz": spectrum.rpm / 60.0 if spectrum.rpm > 0 else None,
         "config_id": CONFIG_ID,
         "data": spectrum.amplitude.tolist(),
     }
@@ -311,7 +309,7 @@ def _waveform_row(waveform: Waveform, point: Point) -> dict[str, Any]:
         "proc_mode_id": _waveform_mode_id(waveform),
         "sample_rate_hz": waveform.sample_rate_hz,
         "n_samples": waveform.n_samples,
-        "unit": waveform.units,
+        "unit": _canonical_unit(waveform.units),
         "signal_family": _signal_family(waveform.units),
         "speed_hz": rpm / 60.0 if rpm > 0 else None,
         "sync": None,
@@ -376,7 +374,7 @@ def _process_equipment(
     types: set[str],
     out_dir: Path,
 ) -> EquipmentResult:
-    """Export every sample of ``equipment`` as one VibDataset asset."""
+    """Export every sample of ``equipment`` as one VibFrame asset."""
     try:
         spectra_rows: list[dict[str, Any]] = []
         wave_rows: list[dict[str, Any]] = []
@@ -529,7 +527,7 @@ def export_dataset(
     parallel: int = 1,
     show_progress: bool = True,
 ) -> ExportSummary:
-    """Export the database under ``file`` to VibDataset rooted at ``out``."""
+    """Export the database under ``file`` to VibFrame rooted at ``out``."""
     out = Path(out)
     _prepare_output_dir(out)
     extracted_at = datetime.now(UTC)
