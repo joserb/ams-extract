@@ -77,6 +77,19 @@ en ese repo). No implementar mapeo de nombres aquí — en VibFrame el nombre
 nunca decide semántica; lo que importa es rellenar bien los descriptores
 estructurales del §3.
 
+**PENDIENTE (2026-07-18): poder interpretar qué son las métricas AMS —
+pasar el mapper.** El export ya emite descriptores estructurales (overall +
+bandas vddt, ADR-0010), pero sin etiquetado canónico el visor no puede
+agrupar/comparar con los datasets T8 (badges canónicos vacíos). Trabajo:
+
+- Adaptador VibFrame→firma en `t8-metrics-mapper` que consuma
+  `metrics.parquet` de un dataset AMS y rellene
+  `canonical_metric`/`proxy_quality`/`mapping_rule` (post-proceso sobre el
+  dataset, o paso opcional de `rbm export` si el mapper está instalado).
+- Los descriptores de banda hoy van sin límites de frecuencia (salvo
+  11-40 X RPM en órdenes): decodificar `pdpa` (FORMAT §5.8) subiría la
+  calidad del mapeo (`proxy_quality`) de las bandas.
+
 ## Validación
 
 - `uv sync && pytest` (usa `RBM_TEST_FILE` para integración), `ruff`,
