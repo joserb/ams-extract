@@ -644,3 +644,54 @@ producir ese formato, pero no debe depender en runtime del monorepo
 - Gaps pendientes para enriquecer `machine.json`/`metrics.parquet`: sensores,
   direcciones de puntos, modos reales de adquisición, configuración `pdpa`,
   alarmas, RPM en FFT, tendencias por banda y contexto operativo.
+
+## ADR-0010 — Bandas `vddt` como métricas VibFrame y `machine.path` solo con niveles de ubicación
+
+- **Fecha**: 2026-07-18
+- **Estado**: aceptada
+
+### Contexto
+
+Los records `vddt` decodifican, además del overall, las bandas con nombre del
+template de velocidad (`band_count = 7`), cada columna validada 62/62 contra
+el PLOTDATA por-banda de M1H AG-100 (FORMAT §5.7): `Mp Wave` (pico de
+aceleración en G's, sin ×25.4), `SUBSINCRONO`, `DESEQUILIBRIO`,
+`DESALINEACION`, `HOLGURAS` y `11-40 X RPM` (velocidades ×25.4 → mm/s). Hasta
+ahora solo se emitía el overall. Además, `machine.json` escribía
+`machine.path = [área, máquina]`, y los visores jerárquicos del ecosistema
+(vibframe_viewer en t8-extract) interpretan `path` como niveles de
+*ubicación* (location → sublocation) con la máquina como nivel propio, con lo
+que la máquina aparecía duplicada como pseudo-sububicación.
+
+### Decisión
+
+1. **Emitir las bandas del template de velocidad** como métricas propias:
+   `Trend.bands` (nuevo `TrendBand` en models) con filas en `trends.parquet`
+   (`metric_id = band_<slug>__<punto>`, p.ej. `band_subsincrono__M1H`) y
+   descriptor en `metrics.parquet` con `name` = etiqueta original AMS.
+2. **Descriptores**: bandas de velocidad → `statistic="spectrum_rms"`,
+   `detector="rms"`, `band_type="single"`; `Mp Wave` → `statistic="true_peak"`,
+   `detector="peak"`, `band_type="none"`, unidad canónica `g` (es un pico de
+   forma de onda, no una banda espectral).
+3. **Límites de banda**: null salvo los derivables sin decodificar `pdpa`:
+   `11-40 X RPM` lleva `band_low_order=11` / `band_high_order=40` (declarados
+   por el nombre y corroborados por los bordes 40×RPM aislados en las
+   plantillas `pdpa`, FORMAT §5.8). El resto quedará pendiente del decode de
+   `pdpa`; se asume la desviación temporal de la spec ("single requiere
+   límites") antes que inventar límites o negar que sean bandas.
+4. **Columna 6 ("1-20 KHz") no se emite**: unidad y escala sin confirmar
+   (la tabla gold está vacía). Lecturas de épocas con `band_count ≠ 7` solo
+   aportan el overall (columnas sin etiquetar).
+5. **`machine.path = [área]`**: solo niveles de ubicación; la máquina es su
+   propio nivel en los visores.
+
+### Consecuencias
+
+- `trends.parquet` multiplica filas (62 lecturas × 6 bandas extra en M1H);
+  los consumidores que asumían una métrica por punto deben filtrar por
+  `name`/`metric_id` (test de integración actualizado).
+- El mapper (`t8-metrics-mapper`) recibe descriptores estructurales de banda
+  con nombre original y podrá etiquetarlos canónicamente; aquí no se mapea
+  semántica de nombres (PLAN_VIBFRAME §4).
+- Los datasets exportados antes de este ADR deben regenerarse para obtener
+  bandas y el `path` corregido.

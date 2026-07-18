@@ -10,6 +10,7 @@ layout is obsolete; ``rbm serve dataset/`` reads this layout directly.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 from collections.abc import Iterable, Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -48,7 +49,15 @@ from ams_extract.export.vibframe_contract import (
     ColumnSpec,
     schema,
 )
-from ams_extract.models import Area, Equipment, Point, Spectrum, Trend, Waveform
+from ams_extract.models import (
+    Area,
+    Equipment,
+    Point,
+    Spectrum,
+    Trend,
+    TrendBand,
+    Waveform,
+)
 from ams_extract.reader import RbmReader
 from ams_extract.report import collect_inventory
 from ams_extract.tree import walk_hierarchy, walk_spectra, walk_trends, walk_waveforms
@@ -195,6 +204,22 @@ def _trend_metric_id(point: Point) -> str:
     return f"{TREND_METRIC_NAME}__{point.short_code}"
 
 
+def _slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
+
+
+def _band_metric_id(point: Point, band: TrendBand) -> str:
+    return f"band_{_slug(band.name)}__{point.short_code}"
+
+
+# Order bounds derivable without the (still undecoded) pdpa per-band floats:
+# the 11-40 X RPM band edges are declared by its name and corroborated by the
+# rpm-scaled 40xRPM frequencies isolated in the pdpa templates (FORMAT §5.8).
+_BAND_ORDER_BOUNDS: dict[str, tuple[float, float]] = {
+    "11-40 X RPM": (11.0, 40.0),
+}
+
+
 def _machine_dir(out_dir: Path, equipment: Equipment) -> Path:
     return out_dir / f"{MACHINE_PARTITION_PREFIX}{equipment.short_code}"
 
@@ -219,7 +244,9 @@ def _build_machine_doc(
         "machine": {
             "id": equipment.short_code,
             "name": equipment.long_name,
-            "path": [area_long, equipment.long_name],
+            # Location levels only (area); the machine is its own level in
+            # the location -> machine hierarchy the viewers build from path.
+            "path": [area_long],
             "fault_frequencies_order": {},
             "definition": None,
         },
@@ -334,6 +361,59 @@ def _trend_rows(trend: Trend, point: Point) -> list[dict[str, Any]]:
     ]
 
 
+def _band_trend_rows(band: TrendBand, point: Point) -> list[dict[str, Any]]:
+    metric_id = _band_metric_id(point, band)
+    return [
+        {
+            "t": _timestamp_us(band.timestamps_utc[i]),
+            "metric_id": metric_id,
+            "value": float(band.values[i]),
+            "alarm": None,
+            "config_id": CONFIG_ID,
+        }
+        for i in range(len(band.values))
+    ]
+
+
+def _band_metric_row(band: TrendBand, point: Point) -> dict[str, Any]:
+    """Descriptor for one named vddt band (FORMAT §5.7).
+
+    "Mp Wave" (F.Onda Pico Máx) is a waveform acceleration peak, not a
+    spectral band; the velocity bands are band RMS values whose frequency
+    bounds live in the still-undecoded pdpa templates (null until then,
+    except the order bounds declared by the band name itself).
+    """
+    family = _signal_family(band.units)
+    is_peak = family == "acceleration"
+    low_order, high_order = _BAND_ORDER_BOUNDS.get(band.name, (None, None))
+    return {
+        "metric_id": _band_metric_id(point, band),
+        "config_id": CONFIG_ID,
+        "point_id": point.short_code,
+        "proc_mode_id": None,
+        "name": band.name,
+        "path": f"{point.short_code}:{band.name}",
+        "statistic": "true_peak" if is_peak else "spectrum_rms",
+        "signal_family": family,
+        "detector": "peak" if is_peak else "rms",
+        "unit": _canonical_unit(band.units),
+        "integrate": False,
+        "band_type": "none" if is_peak else "single",
+        "band_low_hz": None,
+        "band_high_hz": None,
+        "band_low_order": low_order,
+        "band_high_order": high_order,
+        "frequency_role": None,
+        "harmonic_orders": None,
+        "n_sidebands": None,
+        "modulator": None,
+        "flags": [],
+        "canonical_metric": None,
+        "proxy_quality": None,
+        "mapping_rule": None,
+    }
+
+
 def _metric_row(point: Point) -> dict[str, Any]:
     metric_id = _trend_metric_id(point)
     return {
@@ -411,6 +491,13 @@ def _process_equipment(
                     if rows:
                         trend_rows.extend(rows)
                         metric_rows[_trend_metric_id(point)] = _metric_row(point)
+                    for band in trend.bands:
+                        band_rows = _band_trend_rows(band, point)
+                        if band_rows:
+                            trend_rows.extend(band_rows)
+                            metric_rows[_band_metric_id(point, band)] = _band_metric_row(
+                                band, point
+                            )
 
         machine_dir = _machine_dir(out_dir, equipment)
         _write_json(

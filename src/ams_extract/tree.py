@@ -20,7 +20,15 @@ from datetime import datetime
 import numpy as np
 import structlog
 
-from ams_extract.models import Area, Equipment, Point, Spectrum, Trend, Waveform
+from ams_extract.models import (
+    Area,
+    Equipment,
+    Point,
+    Spectrum,
+    Trend,
+    TrendBand,
+    Waveform,
+)
 from ams_extract.naming import NameSanitizer
 from ams_extract.reader import RbmReader
 from ams_extract.records.area import (
@@ -697,6 +705,35 @@ def _point_spectrum_units(reader: RbmReader, links: PdcdLinks) -> str | None:
         return None
 
 
+@dataclass(frozen=True, slots=True)
+class _BandColumn:
+    """Label/calibration of one velocity-template vddt band column."""
+
+    name: str
+    scale: float
+    units: str
+
+
+# Band columns of the velocity template (band_count = 7), in slot order —
+# FORMAT §5.7, each column validated 62/62 against the AMS per-band PLOTDATA
+# gold for M1H AG-100. Mixed units: "Mp Wave" is a raw acceleration peak in
+# G's, the rest are velocities (x 25.4 -> mm/s). Column 6 ("1-20 KHz") is
+# NOT emitted: its unit/scale is unconfirmed (the gold table is empty).
+VDDT_VELOCITY_BANDS: tuple[_BandColumn, ...] = (
+    _BandColumn("Mp Wave", 1.0, "G's"),
+    _BandColumn("SUBSINCRONO", TREND_VELOCITY_SCALE_MM_S, "mm/s"),
+    _BandColumn("DESEQUILIBRIO", TREND_VELOCITY_SCALE_MM_S, "mm/s"),
+    _BandColumn("DESALINEACION", TREND_VELOCITY_SCALE_MM_S, "mm/s"),
+    _BandColumn("HOLGURAS", TREND_VELOCITY_SCALE_MM_S, "mm/s"),
+    _BandColumn("11-40 X RPM", TREND_VELOCITY_SCALE_MM_S, "mm/s"),
+)
+
+# Slot band count that identifies the velocity template above. Records with
+# other counts (reconfigured epochs) decode the overall but their band
+# columns are unlabeled, so those readings contribute no band values.
+_VELOCITY_TEMPLATE_BAND_COUNT = 7
+
+
 def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
     """Yield the "Valores Globales" trend series for ``point`` (usually one).
 
@@ -711,6 +748,11 @@ def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
     scale is not yet gold-confirmed, so they are skipped with a log rather
     than emitting unverified values (PLAN §7.4). A missing pdcd / first-vddt,
     an undetermined unit, or an all-skipped chain yields no trend.
+
+    Readings stored with the velocity band template (``band_count = 7``)
+    also contribute the named band series (:data:`VDDT_VELOCITY_BANDS`) to
+    ``Trend.bands``; readings from other band-count epochs only contribute
+    the overall.
     """
     links = _resolve_pdcd_links(reader, point)
     if links is None:
@@ -746,6 +788,8 @@ def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
 
     timestamps: list[datetime] = []
     overall: list[float] = []
+    band_timestamps: list[datetime] = []
+    band_rows: list[tuple[float, ...]] = []
     for record_num in records:
         try:
             readings = parse_vddt_record(reader, record_num)
@@ -768,9 +812,24 @@ def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
         for reading in readings:
             timestamps.append(reading.timestamp_utc)
             overall.append(reading.overall_raw * TREND_VELOCITY_SCALE_MM_S)
+            if len(reading.bands_raw) == _VELOCITY_TEMPLATE_BAND_COUNT:
+                band_timestamps.append(reading.timestamp_utc)
+                band_rows.append(reading.bands_raw)
 
     if not timestamps:
         return
+
+    bands: tuple[TrendBand, ...] = ()
+    if band_timestamps:
+        bands = tuple(
+            TrendBand(
+                name=column.name,
+                units=column.units,
+                timestamps_utc=tuple(band_timestamps),
+                values=np.asarray([row[i] * column.scale for row in band_rows], dtype=np.float32),
+            )
+            for i, column in enumerate(VDDT_VELOCITY_BANDS)
+        )
 
     yield Trend(
         record_num=links.trend_first_vddt,
@@ -778,4 +837,5 @@ def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
         units="mm/s",
         timestamps_utc=tuple(timestamps),
         overall=np.asarray(overall, dtype=np.float32),
+        bands=bands,
     )

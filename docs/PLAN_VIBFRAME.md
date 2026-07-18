@@ -55,10 +55,14 @@ Checklist contra `VIBFRAME.md`:
 
 Del estudio (gaps conocidos, en orden de valor):
 
-1. **Bandas `vddt` con nombre** (Mp Wave, SUBSINCRONO, DESEQUILIBRIO…): hoy
-   se decodifican y no se emiten. Emitirlas como métricas propias con
-   descriptor: `statistic="spectrum_rms"` (verificar), `band_type="single"`,
-   `band_low/high_hz` si el `.rbm` da los límites, `name` = nombre original.
+1. **Bandas `vddt` con nombre** — completado 2026-07-18 (ADR-0010): se
+   emiten como métricas propias (`band_<slug>__<punto>`) con `name` = nombre
+   original; bandas de velocidad `statistic="spectrum_rms"` /
+   `band_type="single"` (límites null salvo `11-40 X RPM` en órdenes, hasta
+   decodificar `pdpa`), `Mp Wave` como `true_peak` de aceleración en `g`.
+   La columna "1-20 KHz" no se emite (escala sin confirmar). En el mismo
+   cambio: `machine.path = [área]` — solo niveles de ubicación, alineado con
+   la jerarquía location→machine del `vibframe_viewer` de t8-extract.
 2. **RPM en FFT** → `speed_hz` en `spectra.parquet` desde `vdps.0x28`
    (completado; AMS lo almacena como RPM × 2).
 3. **Ventana / promedios / detector / sensor** donde el `.rbm` lo permita →

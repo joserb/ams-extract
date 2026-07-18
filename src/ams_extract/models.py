@@ -152,6 +152,30 @@ class Waveform:
 
 
 @dataclass(frozen=True, slots=True)
+class TrendBand:
+    """One named ``vddt`` band series of a point's trend (FORMAT §5.7).
+
+    The velocity template stores mixed units per slot: "Mp Wave" is a raw
+    acceleration peak in G's, the remaining bands are velocities calibrated
+    to mm/s (``raw * 25.4``), each column validated 62/62 against the AMS
+    per-band PLOTDATA gold for M1H AG-100.
+
+    Attributes:
+        name: Original AMS band label ("SUBSINCRONO", "Mp Wave", ...).
+        units: Display units of ``values`` (``"mm/s"`` or ``"G's"``).
+        timestamps_utc: Reading timestamps, oldest first. Only readings from
+            velocity-template records (``band_count = 7``) contribute, so
+            this can be shorter than the overall series.
+        values: Calibrated band value per reading.
+    """
+
+    name: str
+    units: str
+    timestamps_utc: tuple[datetime, ...]
+    values: NDArray[np.float32]
+
+
+@dataclass(frozen=True, slots=True)
 class Trend:
     """The "Valores Globales" trend series for a point (overall RMS velocity).
 
@@ -171,6 +195,8 @@ class Trend:
             oldest first. Decoded via the off-by-one date rule (FORMAT §5.7).
         overall: Calibrated overall value per reading (``raw * 25.4`` -> mm/s).
             Validated 47/47 against the AMS PLOTDATA gold for M1H AG-100.
+        bands: Named band series decoded from the velocity-template slots
+            (``band_count = 7``); empty when no reading matches the template.
     """
 
     record_num: int
@@ -178,3 +204,4 @@ class Trend:
     units: str
     timestamps_utc: tuple[datetime, ...]
     overall: NDArray[np.float32]
+    bands: tuple[TrendBand, ...] = ()

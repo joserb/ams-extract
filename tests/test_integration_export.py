@@ -118,18 +118,39 @@ def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
     point = next(p for p in doc["points"] if p["name"] == "MOTOR LOA HORIZONTAL")
 
     metrics = pq.read_table(machine_dir / "metrics.parquet").to_pylist()
-    metric = next(m for m in metrics if m["point_id"] == point["id"])
-    assert metric["name"] == "overall_velocity_rms"
+    point_metrics = [m for m in metrics if m["point_id"] == point["id"]]
+    metric = next(m for m in point_metrics if m["name"] == "overall_velocity_rms")
     assert metric["unit"] == "mm/s"
 
+    trend_rows = pq.read_table(machine_dir / "trends.parquet").to_pylist()
     rows = sorted(
-        (
-            r
-            for r in pq.read_table(machine_dir / "trends.parquet").to_pylist()
-            if r["metric_id"] == metric["metric_id"]
-        ),
+        (r for r in trend_rows if r["metric_id"] == metric["metric_id"]),
         key=lambda r: r["t"],
     )
     assert len(rows) == 62
     assert rows[0]["value"] == pytest.approx(1.58, abs=0.02)
     assert max(r["value"] for r in rows) == pytest.approx(36.43, abs=0.02)
+
+    # Named vddt bands (velocity template; M1H is band_count=7 throughout).
+    band_metrics = {m["name"]: m for m in point_metrics if m["metric_id"].startswith("band_")}
+    assert set(band_metrics) == {
+        "Mp Wave",
+        "SUBSINCRONO",
+        "DESEQUILIBRIO",
+        "DESALINEACION",
+        "HOLGURAS",
+        "11-40 X RPM",
+    }
+    assert band_metrics["Mp Wave"]["unit"] == "g"
+    assert band_metrics["Mp Wave"]["statistic"] == "true_peak"
+    assert band_metrics["SUBSINCRONO"]["unit"] == "mm/s"
+    assert band_metrics["11-40 X RPM"]["band_low_order"] == 11.0
+
+    sub_rows = [r for r in trend_rows if r["metric_id"] == band_metrics["SUBSINCRONO"]["metric_id"]]
+    assert len(sub_rows) == 62
+    # SUBSINCRONO crosses its C alarm at the trend peak (FORMAT §5.8: gold
+    # alarm report "SUBSINCRONO - 1.986 mm/Seg - C Alarm").
+    assert max(r["value"] for r in sub_rows) > 1.5
+
+    # machine.path carries location levels only (the area), not the machine.
+    assert doc["machine"]["path"] == ["DEPURADORA"]

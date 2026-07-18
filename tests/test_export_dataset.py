@@ -12,12 +12,14 @@ from typer.testing import CliRunner
 
 from ams_extract.cli import app as rbm_app
 from ams_extract.export.dataset import (
+    _band_metric_row,
+    _band_trend_rows,
     _build_machine_doc,
     _spectrum_row,
     _waveform_row,
     export_dataset,
 )
-from ams_extract.models import Equipment, Point, Spectrum, Waveform
+from ams_extract.models import Equipment, Point, Spectrum, TrendBand, Waveform
 
 runner = CliRunner()
 
@@ -62,6 +64,8 @@ class TestExportDataset:
         assert spectrum_row["unit"] == waveform_row["unit"] == "g"
         assert spectrum_row["speed_hz"] == waveform_row["speed_hz"] == 25.0
         assert machine_doc["config_generations"] == []
+        # Location levels only: the machine is its own level in the viewers.
+        assert machine_doc["machine"]["path"] == ["AREA"]
 
     def test_machine_doc_validates_against_optional_vibframe_contract(self) -> None:
         contracts = pytest.importorskip("vibsynth_contracts.dataset")
@@ -112,6 +116,56 @@ class TestExportDataset:
             show_progress=False,
         )
         assert summary.areas == 1
+
+
+def _make_band(name: str, units: str) -> TrendBand:
+    return TrendBand(
+        name=name,
+        units=units,
+        timestamps_utc=(datetime(2020, 1, 1, tzinfo=UTC),),
+        values=np.asarray([1.5], dtype=np.float32),
+    )
+
+
+class TestBandExport:
+    point = Point(record_num=1, long_name="MOTOR LOA HORIZONTAL", short_code="M1H")
+
+    def test_velocity_band_descriptor(self) -> None:
+        row = _band_metric_row(_make_band("SUBSINCRONO", "mm/s"), self.point)
+        assert row["metric_id"] == "band_subsincrono__M1H"
+        assert row["name"] == "SUBSINCRONO"
+        assert row["path"] == "M1H:SUBSINCRONO"
+        assert row["statistic"] == "spectrum_rms"
+        assert row["detector"] == "rms"
+        assert row["signal_family"] == "velocity"
+        assert row["unit"] == "mm/s"
+        assert row["band_type"] == "single"
+        assert row["band_low_order"] is None
+        assert row["band_high_order"] is None
+
+    def test_order_bounds_declared_by_band_name(self) -> None:
+        row = _band_metric_row(_make_band("11-40 X RPM", "mm/s"), self.point)
+        assert row["metric_id"] == "band_11_40_x_rpm__M1H"
+        assert row["band_low_order"] == 11.0
+        assert row["band_high_order"] == 40.0
+
+    def test_mp_wave_is_an_acceleration_peak_not_a_band(self) -> None:
+        row = _band_metric_row(_make_band("Mp Wave", "G's"), self.point)
+        assert row["metric_id"] == "band_mp_wave__M1H"
+        assert row["statistic"] == "true_peak"
+        assert row["detector"] == "peak"
+        assert row["signal_family"] == "acceleration"
+        assert row["unit"] == "g"
+        assert row["band_type"] == "none"
+
+    def test_band_trend_rows(self) -> None:
+        band = _make_band("HOLGURAS", "mm/s")
+        rows = _band_trend_rows(band, self.point)
+        assert len(rows) == 1
+        assert rows[0]["metric_id"] == "band_holguras__M1H"
+        assert rows[0]["value"] == pytest.approx(1.5)
+        assert rows[0]["t"] == 1_577_836_800_000_000  # 2020-01-01 UTC in µs
+        assert rows[0]["config_id"] == ""
 
 
 class TestRbmExportCommand:

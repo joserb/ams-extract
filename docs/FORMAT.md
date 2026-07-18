@@ -552,9 +552,12 @@ primeros 47 coinciden **EXACTO** (fecha + valor) con la tabla gold de AMS
 
 **Implementado** (2026-05-30): `records/trend.py`, `tree.walk_trends`,
 `models.Trend`, export (`__trend.parquet`, una fila por lectura) y CLI
-(`rbm extract --type trend`, `rbm export --types …,trend`). Hoy se emite
-**solo el overall**; emitir las bandas etiquetadas (con sus unidades mixtas)
-y los trends de aceleración queda pendiente.
+(`rbm extract --type trend`, `rbm export --types …,trend`). Desde 2026-07-18
+(ADR-0010) `walk_trends` también emite las **bandas etiquetadas** del template
+de velocidad (`Trend.bands`, columnas 0–5 con sus unidades mixtas; la columna
+6 "1-20 KHz" no se emite por escala sin confirmar) y `rbm export` las escribe
+como métricas VibFrame propias (`band_<slug>__<punto>`). Los trends de
+aceleración siguen pendientes.
 
 ### 5.8 `pdpa` — config de análisis del punto (bandas / rangos / alarmas)
 

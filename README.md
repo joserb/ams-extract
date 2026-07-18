@@ -23,7 +23,10 @@ matching AMS exactly).
 - **Waveforms** are calibrated to display units — **G's** for acceleration
   (AMS peak/trough within ~0.3%) and **mm/s** for velocity.
 - **Trends** ("Valores Globales", overall RMS velocity) are decoded to **mm/s**
-  (validated 47/47 against the AMS trend table for M1H AG-100).
+  (validated 47/47 against the AMS trend table for M1H AG-100), plus the named
+  bands of the velocity template — Mp Wave (G's), SUBSINCRONO, DESEQUILIBRIO,
+  DESALINEACION, HOLGURAS, 11-40 X RPM (mm/s) — each column validated 62/62
+  against the AMS per-band PLOTDATA and exported as its own VibFrame metric.
 
 ## Commands
 
