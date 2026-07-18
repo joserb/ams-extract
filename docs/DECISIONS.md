@@ -695,3 +695,50 @@ que la máquina aparecía duplicada como pseudo-sububicación.
   semántica de nombres (workplans/03-vibframe-conformidad.md §4).
 - Los datasets exportados antes de este ADR deben regenerarse para obtener
   bandas y el `path` corregido.
+
+## ADR-0011 — Etiquetado canónico como post-proceso con `t8-mapper vibframe --write`
+
+- **Fecha**: 2026-07-19
+- **Estado**: aceptada
+
+### Contexto
+
+Los descriptores estructurales del export (ADR-0010) dejaban
+`canonical_metric`/`proxy_quality`/`mapping_rule` en null: sin etiquetado
+canónico el visor no puede agrupar ni comparar las métricas AMS con las de
+los datasets T8/vibsynth. El plan (workplans/03 §4) contemplaba dos encajes:
+post-proceso sobre el dataset o paso opcional de `rbm export` si el mapper
+está instalado.
+
+### Decisión
+
+1. **Post-proceso, no paso de export**: el etiquetado lo hace
+   `t8-mapper vibframe <dataset> --write` (repo `t8-metrics-mapper`),
+   que reconstruye la firma estructural desde `metrics.parquet` +
+   `machine.json` y escribe las etiquetas de vuelta. `ams-extract` no
+   depende del mapper ni del monorepo vibsynth (se mantiene la decisión de
+   contrato local copiado); el comando es idempotente y `--diff` valida el
+   round-trip. Es el encaje más simple: cero dependencias nuevas aquí y un
+   único punto de verdad de las reglas de mapeo para los tres orígenes.
+2. **Velocidad de referencia**: el dataset AMS no emite la métrica reservada
+   `speed`; el mapper usa como fallback la mediana de `spectra.speed_hz`
+   (global y por punto), que es donde este repo emite las RPM por FFT
+   (`vdps.0x28`). Cuando se emita el contexto de operación (pendiente), la
+   tendencia reservada `speed` tendrá prioridad.
+3. **Bandas sin límites**: vibsynth-contracts acepta desde 2026-07-19
+   `band_type="single"` sin límites (par incompleto sigue siendo inválido),
+   así que la "desviación temporal" asumida en ADR-0010 §3 ya es conforme a
+   la spec. El mapper las deja honestamente sin canónica (R099, nota
+   explícita): el nombre nunca decide semántica.
+
+### Consecuencias
+
+- BUNGE CARTAGENA completo (347 máquinas, 15 612 métricas): 45.0 %
+  etiquetado — 4 882 direct (overall → `vel_overall_rms` IR004v2, Mp Wave →
+  `waveform_peak` IR003D), 2 146 approximate (11-40 X RPM →
+  `band_sync_high_rms` IR029), 8 584 null (las 4 bandas vddt con nombre,
+  SUBSINCRONO/DESEQUILIBRIO/DESALINEACION/HOLGURAS, sin límites).
+- El decode de `pdpa` (FORMAT §5.8) es ahora el único bloqueo para etiquetar
+  esas 8 584 filas: con límites Hz el mapper las clasificaría por estructura.
+- Cada regeneración del dataset (`rbm export`) exige repasar el mapper
+  (`--write`); documentado en workplans/03 §4.

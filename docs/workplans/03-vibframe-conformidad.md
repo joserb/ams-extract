@@ -1,9 +1,10 @@
 # Plan: alinear `rbm export` con VibFrame v0.1 y cerrar los huecos del export
 
 **Fecha**: 2026-07-10 (actualizado 2026-07-19) · **Estado**: en curso —
-conformidad base cerrada (`f17bb9c`) y bandas vddt + `path=[área]` emitidas
-(`2c5e1fe`, ADR-0010); quedan el etiquetado canónico vía mapper (§4), el
-decode de `pdpa`, los trends de aceleración y el contexto de operación.
+conformidad base cerrada (`f17bb9c`), bandas vddt + `path=[área]` emitidas
+(`2c5e1fe`, ADR-0010) y etiquetado canónico vía mapper operativo (§4,
+ADR-0011); quedan el decode de `pdpa`, los trends de aceleración y el
+contexto de operación.
 Para ejecutar por un agente desde este repo, sin más contexto que este
 documento y las referencias.
 
@@ -81,18 +82,36 @@ en ese repo). No implementar mapeo de nombres aquí — en VibFrame el nombre
 nunca decide semántica; lo que importa es rellenar bien los descriptores
 estructurales del §3.
 
-**PENDIENTE (2026-07-18): poder interpretar qué son las métricas AMS —
-pasar el mapper.** El export ya emite descriptores estructurales (overall +
-bandas vddt, ADR-0010), pero sin etiquetado canónico el visor no puede
-agrupar/comparar con los datasets T8 (badges canónicos vacíos). Trabajo:
+**HECHO (2026-07-19, ADR-0011): el etiquetado es un post-proceso con el
+front-end VibFrame de `t8-metrics-mapper`** (repo
+`~/wslprojects/t8-metrics-mapper`), no un paso de `rbm export` — cero
+dependencias nuevas aquí y un único punto de verdad de las reglas para los
+tres orígenes (T8/AMS/vibsynth). Tras cada export:
 
-- Adaptador VibFrame→firma en `t8-metrics-mapper` que consuma
-  `metrics.parquet` de un dataset AMS y rellene
-  `canonical_metric`/`proxy_quality`/`mapping_rule` (post-proceso sobre el
-  dataset, o paso opcional de `rbm export` si el mapper está instalado).
-- Los descriptores de banda hoy van sin límites de frecuencia (salvo
-  11-40 X RPM en órdenes): decodificar `pdpa` (FORMAT §5.8) subiría la
-  calidad del mapeo (`proxy_quality`) de las bandas.
+```bash
+# en el repo t8-metrics-mapper
+uv run t8-mapper vibframe /ruta/al/dataset --write   # escribe las etiquetas
+uv run t8-mapper vibframe /ruta/al/dataset --diff    # valida el round-trip
+```
+
+`--write` rellena `canonical_metric`/`proxy_quality` cuando resuelven y
+`mapping_rule` siempre (en los null la regla registra la causa); es
+idempotente. La velocidad de referencia sale de la mediana de
+`spectra.speed_hz` (global y por punto) porque este export aún no emite la
+métrica reservada `speed`.
+
+Resultado sobre BUNGE CARTAGENA completo (347 máquinas, 15 612 métricas,
+`datasets/bunge_cartagena_ams` en RESONINS): **45.0 % etiquetado** —
+4 882 direct (overall → `vel_overall_rms`, Mp Wave → `waveform_peak`),
+2 146 approximate (11-40 X RPM → `band_sync_high_rms`), 8 584 null (las 4
+bandas vddt con nombre sin límites: SUBSINCRONO, DESEQUILIBRIO,
+DESALINEACION, HOLGURAS — el nombre nunca decide semántica). Nota:
+vibsynth-contracts acepta desde 2026-07-19 `band_type="single"` sin límites,
+así que la desviación asumida en ADR-0010 §3 ya es conforme a la spec.
+
+- Pendiente (único bloqueo para las 8 584 null): decodificar `pdpa`
+  (FORMAT §5.8) y emitir `band_low_hz`/`band_high_hz`; el mapper las
+  clasificaría entonces por estructura.
 
 ## Validación
 
