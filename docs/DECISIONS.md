@@ -3,7 +3,7 @@
 > ADRs cortos para las decisiones técnicas no triviales del proyecto.
 > Formato libre por entrada: contexto, decisión, alternativas, consecuencias.
 
-Las decisiones consolidadas en el plan original están en `docs/PLAN.md` §3 y §8;
+Las decisiones consolidadas en el plan original están en `docs/workplans/01-plan-general.md` §3 y §8;
 aquí se documentan las que aparecen durante la implementación.
 
 ---
@@ -692,6 +692,6 @@ que la máquina aparecía duplicada como pseudo-sububicación.
   `name`/`metric_id` (test de integración actualizado).
 - El mapper (`t8-metrics-mapper`) recibe descriptores estructurales de banda
   con nombre original y podrá etiquetarlos canónicamente; aquí no se mapea
-  semántica de nombres (PLAN_VIBFRAME §4).
+  semántica de nombres (workplans/03-vibframe-conformidad.md §4).
 - Los datasets exportados antes de este ADR deben regenerarse para obtener
   bandas y el `path` corregido.

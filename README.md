@@ -4,7 +4,7 @@ CLI tool to extract data from RBMware / AMS Machinery Manager `.rbm` databases
 into modern formats (Parquet + JSON), without depending on the legacy Windows XP
 VM or the original AMS software.
 
-See [docs/PLAN.md](docs/PLAN.md) for the project plan and roadmap, and
+See [docs/workplans/01-plan-general.md](docs/workplans/01-plan-general.md) for the project plan and roadmap, and
 [docs/FORMAT.md](docs/FORMAT.md) for the reverse-engineered `.rbm` format.
 
 ## Status

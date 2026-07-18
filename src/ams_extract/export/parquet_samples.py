@@ -2,7 +2,7 @@
 
 Sub-fase 3b/5b emitted ONE parquet file per sample (used by ``rbm
 extract``). Fase 6 (``rbm export``) writes ONE parquet file per equipment
-*and per sample type*, with one row per sample — see PLAN.md §3.5 and the
+*and per sample type*, with one row per sample — see docs/workplans/01-plan-general.md §3.5 and the
 "separate files per type" decision. The single-sample writers are kept as
 thin wrappers over the batch writers so ``extract`` and ``export`` share
 exactly one schema definition.

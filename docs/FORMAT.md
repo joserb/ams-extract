@@ -649,4 +649,4 @@ Pendientes:
   `vdpm.0x10+`, `vdps.0x0C`/`0x10` y `vcps.0x0C`/`0x10`. No bloquean
   ninguna fase actual.
 - Padding waveform 488 vs 512 (24 muestras "fantasma" en el descriptor).
-- Resto de la lista inicial en `docs/PLAN.md` §4.6.
+- Resto de la lista inicial en `docs/workplans/01-plan-general.md` §4.6.

@@ -4,7 +4,9 @@
 > Manager (`.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM
 > Windows XP ni del software AMS original.
 
-Última actualización: 2026-06-14 · Repo: `git@github.com:joserb/ams-extract.git`
+Última actualización: 2026-06-14 (movido a `docs/workplans/` el 2026-07-19;
+el trabajo VibFrame posterior vive en `02-vibdataset-export.md` y
+`03-vibframe-conformidad.md`) · Repo: `git@github.com:joserb/ams-extract.git`
 (privado) · Branch de trabajo: `master`.
 
 > **Nota histórica**: este documento fue originalmente un plan por fases (0–7)

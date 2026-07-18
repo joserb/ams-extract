@@ -1,5 +1,9 @@
 # Plan: sustituir `rbm export` por VibDataset
 
+**Fecha**: 2026-07-09 · **Estado**: completado (histórico) — ejecutado en
+`cf4b240`; el formato se llama ahora **VibFrame** y su conformidad continúa
+en `03-vibframe-conformidad.md`.
+
 ## Resumen
 
 `rbm export` pasará a escribir el formato VibDataset importado

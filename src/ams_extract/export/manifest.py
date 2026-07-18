@@ -2,7 +2,7 @@
 
 The manifest is the master index of the dataset: one row per sample, with
 NO amplitude arrays, so "what did I measure, where and when?" can be
-answered without loading a single spectrum. See PLAN.md §3.5.
+answered without loading a single spectrum. See docs/workplans/01-plan-general.md §3.5.
 
 Rows are produced by the dataset orchestrator (one per emitted FFT spectrum,
 waveform, or trend reading) as plain dicts so they survive pickling across

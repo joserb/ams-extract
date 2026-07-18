@@ -1,7 +1,11 @@
 # Plan: alinear `rbm export` con VibFrame v0.1 y cerrar los huecos del export
 
-**Fecha**: 2026-07-10 · **Estado**: en curso · Para ejecutar por un agente
-desde este repo, sin más contexto que este documento y las referencias.
+**Fecha**: 2026-07-10 (actualizado 2026-07-19) · **Estado**: en curso —
+conformidad base cerrada (`f17bb9c`) y bandas vddt + `path=[área]` emitidas
+(`2c5e1fe`, ADR-0010); quedan el etiquetado canónico vía mapper (§4), el
+decode de `pdpa`, los trends de aceleración y el contexto de operación.
+Para ejecutar por un agente desde este repo, sin más contexto que este
+documento y las referencias.
 
 ## Contexto
 
@@ -14,7 +18,7 @@ El formato de intercambio se llama **VibFrame** (decisión 2026-07-10; antes
 - Diseño y decisiones: `~/wslprojects/RESONINS/t8-extract/docs/ESTUDIO-FORMATO-ESTANDAR.md` (repo github.com:joserb/t8-extract).
 
 `rbm export` ya escribe el layout VibDataset desde el commit `cf4b240`
-(2026-07-09, ver `docs/VIBDATASET_EXPORT_PLAN.md`, ya histórico): carpeta
+(2026-07-09, ver `docs/workplans/02-vibdataset-export.md`, ya histórico): carpeta
 `machine=<short_code>/` con `machine.json` + 4 parquet, contrato local mínimo
 copiado en `src/ams_extract/export/vibframe_contract.py` (sin dependencia
 runtime del monorepo vibsynth — decisión que se mantiene).
@@ -98,5 +102,5 @@ agrupar/comparar con los datasets T8 (badges canónicos vacíos). Trabajo:
   5 waveform, 62 tendencias) sigue pasando.
 - Dataset resultante legible con duckdb/polars según los ejemplos de la spec;
   spot-check de un join trends↔metrics.
-- Actualizar `docs/PLAN.md`, `README.md` y `docs/DECISIONS.md` (ADR del
+- Actualizar `docs/workplans/01-plan-general.md`, `README.md` y `docs/DECISIONS.md` (ADR del
   renombrado y de las bandas vddt).
