@@ -23,7 +23,7 @@ from ams_extract.records.sample import (
     VDPS_LOW_BAND_OFFSET,
     VDPS_N_LINES_OFFSET,
     VDPS_NEXT_OFFSET,
-    VDPS_RPM_X2_OFFSET,
+    VDPS_RPM_OFFSET,
     VDPS_TAG,
     VDPS_TIMESTAMP_OFFSET,
     VDPS_UNITS_LENGTH,
@@ -65,7 +65,7 @@ def _make_vdps(
     struct.pack_into("<I", record, VDPS_FIRST_VCPS_OFFSET, first_vcps_stored)
     struct.pack_into("<f", record, VDPS_FMAX_OFFSET, fmax_hz)
     struct.pack_into("<I", record, VDPS_TIMESTAMP_OFFSET, timestamp_raw)
-    struct.pack_into("<f", record, VDPS_RPM_X2_OFFSET, rpm * 2.0)
+    struct.pack_into("<f", record, VDPS_RPM_OFFSET, rpm)
     struct.pack_into("<f", record, VDPS_CARGA_OFFSET, carga_pct)
     struct.pack_into("<I", record, VDPS_N_LINES_OFFSET, n_lines)
     units_slot = bytearray(b" " * VDPS_UNITS_LENGTH)

@@ -164,6 +164,20 @@ class TestBandExport:
         assert row["band_type"] == "none"
         assert row["band_low_order"] is None
 
+    def test_hf_acceleration_band_is_spectral_rms_not_peak(self) -> None:
+        # "1 - 20 KHz" (tipo 0x04): RMS de aceleración con límites Hz fijos,
+        # crudo en G's (validado contra captura AMS de PM-9101-A M1H).
+        band = _make_band("1 - 20 KHz", "G's", low_hz=1000.0, high_hz=20000.0)
+        row = _band_metric_row(band, self.point)
+        assert row["metric_id"] == "band_1_20_khz__M1H"
+        assert row["statistic"] == "spectrum_rms"
+        assert row["detector"] == "rms"
+        assert row["signal_family"] == "acceleration"
+        assert row["unit"] == "g"
+        assert row["band_type"] == "single"
+        assert row["band_low_hz"] == 1000.0
+        assert row["band_high_hz"] == 20000.0
+
     def test_mp_wave_is_an_acceleration_peak_not_a_band(self) -> None:
         row = _band_metric_row(_make_band("Mp Wave", "G's"), self.point)
         assert row["metric_id"] == "band_mp_wave__M1H"

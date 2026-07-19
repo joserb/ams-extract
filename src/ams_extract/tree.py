@@ -755,9 +755,9 @@ def _resolve_band_columns(
 ) -> dict[int, _BandColumn]:
     """Map emittable template slots to resolved band columns.
 
-    Skips ``BAND_TYPE_HF_FIXED_HZ`` columns ("1 - 20 KHz"): their trend
-    scale (G's, per the pdla unit code and the gdnl alarm reports) is not
-    gold-validated yet, so they are not emitted (FORMAT §5.8). Unknown slot
+    ``BAND_TYPE_HF_FIXED_HZ`` columns ("1 - 20 KHz") are raw acceleration
+    RMS in G's (validated 2026-07-19 against an AMS capture of PM-9101-A
+    M1H: stored raw values match the plotted G's exactly). Unknown slot
     types are skipped with a log.
     """
     columns: dict[int, _BandColumn] = {}
@@ -794,10 +794,23 @@ def _resolve_band_columns(
                 danger_raw=danger_raw,
             )
         elif band.band_type == BAND_TYPE_HF_FIXED_HZ:
-            _log.info(
-                "trend_band_hf_column_skipped",
-                point=point.long_name,
-                band=band.name,
+            # Escala validada 2026-07-19 contra captura de AMS (PM-9101-A
+            # M1H, REF): la columna cruda ES el "RMS Aceleración" en G's
+            # que pinta AMS (0.229→0.463 idénticos punto a punto), sin
+            # factor de conversión.
+            alert_raw, danger_raw = _threshold_pair(
+                limits, i + 1, THRESHOLD_UNIT_ACCELERATION
+            )
+            columns[i] = _BandColumn(
+                name=band.name,
+                scale=1.0,
+                units="G's",
+                low_order=None,
+                high_order=None,
+                low_hz=band.low,
+                high_hz=band.high,
+                alert_raw=alert_raw,
+                danger_raw=danger_raw,
             )
         else:
             _log.warning(
@@ -831,8 +844,8 @@ def walk_trends(
     The named band series come from the point's **analysis parameter set**
     (``pdcd.0xAC`` → pdpa template, FORMAT §5.8): readings whose stored
     column count matches the template's active slot count contribute one
-    value per emittable slot ("1 - 20 KHz" HF columns are skipped — scale
-    unvalidated). Frequency bounds (orders or Hz) come from the template;
+    value per emittable slot. Frequency bounds (orders or Hz) come from
+    the template;
     alert/danger thresholds and the derived per-reading alarm levels come
     from the **alarm limit set** (``pdcd.0xAE`` → pdla). Readings from
     other column-count epochs (historical configurations) contribute only

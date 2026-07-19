@@ -256,8 +256,12 @@ vdps chain (espectros FFT ordenados de antiguo a moderno):
               0x20 → float32 Fmax (Hz)
               0x24 → u32 LE Unix timestamp (segundos, UTC; el huso local
                      varía CET/CEST a lo largo del año)
-              0x28 → float32 RPM × 2 (¿o CPM?) — para M1H da 2920, RPM nativa
-                     en vdpm.0x164 = 1455
+              0x28 → float32 RPM del análisis — la que AMS "fija" para el
+                     espectro (base de órdenes de las bandas pdpa). Gold:
+                     captura AMS de PM-9101-A M1H 19/05/2021 muestra
+                     "RPM = 2900,0 (48,33 Hz)" = crudo exacto. OJO: puede no
+                     ser la velocidad física (AG-100 M1H: crudo 2920 = 2× la
+                     nominal vdpm.0x164 = 1455 y la rpm de sus vdfw)
               0x2C → float32 CARGA % (100.0 en M1H)
               0x50 → u32 LE n_lines (1600 en M1H)
               0x78 → ASCII 8 bytes — units, p.ej. "plg/segs"
@@ -300,7 +304,7 @@ afinar).
 | `0x1C` | 4 | u32 LE (+1 encoded) — apunta al `pdcd` del punto (back-ref compartido) |
 | `0x20` | 4 | float32 LE — **Fmax (Hz)** |
 | `0x24` | 4 | u32 LE — **Unix timestamp (UTC, segundos)** |
-| `0x28` | 4 | float32 LE — RPM × 2 (interpretación tentativa) |
+| `0x28` | 4 | float32 LE — **RPM del análisis** (la que fija AMS; validada contra captura PM-9101-A. Hasta 2026-07-19 el export la dividía por 2 por la suposición "RPM × 2") |
 | `0x2C` | 4 | float32 LE — **CARGA %** |
 | `0x50` | 4 | u32 LE — **n_lines** (típico 1600) |
 | `0x78` | 8 | ASCII — **units** (e.g. `"plg/segs"`) |
@@ -544,7 +548,7 @@ columna validada **62/62** contra el PLOTDATA por-banda de M1H AG-100.
 | 3 | `+0x14` | DESALINEACION | mm/s |
 | 4 | `+0x18` | HOLGURAS | mm/s |
 | 5 | `+0x1C` | 11-40 X RPM | mm/s |
-| 6 | `+0x20` | 1-20 KHz | sin confirmar (gold vacío) |
+| 6 | `+0x20` | 1-20 KHz | **G's crudos** (confirmado 2026-07-19 contra captura AMS de PM-9101-A) |
 
 **Validación del overall**: 62 lecturas decodificadas para M1H AG-100; los
 primeros 47 coinciden **EXACTO** (fecha + valor) con la tabla gold de AMS
@@ -601,7 +605,9 @@ Tipos de banda (`0xDC`):
 - `0x01` — bordes en **Hz fijos** (FALLO ELECTRIC 99.8–100.2 Hz; bandas HF
   10–2000 / 2000–4000 / 4000–6000 Hz).
 - `0x04` — Hz fijos pero el **valor** de la columna es energía HF en G's
-  ("1 - 20 KHz", 1000–20000 Hz). Escala del trend sin gold → no se emite.
+  ("1 - 20 KHz", 1000–20000 Hz). Escala VALIDADA (2026-07-19) contra la
+  captura AMS de PM-9101-A M1H: el crudo ES el "RMS Aceleración" en G's que
+  pinta AMS, valor a valor (0.229→0.463, 2016→2025) → se emite en `g`.
 - `0x0B` — pico de forma de onda ("Mp Wave"), sin rango de frecuencia.
 
 **Validación numérica** (la clave del cierre): el valor de la columna
@@ -664,11 +670,13 @@ lleva además la familia en `0x4B` (`:ESTÁNDAR`) y los rodamientos en
 `records/sample_index.py`, etiquetado por plantilla en `tree.walk_trends`
 y export de límites de banda + columna `alarm` derivada (ADR-0012).
 
-**Pendiente**: la escala de la columna "1-20 KHz" (tipo `0x04`; evidencia
-de que va en G's: código de unidad pdla = 3 y los `gdnl` la reportan en
-"G-s", pero sin gold numérico → no se emite). El array 1.7[13] del `pdla`
-y el resto de campos de medida del `pdpa` (`0x148+`: Fmax/lines por
-análisis) sin decodificar del todo.
+**Pendiente**: el array 1.7[13] del `pdla` y el resto de campos de medida
+del `pdpa` (`0x148+`: Fmax/lines por análisis) sin decodificar del todo.
+Nivel **"Advertencia"** de las gráficas AMS: la captura de PM-9101-A M1H
+muestra una "Advertencia Superior" a ~0,95 G's en la 1-20 KHz, DISTINTA de
+los umbrales C/D del `pdla` (4,3/6,4 G's, que son los niveles de alarma de
+los informes `gdnl`) — dónde se almacena ese nivel warning, sin localizar
+(candidato: los arrays sin interpretar del `pdla`).
 
 
 ## 6. Encoding y strings

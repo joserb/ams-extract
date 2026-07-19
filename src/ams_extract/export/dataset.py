@@ -380,13 +380,14 @@ def _band_metric_row(band: TrendBand, point: Point) -> dict[str, Any]:
     """Descriptor for one named vddt band (FORMAT §5.7/§5.8).
 
     "Mp Wave" (F.Onda Pico Máx) is a waveform acceleration peak, not a
-    spectral band; the velocity bands are band RMS values whose frequency
+    spectral band; every bounded band is a spectral RMS whose frequency
     bounds come from the point's pdpa analysis parameter set — in shaft
-    orders for order-scaled bands, in Hz for fixed-frequency bands.
+    orders for order-scaled bands, in Hz for fixed-frequency bands
+    (velocity in mm/s, or acceleration in g for the HF "1 - 20 KHz" band).
     """
     family = _signal_family(band.units)
-    is_peak = family == "acceleration"
     has_bounds = band.low_order is not None or band.low_hz is not None
+    is_peak = family == "acceleration" and not has_bounds
     return {
         "metric_id": _band_metric_id(point, band),
         "config_id": CONFIG_ID,

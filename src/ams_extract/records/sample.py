@@ -50,7 +50,7 @@ VDPS_NEXT_OFFSET = 0x14
 VDPS_FIRST_VCPS_OFFSET = 0x18
 VDPS_FMAX_OFFSET = 0x20
 VDPS_TIMESTAMP_OFFSET = 0x24
-VDPS_RPM_X2_OFFSET = 0x28
+VDPS_RPM_OFFSET = 0x28  # RPM que fija AMS para el análisis (validado contra captura)
 VDPS_CARGA_OFFSET = 0x2C
 VDPS_N_LINES_OFFSET = 0x50
 VDPS_UNITS_OFFSET = 0x78
@@ -141,7 +141,7 @@ def parse_vdps_descriptor(reader: RbmReader, vdps_record: int) -> VdpsDescriptor
         fmax_hz=_f32(VDPS_FMAX_OFFSET),
         n_lines=_u32(VDPS_N_LINES_OFFSET),
         units=decode_string(units_bytes),
-        rpm=_f32(VDPS_RPM_X2_OFFSET) / 2.0,
+        rpm=_f32(VDPS_RPM_OFFSET),
         carga_pct=_f32(VDPS_CARGA_OFFSET),
         first_vcps=decode_inner_pointer(_u32(VDPS_FIRST_VCPS_OFFSET)),
         next_vdps=decode_inner_pointer(_u32(VDPS_NEXT_OFFSET)),

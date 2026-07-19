@@ -123,6 +123,17 @@ así que la desviación asumida en ADR-0010 §3 ya es conforme a la spec.
   COMBUSTION → `band_3X_rms`; además los puntos HF suman bandas nuevas
   (10 Hz-2 kHz, 2-4 kHz, 4-6 kHz).
 
+### 5. Cierres del 2026-07-19 (capturas AMS del usuario)
+
+- [x] **Banda "1 - 20 KHz" emitida** (ADR-0013): escala validada contra la
+  captura de PM-9101-A M1H (crudo = G's, valor a valor); descriptor
+  `spectrum_rms`/`g`/`single` 1000–20000 Hz + alarma pdla en G's.
+- [x] **`spectra.speed_hz` corregido** (ADR-0013): `vdps.0x28` es la RPM
+  del análisis que fija AMS (captura: 2900 = crudo), no "RPM × 2"; fuera
+  el `/2` del decode. Re-etiquetar datasets tras re-exportar.
+- [ ] Nivel "Advertencia" de las gráficas AMS (~0,95 G's) ≠ C/D del pdla:
+  sin localizar en el binario.
+
 ## Validación
 
 - `uv sync && pytest` (usa `RBM_TEST_FILE` para integración), `ruff`,

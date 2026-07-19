@@ -141,7 +141,16 @@ def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
         "DESALINEACION",
         "HOLGURAS",
         "11-40 X RPM",
+        "1 - 20 KHz",
     }
+    # HF band: raw acceleration RMS in G's with fixed Hz bounds (scale
+    # validated against the AMS capture of PM-9101-A M1H, 2026-07-19).
+    hf = band_metrics["1 - 20 KHz"]
+    assert hf["unit"] == "g"
+    assert hf["statistic"] == "spectrum_rms"
+    assert hf["band_type"] == "single"
+    assert hf["band_low_hz"] == pytest.approx(1000.0)
+    assert hf["band_high_hz"] == pytest.approx(20000.0)
     assert band_metrics["Mp Wave"]["unit"] == "g"
     assert band_metrics["Mp Wave"]["statistic"] == "true_peak"
     assert band_metrics["Mp Wave"]["band_type"] == "none"

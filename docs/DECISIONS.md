@@ -804,3 +804,47 @@ del set 5 (1.4 / 2.2 mm/s) reproducen las transiciones C/D del gold de M1H.
 - La validación numérica queda como técnica reutilizable: banda =
   RSS de bins crudos in/s en `[lo, hi)`; ×25.4 → mm/s (scripts del
   análisis, no comiteados; método documentado en FORMAT §5.8).
+
+## ADR-0013 — `spectra.speed_hz` = RPM del análisis sin dividir; banda "1 - 20 KHz" emitida en g
+
+- **Fecha**: 2026-07-19
+- **Estado**: aceptada
+
+### Contexto
+
+Dos capturas de AMS aportadas por el usuario (PM-9101-A / M1H, área REF)
+cerraron dos incógnitas a la vez:
+
+1. La pantalla del espectro (19/05/2021) muestra "RPM = 2900,0 (48,33 Hz)"
+   con las familias de armónicos calculadas sobre esa base — exactamente el
+   crudo de `vdps.0x28`. El export dividía ese campo por 2 (suposición
+   histórica "RPM × 2"), emitiendo la mitad (24,17 Hz) e inconsistente con
+   las waveforms (`vdfw`, que nunca se dividían). La identidad RSS de las
+   bandas pdpa (ADR-0012) ya había demostrado que AMS usa el crudo como
+   base de órdenes.
+2. La tendencia de la banda "1 - 20 KHz" en G's ("RMS Aceleración")
+   coincide valor a valor con la columna cruda del `vddt`
+   (0.229→0.463, 2016→2025): la escala es **cruda en G's, sin factor**.
+
+### Decisión
+
+1. `Spectrum.rpm` = crudo de `vdps.0x28` (la **RPM del análisis** que fija
+   AMS). Sin división. OJO: puede diferir de la velocidad física (AG-100
+   M1H: análisis a 2920, física/nominal 1455 según `vdpm.0x164` y sus
+   `vdfw`) — se emite lo que declara el origen, que es además la base con
+   la que AMS evalúa sus bandas por órdenes.
+2. Las bandas tipo `0x04` (HF, "1 - 20 KHz") se emiten: `unit=g`,
+   `statistic=spectrum_rms`, `band_type=single` con límites Hz del pdpa, y
+   umbrales/alarma derivada del pdla en G's. En los descriptores, "pico de
+   aceleración" (Mp Wave) queda reservado a bandas de aceleración SIN
+   límites.
+
+### Consecuencias
+
+- `spectra.speed_hz` y `waves.speed_hz` quedan coherentes entre sí donde el
+  analista fijó bien la RPM (PM-9101-A: 48,33 ambas) y delatan las máquinas
+  con RPM de análisis doblada (AG-100: 48,67 vs 24,25).
+- El mapper (fallback de velocidad por spectra) pasa a usar la misma base
+  de órdenes que AMS; hay que re-etiquetar los datasets exportados.
+- Nivel "Advertencia" de las gráficas (~0,95 G's en la captura) ≠ C/D del
+  pdla: pendiente de localizar (FORMAT §5.8).
