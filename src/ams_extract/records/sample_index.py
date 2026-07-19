@@ -12,6 +12,8 @@ The ``pdcd`` acts as a per-point index of measurement chains:
 - ``pdcd.0x48`` → last  ``vdps`` of the FFT chain (newest spectrum)
 - ``pdcd.0x5C`` → first ``vdfw`` waveform descriptor (oldest), sub-fase 5a
 - ``pdcd.0x60`` → last  ``vdfw`` waveform descriptor (newest), sub-fase 5a
+- ``pdcd.0xAC`` → u16 analysis-parameter-set index (``pdpa``, FORMAT §5.8)
+- ``pdcd.0xAE`` → u16 alarm-limit-set index (``pdla``, FORMAT §5.8)
 
 The FFT spectrum chain runs vdps → vdps via offset 0x14 from the head
 returned here; see :mod:`ams_extract.records.sample`. The waveform
@@ -36,6 +38,8 @@ PDCD_FFT_LAST_VDPS_OFFSET = 0x48
 PDCD_WAVEFORM_FIRST_OFFSET = 0x04
 PDCD_WAVEFORM_FIRST_VDFW_OFFSET = 0x5C
 PDCD_WAVEFORM_LAST_VDFW_OFFSET = 0x60
+PDCD_ANALYSIS_SET_INDEX_OFFSET = 0xAC
+PDCD_ALARM_SET_INDEX_OFFSET = 0xAE
 
 
 class SampleIndexError(ValueError):
@@ -46,8 +50,10 @@ class SampleIndexError(ValueError):
 class PdcdLinks:
     """The chain heads exposed by one ``pdcd`` record.
 
-    Each field is ``None`` when the corresponding pointer is zero (no
-    chain of that type recorded for the point).
+    Each pointer field is ``None`` when the corresponding pointer is zero
+    (no chain of that type recorded for the point). The set indexes are
+    plain u16 values into the shared ``pdpa``/``pdla`` pools (FORMAT §5.8);
+    0 means "unset".
     """
 
     record_num: int
@@ -58,6 +64,8 @@ class PdcdLinks:
     waveform_first: int | None
     waveform_first_vdfw: int | None
     waveform_last_vdfw: int | None
+    analysis_set_index: int = 0
+    alarm_set_index: int = 0
 
 
 def _check_tag(record: bytes, expected: bytes, record_num: int) -> None:
@@ -90,4 +98,10 @@ def parse_pdcd_links(reader: RbmReader, pdcd_record: int) -> PdcdLinks:
         waveform_first=_pointer(PDCD_WAVEFORM_FIRST_OFFSET),
         waveform_first_vdfw=_pointer(PDCD_WAVEFORM_FIRST_VDFW_OFFSET),
         waveform_last_vdfw=_pointer(PDCD_WAVEFORM_LAST_VDFW_OFFSET),
+        analysis_set_index=struct.unpack_from(
+            "<H", record, PDCD_ANALYSIS_SET_INDEX_OFFSET
+        )[0],
+        alarm_set_index=struct.unpack_from(
+            "<H", record, PDCD_ALARM_SET_INDEX_OFFSET
+        )[0],
     )

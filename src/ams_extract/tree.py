@@ -47,6 +47,18 @@ from ams_extract.records.header import (
     AREA_CHAIN_SECONDARY_POINTER_OFFSET,
     parse_header,
 )
+from ams_extract.records.pdpa import (
+    BAND_TYPE_FIXED_HZ,
+    BAND_TYPE_HF_FIXED_HZ,
+    BAND_TYPE_ORDERS,
+    BAND_TYPE_WAVEFORM_PEAK,
+    THRESHOLD_UNIT_ACCELERATION,
+    THRESHOLD_UNIT_VELOCITY,
+    AlarmLimitSet,
+    AnalysisParameterSet,
+    ParamSetIndex,
+    alarm_level,
+)
 from ams_extract.records.point import (
     PointChainError,
     parse_gipm_point_records,
@@ -707,34 +719,101 @@ def _point_spectrum_units(reader: RbmReader, links: PdcdLinks) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class _BandColumn:
-    """Label/calibration of one velocity-template vddt band column."""
+    """Resolved label/calibration/limits of one vddt band column."""
 
     name: str
     scale: float
     units: str
+    low_order: float | None
+    high_order: float | None
+    low_hz: float | None
+    high_hz: float | None
+    alert_raw: float | None
+    danger_raw: float | None
 
 
-# Band columns of the velocity template (band_count = 7), in slot order —
-# FORMAT §5.7, each column validated 62/62 against the AMS per-band PLOTDATA
-# gold for M1H AG-100. Mixed units: "Mp Wave" is a raw acceleration peak in
-# G's, the rest are velocities (x 25.4 -> mm/s). Column 6 ("1-20 KHz") is
-# NOT emitted: its unit/scale is unconfirmed (the gold table is empty).
-VDDT_VELOCITY_BANDS: tuple[_BandColumn, ...] = (
-    _BandColumn("Mp Wave", 1.0, "G's"),
-    _BandColumn("SUBSINCRONO", TREND_VELOCITY_SCALE_MM_S, "mm/s"),
-    _BandColumn("DESEQUILIBRIO", TREND_VELOCITY_SCALE_MM_S, "mm/s"),
-    _BandColumn("DESALINEACION", TREND_VELOCITY_SCALE_MM_S, "mm/s"),
-    _BandColumn("HOLGURAS", TREND_VELOCITY_SCALE_MM_S, "mm/s"),
-    _BandColumn("11-40 X RPM", TREND_VELOCITY_SCALE_MM_S, "mm/s"),
-)
+def _threshold_pair(
+    limits: AlarmLimitSet | None, array_index: int, expected_unit_code: int
+) -> tuple[float | None, float | None]:
+    """Raw (alert, danger) thresholds at ``array_index``, unit-checked.
 
-# Slot band count that identifies the velocity template above. Records with
-# other counts (reconfigured epochs) decode the overall but their band
-# columns are unlabeled, so those readings contribute no band values.
-_VELOCITY_TEMPLATE_BAND_COUNT = 7
+    Returns ``(None, None)`` when there is no alarm limit set, no
+    configured limit, or the stored unit code disagrees with the slot's
+    value unit (never compare across units).
+    """
+    if limits is None:
+        return (None, None)
+    if limits.unit_codes[array_index] != expected_unit_code:
+        return (None, None)
+    return (limits.alert_for(array_index), limits.danger_for(array_index))
 
 
-def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
+def _resolve_band_columns(
+    point: Point,
+    template: AnalysisParameterSet,
+    limits: AlarmLimitSet | None,
+) -> dict[int, _BandColumn]:
+    """Map emittable template slots to resolved band columns.
+
+    Skips ``BAND_TYPE_HF_FIXED_HZ`` columns ("1 - 20 KHz"): their trend
+    scale (G's, per the pdla unit code and the gdnl alarm reports) is not
+    gold-validated yet, so they are not emitted (FORMAT §5.8). Unknown slot
+    types are skipped with a log.
+    """
+    columns: dict[int, _BandColumn] = {}
+    for i, band in enumerate(template.bands):
+        if band.band_type == BAND_TYPE_WAVEFORM_PEAK:
+            alert_raw, danger_raw = _threshold_pair(
+                limits, i + 1, THRESHOLD_UNIT_ACCELERATION
+            )
+            columns[i] = _BandColumn(
+                name=band.name,
+                scale=1.0,
+                units="G's",
+                low_order=None,
+                high_order=None,
+                low_hz=None,
+                high_hz=None,
+                alert_raw=alert_raw,
+                danger_raw=danger_raw,
+            )
+        elif band.band_type in (BAND_TYPE_ORDERS, BAND_TYPE_FIXED_HZ):
+            alert_raw, danger_raw = _threshold_pair(
+                limits, i + 1, THRESHOLD_UNIT_VELOCITY
+            )
+            in_orders = band.band_type == BAND_TYPE_ORDERS
+            columns[i] = _BandColumn(
+                name=band.name,
+                scale=TREND_VELOCITY_SCALE_MM_S,
+                units="mm/s",
+                low_order=band.low if in_orders else None,
+                high_order=band.high if in_orders else None,
+                low_hz=None if in_orders else band.low,
+                high_hz=None if in_orders else band.high,
+                alert_raw=alert_raw,
+                danger_raw=danger_raw,
+            )
+        elif band.band_type == BAND_TYPE_HF_FIXED_HZ:
+            _log.info(
+                "trend_band_hf_column_skipped",
+                point=point.long_name,
+                band=band.name,
+            )
+        else:
+            _log.warning(
+                "trend_band_type_unknown",
+                point=point.long_name,
+                band=band.name,
+                band_type=band.band_type,
+            )
+    return columns
+
+
+def walk_trends(
+    reader: RbmReader,
+    point: Point,
+    param_sets: ParamSetIndex | None = None,
+) -> Iterator[Trend]:
     """Yield the "Valores Globales" trend series for ``point`` (usually one).
 
     Walks ``vdpm.0x10 → pdcd → 0x3C → vddt → (chain via 0x10)``, decodes
@@ -749,10 +828,16 @@ def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
     than emitting unverified values (PLAN §7.4). A missing pdcd / first-vddt,
     an undetermined unit, or an all-skipped chain yields no trend.
 
-    Readings stored with the velocity band template (``band_count = 7``)
-    also contribute the named band series (:data:`VDDT_VELOCITY_BANDS`) to
-    ``Trend.bands``; readings from other band-count epochs only contribute
-    the overall.
+    The named band series come from the point's **analysis parameter set**
+    (``pdcd.0xAC`` → pdpa template, FORMAT §5.8): readings whose stored
+    column count matches the template's active slot count contribute one
+    value per emittable slot ("1 - 20 KHz" HF columns are skipped — scale
+    unvalidated). Frequency bounds (orders or Hz) come from the template;
+    alert/danger thresholds and the derived per-reading alarm levels come
+    from the **alarm limit set** (``pdcd.0xAE`` → pdla). Readings from
+    other column-count epochs (historical configurations) contribute only
+    the overall. Pass a preloaded :class:`ParamSetIndex` to avoid
+    re-scanning the set directories per point.
     """
     links = _resolve_pdcd_links(reader, point)
     if links is None:
@@ -786,8 +871,29 @@ def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
         )
         return
 
+    if param_sets is None:
+        param_sets = ParamSetIndex.load(reader)
+    template = (
+        param_sets.analysis_set(links.analysis_set_index)
+        if links.analysis_set_index
+        else None
+    )
+    limits = (
+        param_sets.alarm_set(links.alarm_set_index) if links.alarm_set_index else None
+    )
+    if template is None:
+        _log.info(
+            "trend_analysis_set_unresolved",
+            point=point.long_name,
+            analysis_set_index=links.analysis_set_index,
+        )
+    overall_alert_raw, overall_danger_raw = _threshold_pair(
+        limits, 0, THRESHOLD_UNIT_VELOCITY
+    )
+
     timestamps: list[datetime] = []
     overall: list[float] = []
+    overall_alarms: list[int | None] = []
     band_timestamps: list[datetime] = []
     band_rows: list[tuple[float, ...]] = []
     for record_num in records:
@@ -812,7 +918,10 @@ def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
         for reading in readings:
             timestamps.append(reading.timestamp_utc)
             overall.append(reading.overall_raw * TREND_VELOCITY_SCALE_MM_S)
-            if len(reading.bands_raw) == _VELOCITY_TEMPLATE_BAND_COUNT:
+            overall_alarms.append(
+                alarm_level(reading.overall_raw, overall_alert_raw, overall_danger_raw)
+            )
+            if template is not None and len(reading.bands_raw) == len(template.bands):
                 band_timestamps.append(reading.timestamp_utc)
                 band_rows.append(reading.bands_raw)
 
@@ -820,15 +929,30 @@ def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
         return
 
     bands: tuple[TrendBand, ...] = ()
-    if band_timestamps:
+    if band_timestamps and template is not None:
+        columns = _resolve_band_columns(point, template, limits)
         bands = tuple(
             TrendBand(
                 name=column.name,
                 units=column.units,
                 timestamps_utc=tuple(band_timestamps),
-                values=np.asarray([row[i] * column.scale for row in band_rows], dtype=np.float32),
+                values=np.asarray(
+                    [row[i] * column.scale for row in band_rows], dtype=np.float32
+                ),
+                low_order=column.low_order,
+                high_order=column.high_order,
+                low_hz=column.low_hz,
+                high_hz=column.high_hz,
+                alert=None if column.alert_raw is None else column.alert_raw * column.scale,
+                danger=None
+                if column.danger_raw is None
+                else column.danger_raw * column.scale,
+                alarms=tuple(
+                    alarm_level(row[i], column.alert_raw, column.danger_raw)
+                    for row in band_rows
+                ),
             )
-            for i, column in enumerate(VDDT_VELOCITY_BANDS)
+            for i, column in sorted(columns.items())
         )
 
     yield Trend(
@@ -838,4 +962,11 @@ def walk_trends(reader: RbmReader, point: Point) -> Iterator[Trend]:
         timestamps_utc=tuple(timestamps),
         overall=np.asarray(overall, dtype=np.float32),
         bands=bands,
+        alert=None
+        if overall_alert_raw is None
+        else overall_alert_raw * TREND_VELOCITY_SCALE_MM_S,
+        danger=None
+        if overall_danger_raw is None
+        else overall_danger_raw * TREND_VELOCITY_SCALE_MM_S,
+        alarms=tuple(overall_alarms),
     )

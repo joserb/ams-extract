@@ -118,20 +118,24 @@ class TestExportDataset:
         assert summary.areas == 1
 
 
-def _make_band(name: str, units: str) -> TrendBand:
+def _make_band(name: str, units: str, **kwargs) -> TrendBand:
     return TrendBand(
         name=name,
         units=units,
         timestamps_utc=(datetime(2020, 1, 1, tzinfo=UTC),),
         values=np.asarray([1.5], dtype=np.float32),
+        **kwargs,
     )
 
 
 class TestBandExport:
     point = Point(record_num=1, long_name="MOTOR LOA HORIZONTAL", short_code="M1H")
 
-    def test_velocity_band_descriptor(self) -> None:
-        row = _band_metric_row(_make_band("SUBSINCRONO", "mm/s"), self.point)
+    def test_velocity_band_descriptor_with_order_bounds(self) -> None:
+        # Bounds come from the point's pdpa template (FORMAT §5.8):
+        # SUBSINCRONO is 0-0.7 shaft orders in the Estandar templates.
+        band = _make_band("SUBSINCRONO", "mm/s", low_order=0.0, high_order=0.7)
+        row = _band_metric_row(band, self.point)
         assert row["metric_id"] == "band_subsincrono__M1H"
         assert row["name"] == "SUBSINCRONO"
         assert row["path"] == "M1H:SUBSINCRONO"
@@ -140,14 +144,25 @@ class TestBandExport:
         assert row["signal_family"] == "velocity"
         assert row["unit"] == "mm/s"
         assert row["band_type"] == "single"
+        assert row["band_low_order"] == 0.0
+        assert row["band_high_order"] == pytest.approx(0.7)
+        assert row["band_low_hz"] is None
+        assert row["band_high_hz"] is None
+
+    def test_fixed_hz_band_descriptor(self) -> None:
+        # FALLO ELECTRIC is a fixed 99.8-100.2 Hz band in the HR template.
+        band = _make_band("FALLO ELECTRIC", "mm/s", low_hz=99.8, high_hz=100.2)
+        row = _band_metric_row(band, self.point)
+        assert row["band_type"] == "single"
+        assert row["band_low_hz"] == pytest.approx(99.8)
+        assert row["band_high_hz"] == pytest.approx(100.2)
         assert row["band_low_order"] is None
         assert row["band_high_order"] is None
 
-    def test_order_bounds_declared_by_band_name(self) -> None:
-        row = _band_metric_row(_make_band("11-40 X RPM", "mm/s"), self.point)
-        assert row["metric_id"] == "band_11_40_x_rpm__M1H"
-        assert row["band_low_order"] == 11.0
-        assert row["band_high_order"] == 40.0
+    def test_band_without_resolved_bounds_has_band_type_none(self) -> None:
+        row = _band_metric_row(_make_band("SUBSINCRONO", "mm/s"), self.point)
+        assert row["band_type"] == "none"
+        assert row["band_low_order"] is None
 
     def test_mp_wave_is_an_acceleration_peak_not_a_band(self) -> None:
         row = _band_metric_row(_make_band("Mp Wave", "G's"), self.point)
@@ -166,6 +181,14 @@ class TestBandExport:
         assert rows[0]["value"] == pytest.approx(1.5)
         assert rows[0]["t"] == 1_577_836_800_000_000  # 2020-01-01 UTC in µs
         assert rows[0]["config_id"] == ""
+        assert rows[0]["alarm"] is None  # no thresholds resolved
+
+    def test_band_trend_rows_carry_derived_alarm(self) -> None:
+        # alarm is DERIVED from the pdla thresholds (0/2/3), never read
+        # from the undecoded per-slot flags (ADR-0012).
+        band = _make_band("HOLGURAS", "mm/s", alert=1.4, danger=2.2, alarms=(2,))
+        rows = _band_trend_rows(band, self.point)
+        assert rows[0]["alarm"] == 2
 
 
 class TestRbmExportCommand:

@@ -224,8 +224,10 @@ verificada en cada fase:
 | `gdts` | 16 | índice área → equipment chain | Fase 2b (ADR-0003) |
 | `gits` | 1 | área list "prefix-list" | Fase 2a (ADR-0002) |
 | `gddh` | 1 | database header tag (record 0) | Fase 1 |
-| `pdpa` | 41 | plantilla de análisis (bandas + rangos + umbrales de alarma); compartida entre puntos | §5.8 |
-| `gdnl` | (varios) | informes de alarma en texto literal (`"SUBSINCRONO - … - C Alarm"`) | §5.8 |
+| `pdpa` | 41 | plantilla de análisis (bandas + rangos por slot); compartida entre puntos | §5.8 |
+| `pdla` | 92 | set de límites de alarma (umbrales C/D por slot); compartido entre puntos | §5.8 |
+| `gipa`/`gila` | 2+ | directorios índice→record de los sets `pdpa`/`pdla` | §5.8 |
+| `gdnl` | 5783 | informes de alarma en texto literal (`"SUBSINCRONO - … - C Alarm"`) | §5.8 |
 
 ## 5. Sample records — FFT chain
 
@@ -553,46 +555,121 @@ primeros 47 coinciden **EXACTO** (fecha + valor) con la tabla gold de AMS
 **Implementado** (2026-05-30): `records/trend.py`, `tree.walk_trends`,
 `models.Trend`, export (`__trend.parquet`, una fila por lectura) y CLI
 (`rbm extract --type trend`, `rbm export --types …,trend`). Desde 2026-07-18
-(ADR-0010) `walk_trends` también emite las **bandas etiquetadas** del template
-de velocidad (`Trend.bands`, columnas 0–5 con sus unidades mixtas; la columna
-6 "1-20 KHz" no se emite por escala sin confirmar) y `rbm export` las escribe
-como métricas VibFrame propias (`band_<slug>__<punto>`). Los trends de
+(ADR-0010) `walk_trends` también emite las **bandas etiquetadas**
+(`Trend.bands`) y `rbm export` las escribe como métricas VibFrame propias
+(`band_<slug>__<punto>`). Desde 2026-07-19 (ADR-0012) el etiquetado, los
+rangos de frecuencia y los umbrales por banda salen de la plantilla `pdpa`
+/ set `pdla` del punto (§5.8) — se emiten las lecturas cuyo nº de columnas
+coincide con los slots activos de la plantilla actual; la columna "1-20
+KHz" (tipo `0x04`) sigue sin emitirse por escala sin gold. Los trends de
 aceleración siguen pendientes.
 
-### 5.8 `pdpa` — config de análisis del punto (bandas / rangos / alarmas)
+### 5.8 `pdpa` / `pdla` — plantillas de análisis y de límites de alarma
 
-Parcialmente mapeado (2026-05-31). Define qué bandas tiene un punto, sus
-rangos de frecuencia y sus umbrales de alarma — la "definición" de los
-indicadores que luego viven como columnas en el `vddt` (§5.7).
+**RESUELTO** (2026-07-19; parcial 2026-05-31). Un punto no lleva su
+definición de bandas inline: referencia dos pools de **plantillas
+compartidas** — en BUNGE, **41 records `pdpa`** (Analysis Parameter Sets:
+qué bandas y con qué rangos) y **92 records `pdla`** (Alarm Limit Sets:
+umbrales C/D por banda) para 5 203 puntos. La config de una máquina
+**generaliza** a todas las que comparten plantilla.
 
-**Son PLANTILLAS COMPARTIDAS**: en BUNGE solo hay **41 records `pdpa`** (de
-3,6M records), agrupados en ~records 120-160; los 5203 puntos referencian
-una de ellas. → la config de una máquina **generaliza** a todas las que
-comparten plantilla.
+#### `pdpa` — Analysis Parameter Set (bandas y rangos)
 
 | Offset | Campo |
 |---|---|
 | `0x08` | tag `pdpa` |
-| `0x10` | nombre de plantilla (`"Estandar 1500 rpm (S)"`, `"REDUCTORA <300 rpm (S)"`, `"Alta resolucion (HR)"`…) |
-| `0x34` | **nombres de banda**: 12 slots × 14 chars, relleno `INDEFINID`. **Mismo orden que las columnas del `vddt`** (validado: pdpa "Estandar 1500 rpm" = `[Mp Wave, SUBSINCRONO, DESEQUILIBRIO, DESALINEACION, HOLGURAS, 11-40 X RPM, 1-20 KHz]`) |
-| `~0xF0+` | floats de **umbrales de alarma** y **rangos de frecuencia**, intercalados |
+| `0x10` | nombre de plantilla, 32 B (`"Estandar 1500 rpm (S)"`…) |
+| `0x30` | u16 **índice de set** (1-based; clave del directorio y del enlace) |
+| `0x32` | u16 **nº de slots activos** |
+| `0x34` | nombres de banda: 12 slots × 14 chars, relleno `INDEFINID` |
+| `0xDC` | u8[12] **tipo de banda** por slot |
+| `0xE8` | f32[12] **borde inferior** por slot |
+| `0x118` | f32[12] **borde superior** por slot |
 
-- **Umbrales**: tripletes recurrentes tipo `[0.7, 1.5, 2.5, 10.5]` =
-  (¿baseline?, **Alerta/C**, **Peligro/D**, ¿máx?). Gold-consistente:
-  SUBSINCRONO de M1H pasa a C ~1.44 y D ~2.24 ≈ alerta 1.5 / peligro 2.5.
-- **Rangos de frecuencia**: fijos (`1000`/`20000` Hz = banda 1-20 KHz) y
-  **rpm-escalados** (`0x164`/`0x17C` = 40×RPM, borde de "11-40 X RPM";
-  diff plantilla 1500 vs 3000 rpm los aísla).
+Solo los primeros `0x32` slots son bandas reales del punto; los slots con
+nombre más allá del contador son **residuos de ediciones** de la plantilla
+(la HR nombra 7 slots pero activa 6; las REDUCTORA nombran 8 y activan 2).
+El orden de los slots activos es el MISMO que las columnas del `vddt`
+(§5.7): `vddt.0x24 == pdpa.0x32` en todos los puntos muestreados.
 
-**Enlace punto→plantilla**: el `vdpm` lleva la familia de plantilla en `0x4B`
-(`:ESTÁNDAR`) y los **rodamientos** en `0x07E` (`6204`/`6208`, frecuencias de
-fallo). La variante rpm se casa por nombre + rpm del punto.
+Tipos de banda (`0xDC`):
 
-**Pendiente**: segmentar el offset exacto por-banda de
-`[freq_lo, freq_hi, alerta, peligro]` y el índice numérico limpio
-punto→`pdpa`. Necesitaría una captura del diálogo de bandas/alarmas de AMS.
-También: los records `gdnl` guardan informes de alarma en texto literal
-(`"SUBSINCRONO - 1.986 mm/Seg - C Alarm"`).
+- `0x02` — bordes en **órdenes de giro** (×RPM). Las bandas estándar son
+  contiguas: SUBSINCRONO 0–0.7×, DESEQUILIBRIO 0.7–1.5×, DESALINEACION
+  1.5–2.5×, HOLGURAS 2.5–10.5×, 11-40 X RPM 10.5–40.5× (variantes 60.5× /
+  120.5× en plantillas 1000 rpm / REDUCTORA).
+- `0x01` — bordes en **Hz fijos** (FALLO ELECTRIC 99.8–100.2 Hz; bandas HF
+  10–2000 / 2000–4000 / 4000–6000 Hz).
+- `0x04` — Hz fijos pero el **valor** de la columna es energía HF en G's
+  ("1 - 20 KHz", 1000–20000 Hz). Escala del trend sin gold → no se emite.
+- `0x0B` — pico de forma de onda ("Mp Wave"), sin rango de frecuencia.
+
+**Validación numérica** (la clave del cierre): el valor de la columna
+`vddt` de una banda espectral es EXACTAMENTE la raíz de la suma de
+cuadrados (RSS) de los bins crudos del espectro (§5.6, en in/s, antes del
+×48.5 de display) dentro de `[lo, hi)`; en mm/s: `×25.4`. Error mediano
+< 0.1 % (a menudo < 0.01 %) sobre 7 plantillas (ap 1, 2, 3, 7, 10, 16, 84)
+× ~30 puntos × bandas, comparando espectro y lectura de trend con el mismo
+timestamp. Para bandas en órdenes el borde en Hz usa las RPM del análisis =
+el valor CRUDO de `vdps.0x28` (= 2 × `Spectrum.rpm`, ojo: ver §5.3).
+
+#### `pdla` — Alarm Limit Set (umbrales de alarma)
+
+| Offset | Campo |
+|---|---|
+| `0x08` | tag `pdla` |
+| `0x10` | nombre del set, 32 B (`"Motor Horizontal P<300 kW (S)"`…) |
+| `0x30` | u16 índice de set (1-based) |
+| `0x38` | f32[13] umbral **Peligro / D Alarm** |
+| `0xA0` | f32[13] umbral **Alerta / C Alarm** |
+| `0x108` | u16[13] código de unidad del umbral |
+
+Los arrays de 13 se indexan `[overall, slot 0, slot 1, …, slot 11]`; un 0
+almacenado = "sin límite configurado". Unidades: código 1 = velocidad
+(almacenado en in/s; ×25.4 → mm/s), código 3 = aceleración (G's). El array
+f32[13] intermedio (en `0x6C`, todo 1.7) no está decodificado y no se usa.
+
+**Validación gold**: M1H (AG-100) usa el set 5 "Motor Horizontal P<300 kW
+(S)": SUBSINCRONO alerta 0.055118 in/s = **1.4 mm/s** y peligro 0.086614 =
+**2.2 mm/s** — el gold PLOTDATA muestra la transición a C en ~1.44 y a D en
+~2.24 mm/s, y el informe literal `gdnl` "SUBSINCRONO - 1.986 mm/Seg - C
+Alarm" cae dentro de [1.4, 2.2). (La estimación previa "alerta 1.5 /
+peligro 2.5" queda superada.) Los 4 bytes de flags por slot del `vddt` son
+constantes en toda la cadena → NO llevan la alarma por lectura; la columna
+`alarm` del export se DERIVA de estos umbrales (ADR-0012).
+
+#### Directorios `gipa`/`gila` y enlace punto→plantilla
+
+Los índices de set se resuelven vía dos **directorios** cerca de la
+cabecera: un record `gipa` etiquetado `pdpa` (en BUNGE, record 6) y un
+`gila` etiquetado `pdla` (record 37). Estructura de cada sección:
+`[span de directorio: 4 records][record etiqueta]` — la etiqueta es un
+record con tag a cero y el nombre del tipo (`pdpa`/`pdla`) en `0x10`. El
+directorio es un array plano u32 LE de punteros **+1-encoded** indexado por
+`índice de set - 1`, que empieza en `0x10` del primer record y continúa por
+los 512 bytes COMPLETOS de los 3 records siguientes (los bytes 0x00–0x0F de
+los records de continuación son datos, no cabecera). Verificado: los 41
+índices pdpa (1–18, 81–84, 100–118) y 92 pdla (1–52, 100, 200–227) resuelven
+al record correcto, incluidos los 4 "NEW" en ~3.12M.
+
+**Enlace punto→plantilla**: `pdcd.0xAC` = u16 índice del `pdpa` y
+`pdcd.0xAE` = u16 índice del `pdla` (0 = sin asignar). Los 5 203 puntos de
+BUNGE resuelven ambos índices sin fallos (72 parejas distintas; la más
+común `(1, 5)` = Estandar 1500 rpm + Motor Horizontal <300 kW). El `vdpm`
+lleva además la familia en `0x4B` (`:ESTÁNDAR`) y los rodamientos en
+`0x07E` (`6204`/`6208`) — ya no hacen falta para el enlace.
+
+**Implementado** (2026-07-19): `records/pdpa.py` (parsers + directorios +
+`ParamSetIndex` + `alarm_level`), `pdcd.0xAC/0xAE` en
+`records/sample_index.py`, etiquetado por plantilla en `tree.walk_trends`
+y export de límites de banda + columna `alarm` derivada (ADR-0012).
+
+**Pendiente**: la escala de la columna "1-20 KHz" (tipo `0x04`; evidencia
+de que va en G's: código de unidad pdla = 3 y los `gdnl` la reportan en
+"G-s", pero sin gold numérico → no se emite). El array 1.7[13] del `pdla`
+y el resto de campos de medida del `pdpa` (`0x148+`: Fmax/lines por
+análisis) sin decodificar del todo.
+
 
 ## 6. Encoding y strings
 
@@ -640,9 +717,9 @@ Pendientes:
 - Layout exacto de `0x22-0x2B` y `0x30-0x57` en la cabecera (Fase 1).
 - Función de los u32 LE en el "rebozado" de cada record (preámbulo
   `0x00-0x07`): timestamps, contadores, versión… aún sin confirmar.
-- **`vddt` — etiquetado de las 7 bandas** (cuál es SUBSINCRONO,
-  DESEQUILIBRIO, …). Requiere gold del PLOTDATA por banda. No bloquea
-  emitir el overall (Valores Globales).
+- ~~**`vddt` — etiquetado de las 7 bandas**~~: RESUELTO (§5.8,
+  2026-07-19). Las columnas siguen el orden de slots activos del `pdpa`
+  del punto (`pdcd.0xAC`); rangos y umbrales validados numéricamente.
 - Marker para distinguir un `vdpm` "real" de uno "plantilla". Hoy se
   filtran por construcción al recorrer sólo lo enlazado.
 - Significado preciso de los i32 signed deltas en `gicm.0x60+`,

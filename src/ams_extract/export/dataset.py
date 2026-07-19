@@ -59,6 +59,7 @@ from ams_extract.models import (
     Waveform,
 )
 from ams_extract.reader import RbmReader
+from ams_extract.records.pdpa import ParamSetIndex
 from ams_extract.report import collect_inventory
 from ams_extract.tree import walk_hierarchy, walk_spectra, walk_trends, walk_waveforms
 
@@ -212,14 +213,6 @@ def _band_metric_id(point: Point, band: TrendBand) -> str:
     return f"band_{_slug(band.name)}__{point.short_code}"
 
 
-# Order bounds derivable without the (still undecoded) pdpa per-band floats:
-# the 11-40 X RPM band edges are declared by its name and corroborated by the
-# rpm-scaled 40xRPM frequencies isolated in the pdpa templates (FORMAT §5.8).
-_BAND_ORDER_BOUNDS: dict[str, tuple[float, float]] = {
-    "11-40 X RPM": (11.0, 40.0),
-}
-
-
 def _machine_dir(out_dir: Path, equipment: Equipment) -> Path:
     return out_dir / f"{MACHINE_PARTITION_PREFIX}{equipment.short_code}"
 
@@ -347,6 +340,11 @@ def _waveform_row(waveform: Waveform, point: Point) -> dict[str, Any]:
     }
 
 
+def _alarm_at(alarms: Sequence[int | None], i: int) -> int | None:
+    """Derived alarm level for reading ``i``, or ``None`` if not computed."""
+    return alarms[i] if i < len(alarms) else None
+
+
 def _trend_rows(trend: Trend, point: Point) -> list[dict[str, Any]]:
     metric_id = _trend_metric_id(point)
     return [
@@ -354,7 +352,9 @@ def _trend_rows(trend: Trend, point: Point) -> list[dict[str, Any]]:
             "t": _timestamp_us(trend.timestamps_utc[i]),
             "metric_id": metric_id,
             "value": float(trend.overall[i]),
-            "alarm": None,
+            # DERIVED from the pdla thresholds (0 normal / 2 alert / 3
+            # danger), not read from the undecoded per-slot flags (ADR-0012).
+            "alarm": _alarm_at(trend.alarms, i),
             "config_id": CONFIG_ID,
         }
         for i in range(len(trend.overall))
@@ -368,7 +368,8 @@ def _band_trend_rows(band: TrendBand, point: Point) -> list[dict[str, Any]]:
             "t": _timestamp_us(band.timestamps_utc[i]),
             "metric_id": metric_id,
             "value": float(band.values[i]),
-            "alarm": None,
+            # DERIVED from the pdla thresholds; see _trend_rows.
+            "alarm": _alarm_at(band.alarms, i),
             "config_id": CONFIG_ID,
         }
         for i in range(len(band.values))
@@ -376,16 +377,16 @@ def _band_trend_rows(band: TrendBand, point: Point) -> list[dict[str, Any]]:
 
 
 def _band_metric_row(band: TrendBand, point: Point) -> dict[str, Any]:
-    """Descriptor for one named vddt band (FORMAT §5.7).
+    """Descriptor for one named vddt band (FORMAT §5.7/§5.8).
 
     "Mp Wave" (F.Onda Pico Máx) is a waveform acceleration peak, not a
     spectral band; the velocity bands are band RMS values whose frequency
-    bounds live in the still-undecoded pdpa templates (null until then,
-    except the order bounds declared by the band name itself).
+    bounds come from the point's pdpa analysis parameter set — in shaft
+    orders for order-scaled bands, in Hz for fixed-frequency bands.
     """
     family = _signal_family(band.units)
     is_peak = family == "acceleration"
-    low_order, high_order = _BAND_ORDER_BOUNDS.get(band.name, (None, None))
+    has_bounds = band.low_order is not None or band.low_hz is not None
     return {
         "metric_id": _band_metric_id(point, band),
         "config_id": CONFIG_ID,
@@ -398,11 +399,11 @@ def _band_metric_row(band: TrendBand, point: Point) -> dict[str, Any]:
         "detector": "peak" if is_peak else "rms",
         "unit": _canonical_unit(band.units),
         "integrate": False,
-        "band_type": "none" if is_peak else "single",
-        "band_low_hz": None,
-        "band_high_hz": None,
-        "band_low_order": low_order,
-        "band_high_order": high_order,
+        "band_type": "single" if has_bounds else "none",
+        "band_low_hz": band.low_hz,
+        "band_high_hz": band.high_hz,
+        "band_low_order": band.low_order,
+        "band_high_order": band.high_order,
         "frequency_role": None,
         "harmonic_orders": None,
         "n_sidebands": None,
@@ -461,6 +462,7 @@ def _process_equipment(
         trend_rows: list[dict[str, Any]] = []
         metric_rows: dict[str, dict[str, Any]] = {}
         proc_modes: dict[tuple[str, str], dict[str, Any]] = {}
+        param_sets = ParamSetIndex.load(reader) if TREND in types else None
 
         for point in equipment.points:
             if FFT in types:
@@ -486,7 +488,7 @@ def _process_equipment(
                         n_samples=waveform.n_samples,
                     )
             if TREND in types:
-                for trend in walk_trends(reader, point):
+                for trend in walk_trends(reader, point, param_sets):
                     rows = _trend_rows(trend, point)
                     if rows:
                         trend_rows.extend(rows)

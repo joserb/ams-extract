@@ -153,26 +153,49 @@ class Waveform:
 
 @dataclass(frozen=True, slots=True)
 class TrendBand:
-    """One named ``vddt`` band series of a point's trend (FORMAT §5.7).
+    """One named ``vddt`` band series of a point's trend (FORMAT §5.7/§5.8).
 
-    The velocity template stores mixed units per slot: "Mp Wave" is a raw
-    acceleration peak in G's, the remaining bands are velocities calibrated
-    to mm/s (``raw * 25.4``), each column validated 62/62 against the AMS
-    per-band PLOTDATA gold for M1H AG-100.
+    The band identity (name, frequency range, thresholds) comes from the
+    point's shared analysis-parameter set (``pdpa``) and alarm-limit set
+    (``pdla``). Mixed units per slot: "Mp Wave" is a raw acceleration peak
+    in G's, spectral bands are velocities calibrated to mm/s
+    (``raw * 25.4``) — each column validated 62/62 against the AMS
+    per-band PLOTDATA gold for M1H AG-100, and the band values reproduce
+    the root-sum-square of the raw spectrum bins inside ``[low, high)``
+    (FORMAT §5.8).
 
     Attributes:
         name: Original AMS band label ("SUBSINCRONO", "Mp Wave", ...).
         units: Display units of ``values`` (``"mm/s"`` or ``"G's"``).
-        timestamps_utc: Reading timestamps, oldest first. Only readings from
-            velocity-template records (``band_count = 7``) contribute, so
-            this can be shorter than the overall series.
+        timestamps_utc: Reading timestamps, oldest first. Only readings
+            whose stored column count matches the point's current template
+            contribute, so this can be shorter than the overall series.
         values: Calibrated band value per reading.
+        low_order: Band low edge in shaft orders (order-scaled bands), else
+            ``None``.
+        high_order: Band high edge in shaft orders, else ``None``.
+        low_hz: Band low edge in Hz (fixed-frequency bands), else ``None``.
+        high_hz: Band high edge in Hz, else ``None``.
+        alert: Alert (C) threshold in display units, or ``None`` if not
+            configured.
+        danger: Danger (D) threshold in display units, or ``None``.
+        alarms: Derived alarm level per reading — 0 normal, 2 alert,
+            3 danger (VibFrame scale) — computed from ``alert``/``danger``,
+            NOT read from the (undecoded) per-slot flags. ``None`` per
+            reading when the point has no thresholds for this slot.
     """
 
     name: str
     units: str
     timestamps_utc: tuple[datetime, ...]
     values: NDArray[np.float32]
+    low_order: float | None = None
+    high_order: float | None = None
+    low_hz: float | None = None
+    high_hz: float | None = None
+    alert: float | None = None
+    danger: float | None = None
+    alarms: tuple[int | None, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -195,8 +218,15 @@ class Trend:
             oldest first. Decoded via the off-by-one date rule (FORMAT §5.7).
         overall: Calibrated overall value per reading (``raw * 25.4`` -> mm/s).
             Validated 47/47 against the AMS PLOTDATA gold for M1H AG-100.
-        bands: Named band series decoded from the velocity-template slots
-            (``band_count = 7``); empty when no reading matches the template.
+        bands: Named band series decoded through the point's analysis
+            parameter set (``pdpa``, FORMAT §5.8); empty when the point has
+            no resolvable template or no reading matches its column count.
+        alert: Overall alert (C) threshold in display units (from the
+            point's ``pdla`` alarm limit set), or ``None``.
+        danger: Overall danger (D) threshold in display units, or ``None``.
+        alarms: Derived alarm level per overall reading (0 normal, 2 alert,
+            3 danger; ``None`` when no thresholds are configured). Same
+            derived-not-stored caveat as :attr:`TrendBand.alarms`.
     """
 
     record_num: int
@@ -205,3 +235,6 @@ class Trend:
     timestamps_utc: tuple[datetime, ...]
     overall: NDArray[np.float32]
     bands: tuple[TrendBand, ...] = ()
+    alert: float | None = None
+    danger: float | None = None
+    alarms: tuple[int | None, ...] = ()

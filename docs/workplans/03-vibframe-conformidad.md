@@ -2,9 +2,10 @@
 
 **Fecha**: 2026-07-10 (actualizado 2026-07-19) · **Estado**: en curso —
 conformidad base cerrada (`f17bb9c`), bandas vddt + `path=[área]` emitidas
-(`2c5e1fe`, ADR-0010) y etiquetado canónico vía mapper operativo (§4,
-ADR-0011); quedan el decode de `pdpa`, los trends de aceleración y el
-contexto de operación.
+(`2c5e1fe`, ADR-0010), etiquetado canónico vía mapper operativo (§4,
+ADR-0011) y decode de `pdpa`/`pdla` con límites de banda + columna `alarm`
+derivada (ADR-0012, FORMAT §5.8); quedan los trends de aceleración, la
+columna "1-20 KHz" y el contexto de operación.
 Para ejecutar por un agente desde este repo, sin más contexto que este
 documento y las referencias.
 
@@ -60,14 +61,16 @@ Checklist contra `VIBFRAME.md`:
 
 Del estudio (gaps conocidos, en orden de valor):
 
-1. **Bandas `vddt` con nombre** — completado 2026-07-18 (ADR-0010): se
-   emiten como métricas propias (`band_<slug>__<punto>`) con `name` = nombre
-   original; bandas de velocidad `statistic="spectrum_rms"` /
-   `band_type="single"` (límites null salvo `11-40 X RPM` en órdenes, hasta
-   decodificar `pdpa`), `Mp Wave` como `true_peak` de aceleración en `g`.
-   La columna "1-20 KHz" no se emite (escala sin confirmar). En el mismo
-   cambio: `machine.path = [área]` — solo niveles de ubicación, alineado con
-   la jerarquía location→machine del `vibframe_viewer` de t8-extract.
+1. **Bandas `vddt` con nombre** — completado 2026-07-18 (ADR-0010) y
+   cerrado 2026-07-19 (ADR-0012): se emiten como métricas propias
+   (`band_<slug>__<punto>`) etiquetadas desde la plantilla `pdpa` del punto,
+   con límites reales (`band_low/high_order` para bandas en órdenes,
+   `band_low/high_hz` para bandas fijas) y la columna `alarm` de
+   `trends.parquet` derivada de los umbrales `pdla` (0/2/3). La columna
+   "1-20 KHz" sigue sin emitirse (escala en G's sin gold). En el mismo
+   cambio ADR-0010: `machine.path = [área]` — solo niveles de ubicación,
+   alineado con la jerarquía location→machine del `vibframe_viewer` de
+   t8-extract.
 2. **RPM en FFT** → `speed_hz` en `spectra.parquet` desde `vdps.0x28`
    (completado; AMS lo almacena como RPM × 2).
 3. **Ventana / promedios / detector / sensor** donde el `.rbm` lo permita →
@@ -109,9 +112,16 @@ DESALINEACION, HOLGURAS — el nombre nunca decide semántica). Nota:
 vibsynth-contracts acepta desde 2026-07-19 `band_type="single"` sin límites,
 así que la desviación asumida en ADR-0010 §3 ya es conforme a la spec.
 
-- Pendiente (único bloqueo para las 8 584 null): decodificar `pdpa`
-  (FORMAT §5.8) y emitir `band_low_hz`/`band_high_hz`; el mapper las
-  clasificaría entonces por estructura.
+- HECHO (2026-07-19, ADR-0012): `pdpa` decodificado y límites emitidos
+  (en órdenes para las bandas ×RPM, en Hz para las fijas) + columna `alarm`
+  derivada de los umbrales `pdla`. Dataset regenerado y re-etiquetado:
+  **100.0 % de cobertura** (16 462 métricas: 5 457 direct, 8 801
+  approximate, 2 204 weak; `--diff` 16 462 match / 0 differ). Las bandas
+  antes null resuelven por estructura: SUBSINCRONO → `band_subsync_rms`,
+  DESEQUILIBRIO → `band_1X_rms`, DESALINEACION → `band_2X_rms`, HOLGURAS →
+  `band_harmonics_high/low_rms` (weak), FALLO ELECTRIC → `band_2xLine_rms`,
+  COMBUSTION → `band_3X_rms`; además los puntos HF suman bandas nuevas
+  (10 Hz-2 kHz, 2-4 kHz, 4-6 kHz).
 
 ## Validación
 

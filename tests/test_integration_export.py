@@ -131,7 +131,8 @@ def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
     assert rows[0]["value"] == pytest.approx(1.58, abs=0.02)
     assert max(r["value"] for r in rows) == pytest.approx(36.43, abs=0.02)
 
-    # Named vddt bands (velocity template; M1H is band_count=7 throughout).
+    # Named vddt bands resolved through the point's pdpa template
+    # "Estandar 1500 rpm (S)" (FORMAT §5.8; M1H is band_count=7 throughout).
     band_metrics = {m["name"]: m for m in point_metrics if m["metric_id"].startswith("band_")}
     assert set(band_metrics) == {
         "Mp Wave",
@@ -143,14 +144,37 @@ def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
     }
     assert band_metrics["Mp Wave"]["unit"] == "g"
     assert band_metrics["Mp Wave"]["statistic"] == "true_peak"
+    assert band_metrics["Mp Wave"]["band_type"] == "none"
     assert band_metrics["SUBSINCRONO"]["unit"] == "mm/s"
-    assert band_metrics["11-40 X RPM"]["band_low_order"] == 11.0
+    # Band edges from the template, in shaft orders (contiguous bands).
+    assert band_metrics["SUBSINCRONO"]["band_low_order"] == pytest.approx(0.0)
+    assert band_metrics["SUBSINCRONO"]["band_high_order"] == pytest.approx(0.7)
+    assert band_metrics["HOLGURAS"]["band_low_order"] == pytest.approx(2.5)
+    assert band_metrics["HOLGURAS"]["band_high_order"] == pytest.approx(10.5)
+    assert band_metrics["11-40 X RPM"]["band_low_order"] == pytest.approx(10.5)
+    assert band_metrics["11-40 X RPM"]["band_high_order"] == pytest.approx(40.5)
+    assert band_metrics["SUBSINCRONO"]["band_low_hz"] is None
 
-    sub_rows = [r for r in trend_rows if r["metric_id"] == band_metrics["SUBSINCRONO"]["metric_id"]]
+    sub_rows = sorted(
+        (r for r in trend_rows if r["metric_id"] == band_metrics["SUBSINCRONO"]["metric_id"]),
+        key=lambda r: r["t"],
+    )
     assert len(sub_rows) == 62
     # SUBSINCRONO crosses its C alarm at the trend peak (FORMAT §5.8: gold
     # alarm report "SUBSINCRONO - 1.986 mm/Seg - C Alarm").
     assert max(r["value"] for r in sub_rows) > 1.5
+
+    # The derived alarm column follows the pdla thresholds of alarm set 5
+    # ("Motor Horizontal P<300 kW (S)"): alert 1.4 mm/s, danger 2.2 mm/s.
+    # Gold anchor: M1H turns C at ~1.44 and D at ~2.24 mm/s (ADR-0012).
+    for row in sub_rows:
+        expected = 0
+        if row["value"] >= 1.4:
+            expected = 2
+        if row["value"] >= 2.2:
+            expected = 3
+        assert row["alarm"] == expected
+    assert {r["alarm"] for r in sub_rows} == {0, 2, 3}
 
     # machine.path carries location levels only (the area), not the machine.
     assert doc["machine"]["path"] == ["DEPURADORA"]

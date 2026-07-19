@@ -742,3 +742,65 @@ está instalado.
   esas 8 584 filas: con límites Hz el mapper las clasificaría por estructura.
 - Cada regeneración del dataset (`rbm export`) exige repasar el mapper
   (`--write`); documentado en workplans/03 §4.
+
+## ADR-0012 — Bandas y alarmas desde las plantillas `pdpa`/`pdla`; columna `alarm` derivada
+
+- **Fecha**: 2026-07-19
+- **Estado**: aceptada
+
+### Contexto
+
+Las bandas `vddt` se emitían con etiquetas fijas del template de velocidad
+(ADR-0010) y sin límites de frecuencia: el mapper dejaba 8 584 filas sin
+canónica (55 % del gap de etiquetado, ADR-0011). El decode de `pdpa`
+(FORMAT §5.8) era el bloqueo. El análisis de 2026-07-19 resolvió el layout
+completo: plantillas `pdpa` (bandas + rangos), sets `pdla` (umbrales C/D),
+directorios `gipa`/`gila` y el enlace `pdcd.0xAC/0xAE`. La validación fue
+numérica: el valor de cada columna vddt reproduce EXACTO (mediana < 0.1 %)
+la RSS de los bins crudos del espectro dentro de `[lo, hi)`, y los umbrales
+del set 5 (1.4 / 2.2 mm/s) reproducen las transiciones C/D del gold de M1H.
+
+### Decisión
+
+1. **Etiquetado por plantilla, no hardcodeado**: `walk_trends` resuelve la
+   plantilla del punto (`pdcd.0xAC` → directorio `gipa` → `pdpa`) y emite
+   las columnas de las lecturas cuyo nº de columnas coincide con los slots
+   activos de la plantilla ACTUAL. Lecturas de épocas con otro nº de
+   columnas (configuraciones históricas) solo aportan el overall — no hay
+   registro de la plantilla histórica y no se inventa. Riesgo residual
+   documentado: una época antigua con el mismo nº de columnas y otra
+   plantilla se etiquetaría con la actual (es lo que muestra el propio AMS).
+2. **Límites de banda en el descriptor**: bandas en órdenes (tipo `0x02`)
+   → `band_low_order`/`band_high_order`; bandas en Hz fijos (`0x01`) →
+   `band_low_hz`/`band_high_hz`; `band_type="single"`. "Mp Wave" (tipo
+   `0x0B`, pico de forma de onda) sigue como `true_peak`/`band_type="none"`.
+   La columna "1-20 KHz" (tipo `0x04`) **no se emite**: su valor va en G's
+   según el código de unidad `pdla` y los informes `gdnl`, pero sin gold
+   numérico que valide la escala.
+3. **Columna `alarm` DERIVADA de umbrales**: VibFrame no tiene columnas de
+   umbral, así que los umbrales `pdla` se materializan como la columna
+   `alarm` de `trends.parquet` (overall y bandas): `0` normal, `2` alerta
+   (AMS "C Alarm"), `3` peligro (AMS "D Alarm"); el nivel `1` no se usa
+   (AMS no tiene escalón intermedio). Es un valor **calculado aquí**
+   comparando `valor >= umbral` en unidades crudas — NO leído de los flags
+   por slot del `vddt` (constantes en toda la cadena: no llevan la alarma
+   por lectura). `None` cuando el punto no tiene umbral configurado para
+   ese slot o el código de unidad no cuadra con la columna.
+4. **Umbrales expuestos en el modelo**: `Trend.alert/danger` y
+   `TrendBand.alert/danger` en unidades de display (mm/s o G's), por si un
+   consumidor quiere los límites además del nivel.
+
+### Consecuencias
+
+- Los puntos HF ("Alta frecuencia 6 KHz", plantillas 4 columnas) emiten
+  ahora sus bandas correctamente etiquetadas (10 Hz-2 kHz, 2-4 kHz,
+  4-6 kHz en mm/s + Mp Wave) — antes ninguna, porque solo se emitía
+  `band_count == 7`. Las variantes "11-60 X RPM" ya no se etiquetan
+  "11-40 X RPM".
+- `trends.parquet` lleva `alarm` poblado donde hay umbrales; los datasets
+  anteriores deben regenerarse (`rbm export` + `t8-mapper vibframe --write`).
+- El mapper puede clasificar por estructura las bandas antes null; la
+  cobertura de etiquetado de BUNGE sube (ver workplans/03 §4).
+- La validación numérica queda como técnica reutilizable: banda =
+  RSS de bins crudos in/s en `[lo, hi)`; ×25.4 → mm/s (scripts del
+  análisis, no comiteados; método documentado en FORMAT §5.8).

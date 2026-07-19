@@ -9,6 +9,8 @@ import pytest
 
 from ams_extract.reader import RECORD_SIZE, RbmReader
 from ams_extract.records.sample_index import (
+    PDCD_ALARM_SET_INDEX_OFFSET,
+    PDCD_ANALYSIS_SET_INDEX_OFFSET,
     PDCD_FFT_FIRST_VDPS_OFFSET,
     PDCD_FFT_LAST_VDPS_OFFSET,
     PDCD_TAG,
@@ -38,9 +40,13 @@ def _make_pdcd(
     waveform_first_stored: int = 0,
     waveform_first_vdfw_stored: int = 0,
     waveform_last_vdfw_stored: int = 0,
+    analysis_set_index: int = 0,
+    alarm_set_index: int = 0,
 ) -> bytes:
     record = _empty_record()
     record[TAG_OFFSET : TAG_OFFSET + 4] = PDCD_TAG
+    struct.pack_into("<H", record, PDCD_ANALYSIS_SET_INDEX_OFFSET, analysis_set_index)
+    struct.pack_into("<H", record, PDCD_ALARM_SET_INDEX_OFFSET, alarm_set_index)
     struct.pack_into("<I", record, PDCD_FFT_FIRST_VDPS_OFFSET, fft_first_stored)
     struct.pack_into("<I", record, PDCD_FFT_LAST_VDPS_OFFSET, fft_last_stored)
     struct.pack_into("<I", record, PDCD_WAVEFORM_FIRST_OFFSET, waveform_first_stored)
@@ -93,6 +99,19 @@ class TestParsePdcdLinks:
         assert links.waveform_first is None
         assert links.waveform_first_vdfw is None
         assert links.waveform_last_vdfw is None
+        assert links.analysis_set_index == 0
+        assert links.alarm_set_index == 0
+
+    def test_reads_parameter_set_indexes(self, reader_factory) -> None:
+        # The set indexes are plain u16 values (not +1-encoded pointers):
+        # M1H AG-100 carries (1, 5) = Estandar 1500 rpm (S) / Motor
+        # Horizontal P<300 kW (S) — FORMAT §5.8.
+        pdcd = _make_pdcd(analysis_set_index=1, alarm_set_index=5)
+        records = [_make_header(), pdcd] + [_empty_record()] * 10
+        with reader_factory(records) as reader:
+            links = parse_pdcd_links(reader, 1)
+        assert links.analysis_set_index == 1
+        assert links.alarm_set_index == 5
 
     def test_rejects_record_with_wrong_tag(self, reader_factory) -> None:
         records = [_make_header(), _empty_record()]  # rec 1 has no pdcd tag
