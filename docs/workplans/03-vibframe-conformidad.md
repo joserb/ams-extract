@@ -1,11 +1,17 @@
+---
+status: in-progress
+created: 2026-07-10
+updated: 2026-07-20
+---
+
 # Plan: alinear `rbm export` con VibFrame v0.1 y cerrar los huecos del export
 
-**Fecha**: 2026-07-10 (actualizado 2026-07-19) · **Estado**: en curso —
+**Fecha**: 2026-07-10 (actualizado 2026-07-20) · **Estado**: en curso —
 conformidad base cerrada (`f17bb9c`), bandas vddt + `path=[área]` emitidas
 (`2c5e1fe`, ADR-0010), etiquetado canónico vía mapper operativo (§4,
-ADR-0011) y decode de `pdpa`/`pdla` con límites de banda + columna `alarm`
-derivada (ADR-0012, FORMAT §5.8); quedan los trends de aceleración, la
-columna "1-20 KHz" y el contexto de operación.
+ADR-0011), decode de `pdpa`/`pdla` con límites de banda + columna `alarm`
+derivada (ADR-0012, FORMAT §5.8), trends de aceleración y "1-20 KHz"
+(ADR-0013/0014) y contexto de operación `speed`/`load` (ADR-0015).
 Para ejecutar por un agente desde este repo, sin más contexto que este
 documento y las referencias.
 
@@ -51,11 +57,14 @@ Checklist contra `VIBFRAME.md`:
       `trends`/`metrics` y sin `config_generations` en machine.json.
 - [x] Identidad de serie `(metric_id, config_id)` y join limpio
       trends ↔ metrics.
-- [ ] `machine.json` valida contra `MachineDoc` (probarlo en un test con
-      vibsynth-contracts como dev-dependency opcional, skip si no está).
-- [ ] Contexto de operación como métricas reservadas `speed`/`load`/`state`
-      si el `.rbm` lo trae (canónicas de contexto, regla `RESERVED` — ver
-      spec §"Reserved context metrics").
+- [x] `machine.json` valida contra `MachineDoc` — hecho 2026-07-20:
+      vibsynth-contracts es dev-dependency editable (`[tool.uv.sources]` →
+      `../../vibsynth/vibsynth-contracts`) y el test ya corre sin skip.
+- [x] Contexto de operación como métricas reservadas `speed`/`load` —
+      hecho 2026-07-20 (ADR-0015): una lectura por captura desde el
+      RPM/CARGA de vdps/vdfw, machine-level (`point_id` null), speed en Hz
+      (= RPM de análisis / 60, caveat ADR-0013), load en %, dedupe de
+      filas exactas; AMS no tiene `state`.
 
 ### 3. Emitir lo decodificado que hoy se descarta
 
