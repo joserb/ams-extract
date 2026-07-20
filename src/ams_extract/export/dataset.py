@@ -72,6 +72,11 @@ VALID_TYPES = frozenset({FFT, WAVEFORM, TREND})
 CONFIG_ID = ""
 TREND_METRIC_NAME_VELOCITY = "overall_velocity_rms"
 TREND_METRIC_NAME_ACCELERATION = "overall_acceleration_rms"
+# Reserved machine-level operating-context metric ids (VibFrame spec,
+# "Reserved context metrics"). AMS has no machine state -> no "state".
+CONTEXT_METRIC_SPEED = "speed"
+CONTEXT_METRIC_LOAD = "load"
+CONTEXT_METRIC_UNITS = {CONTEXT_METRIC_SPEED: "Hz", CONTEXT_METRIC_LOAD: "%"}
 
 
 @dataclass(frozen=True)
@@ -453,6 +458,79 @@ def _metric_row(trend: Trend, point: Point) -> dict[str, Any]:
     }
 
 
+def _context_trend_rows(
+    captures: Iterable[tuple[int, float, float]],
+) -> list[dict[str, Any]]:
+    """Machine-level ``speed``/``load`` readings from capture context.
+
+    ``captures`` yields ``(t_us, rpm, carga_pct)`` from every spectrum and
+    waveform of the machine. ``speed`` is the AMS analysis RPM / 60 (Hz;
+    it may differ from the physical shaft speed, ADR-0013/ADR-0015);
+    readings with rpm <= 0 are skipped. ``load`` is the CARGA % field
+    emitted as-is (0.0 and 100.0 are valid readings). Exact duplicates
+    (same t + metric + value) collapse: spectrum and waveform of the same
+    point/timestamp share the rpm.
+    """
+    seen: set[tuple[int, str, float]] = set()
+    rows: list[dict[str, Any]] = []
+    for t_us, rpm, carga_pct in captures:
+        readings: list[tuple[str, float]] = [(CONTEXT_METRIC_LOAD, float(carga_pct))]
+        if rpm > 0:
+            readings.append((CONTEXT_METRIC_SPEED, rpm / 60.0))
+        for metric_id, value in readings:
+            key = (t_us, metric_id, value)
+            if key in seen:
+                continue
+            seen.add(key)
+            rows.append(
+                {
+                    "t": t_us,
+                    "metric_id": metric_id,
+                    "value": value,
+                    "alarm": None,
+                    "config_id": CONFIG_ID,
+                }
+            )
+    rows.sort(key=lambda r: (r["metric_id"], r["t"]))
+    return rows
+
+
+def _context_metric_row(metric_id: str, machine_id: str) -> dict[str, Any]:
+    """Descriptor for a reserved machine-level context metric.
+
+    Reserved ids are literal (no point suffix) with ``point_id`` null; the
+    canonical labelling stays null like every other metric — it is a
+    post-process with t8-mapper (ADR-0011), whose engine resolves these
+    ids through its RESERVED rule.
+    """
+    return {
+        "metric_id": metric_id,
+        "config_id": CONFIG_ID,
+        "point_id": None,
+        "proc_mode_id": None,
+        "name": metric_id,
+        "path": f"{machine_id}:{metric_id}",
+        "statistic": "value",
+        "signal_family": "non_vibration",
+        "detector": None,
+        "unit": CONTEXT_METRIC_UNITS[metric_id],
+        "integrate": None,
+        "band_type": "none",
+        "band_low_hz": None,
+        "band_high_hz": None,
+        "band_low_order": None,
+        "band_high_order": None,
+        "frequency_role": None,
+        "harmonic_orders": None,
+        "n_sidebands": None,
+        "modulator": None,
+        "flags": [],
+        "canonical_metric": None,
+        "proxy_quality": None,
+        "mapping_rule": None,
+    }
+
+
 def _process_equipment(
     reader: RbmReader,
     source_path: str,
@@ -470,12 +548,16 @@ def _process_equipment(
         trend_rows: list[dict[str, Any]] = []
         metric_rows: dict[str, dict[str, Any]] = {}
         proc_modes: dict[tuple[str, str], dict[str, Any]] = {}
+        # (t_us, rpm, carga_pct) of every capture: machine-level context.
+        context_captures: list[tuple[int, float, float]] = []
         param_sets = ParamSetIndex.load(reader) if TREND in types else None
 
         for point in equipment.points:
             if FFT in types:
                 for spectrum in walk_spectra(reader, point):
-                    spectra_rows.append(_spectrum_row(spectrum, point))
+                    row = _spectrum_row(spectrum, point)
+                    spectra_rows.append(row)
+                    context_captures.append((row["t"], spectrum.rpm, spectrum.carga_pct))
                     _add_proc_mode(
                         proc_modes,
                         point_id=point.short_code,
@@ -486,7 +568,9 @@ def _process_equipment(
                     )
             if WAVEFORM in types:
                 for waveform in walk_waveforms(reader, point):
-                    wave_rows.append(_waveform_row(waveform, point))
+                    row = _waveform_row(waveform, point)
+                    wave_rows.append(row)
+                    context_captures.append((row["t"], float(waveform.rpm), waveform.carga_pct))
                     _add_proc_mode(
                         proc_modes,
                         point_id=point.short_code,
@@ -510,6 +594,12 @@ def _process_equipment(
                             metric_rows[_band_metric_id(point, band)] = _band_metric_row(
                                 band, point
                             )
+
+        context_rows = _context_trend_rows(context_captures)
+        if context_rows:
+            trend_rows.extend(context_rows)
+            for metric_id in sorted({r["metric_id"] for r in context_rows}):
+                metric_rows[metric_id] = _context_metric_row(metric_id, equipment.short_code)
 
         machine_dir = _machine_dir(out_dir, equipment)
         _write_json(

@@ -901,3 +901,56 @@ plot — la derivación de alarma de ADR-0012 aplica sin cambios.
   superado / valor bajo?), como la "Advertencia" ~0,95 G's de ADR-0013.
   Siguen sin localizar en el binario; la columna `alarm` derivada no los
   refleja.
+
+## ADR-0015 — Contexto de operación: métricas reservadas `speed`/`load` a nivel de máquina
+
+- **Fecha**: 2026-07-20
+- **Estado**: aceptada
+
+### Contexto
+
+VibFrame reserva ids de métrica de contexto de operación a nivel de máquina
+(spec §"Reserved context metrics"): `speed`, `load` y `state`, con
+`metric_id` literal (sin sufijo de punto) y `point_id` null. t8-extract ya
+los emite desde sus snapshots; `rbm export` no emitía ninguno y el mapper
+tenía que estimar la velocidad de referencia con la mediana de
+`spectra.speed_hz` (workplan 03 §4).
+
+AMS sí trae el dato: cada captura de espectro (`vdps.0x28` RPM,
+`vdps.0x2C` CARGA %) y de waveform (`vdfw.0x38`, `vdfw.0x3C`) lleva RPM y
+CARGA. No hay estado de máquina en el `.rbm` → no hay `state` que emitir.
+
+### Decisión
+
+1. `rbm export` emite POR MÁQUINA las métricas reservadas `speed` y `load`
+   con una lectura de contexto por captura (espectros y waveforms):
+   - `speed`: valor = rpm / 60.0 en **Hz**. OJO: esa RPM es la **RPM de
+     análisis que fija AMS** (ADR-0013), puede diferir de la velocidad
+     física — se emite lo que declara el origen. Lecturas con rpm ≤ 0 no
+     se emiten.
+   - `load`: el campo CARGA % tal cual, unidad `%` (0.0 y 100.0 son
+     lecturas válidas).
+2. Descriptor machine-level en `metrics.parquet`: `metric_id` literal
+   (`"speed"`/`"load"`), `point_id=None`, `path="<machine>:<id>"`,
+   `statistic="value"`, `signal_family="non_vibration"`,
+   `band_type="none"`. `canonical_metric`/`proxy_quality`/`mapping_rule`
+   quedan null como el resto: el etiquetado es post-proceso con t8-mapper
+   (ADR-0011), cuyo motor resuelve estos ids por la regla RESERVED
+   (`CONTEXT_CANONICAL_METRICS`).
+3. Filas en `trends.parquet`: `t` (µs UTC), `value`, `alarm=None`,
+   `config_id=""`. Dentro de una máquina se deduplican filas exactas
+   (mismo `t` + `metric_id` + `value`): espectro y waveform del mismo
+   punto/timestamp comparten rpm.
+4. **No se emite `state`**: AMS no tiene estados de máquina.
+
+### Consecuencias
+
+- El mapper deja de depender del fallback por mediana de
+  `spectra.speed_hz` en datasets AMS: la reserva `speed` da la velocidad
+  declarada por captura.
+- Nota sobre AG-100 (DEPURADORA): sus capturas almacenan rpm=1455 en
+  TODAS las cadenas (vdps y vdfw) → `speed` = 24.25 Hz uniforme; el
+  desdoble análisis 2920 / física 1455 citado en ADR-0013 no aparece en
+  las capturas almacenadas de esa máquina.
+- `trends.parquet` de máquinas exportadas solo con `--types fft,waveform`
+  deja de estar vacío: lleva las filas de contexto.

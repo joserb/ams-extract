@@ -15,6 +15,8 @@ from ams_extract.export.dataset import (
     _band_metric_row,
     _band_trend_rows,
     _build_machine_doc,
+    _context_metric_row,
+    _context_trend_rows,
     _metric_row,
     _spectrum_row,
     _trend_rows,
@@ -245,6 +247,61 @@ class TestTrendMetricDescriptor:
         assert _trend_rows(trend, point)[0]["metric_id"] == (
             "overall_acceleration_rms__M1P"
         )
+
+
+class TestContextMetrics:
+    def test_speed_descriptor_is_machine_level_and_reserved(self) -> None:
+        row = _context_metric_row("speed", "AG-100")
+        assert row["metric_id"] == "speed"  # literal reserved id, no point suffix
+        assert row["point_id"] is None
+        assert row["name"] == "speed"
+        assert row["path"] == "AG-100:speed"
+        assert row["statistic"] == "value"
+        assert row["signal_family"] == "non_vibration"
+        assert row["unit"] == "Hz"
+        assert row["band_type"] == "none"
+        # Canonical labelling is a t8-mapper post-process (ADR-0011).
+        assert row["canonical_metric"] is None
+        assert row["proxy_quality"] is None
+        assert row["mapping_rule"] is None
+
+    def test_load_descriptor_unit_is_percent(self) -> None:
+        row = _context_metric_row("load", "DT-0070")
+        assert row["metric_id"] == "load"
+        assert row["path"] == "DT-0070:load"
+        assert row["unit"] == "%"
+        assert row["point_id"] is None
+
+    def test_speed_is_analysis_rpm_over_60_and_load_as_is(self) -> None:
+        rows = _context_trend_rows([(1_000, 2920.0, 75.0)])
+        by_metric = {r["metric_id"]: r for r in rows}
+        assert by_metric["speed"]["value"] == pytest.approx(2920.0 / 60.0)
+        assert by_metric["load"]["value"] == 75.0
+        for row in rows:
+            assert row["t"] == 1_000
+            assert row["alarm"] is None
+            assert row["config_id"] == ""
+
+    def test_rpm_zero_or_negative_emits_no_speed_but_keeps_load(self) -> None:
+        rows = _context_trend_rows([(1_000, 0.0, 0.0), (2_000, -1.0, 100.0)])
+        assert [r["metric_id"] for r in rows] == ["load", "load"]
+        # 0.0 and 100.0 are valid load readings, emitted as-is.
+        assert [r["value"] for r in rows] == [0.0, 100.0]
+
+    def test_exact_duplicates_collapse_across_captures(self) -> None:
+        # Spectrum and waveform of the same point/timestamp share the rpm:
+        # one reading per (t, metric, value), not per capture.
+        capture = (1_000, 1500.0, 50.0)
+        rows = _context_trend_rows([capture, capture])
+        assert len(rows) == 2
+        assert {r["metric_id"] for r in rows} == {"speed", "load"}
+
+    def test_distinct_values_at_same_timestamp_are_kept(self) -> None:
+        # Analysis RPM can differ between captures (ADR-0013): keep both.
+        rows = _context_trend_rows([(1_000, 2920.0, 50.0), (1_000, 1455.0, 50.0)])
+        speeds = sorted(r["value"] for r in rows if r["metric_id"] == "speed")
+        assert speeds == [pytest.approx(1455.0 / 60.0), pytest.approx(2920.0 / 60.0)]
+        assert sum(1 for r in rows if r["metric_id"] == "load") == 1
 
 
 class TestRbmExportCommand:

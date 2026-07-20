@@ -109,6 +109,39 @@ def test_export_parallel_matches_serial(real_rbm: Path, tmp_path: Path) -> None:
     assert serial_rows > 0
 
 
+def test_export_emits_machine_level_context_metrics(real_rbm: Path, tmp_path: Path) -> None:
+    out = tmp_path / "dataset"
+    _export_depuradora(real_rbm, out)
+
+    machine_dir = _find_machine_dir(out, "AG-100")
+    metric_rows = pq.read_table(machine_dir / "metrics.parquet").to_pylist()
+    metrics = {m["metric_id"]: m for m in metric_rows}
+
+    for metric_id, unit in (("speed", "Hz"), ("load", "%")):
+        metric = metrics[metric_id]
+        assert metric["point_id"] is None
+        assert metric["statistic"] == "value"
+        assert metric["signal_family"] == "non_vibration"
+        assert metric["unit"] == unit
+        assert metric["canonical_metric"] is None  # labelled post-hoc (ADR-0011)
+
+    trend_rows = pq.read_table(machine_dir / "trends.parquet").to_pylist()
+    speeds = [r["value"] for r in trend_rows if r["metric_id"] == "speed"]
+    assert speeds
+    # AG-100 stores rpm=1455 (the 1455 nominal of ADR-0013) in every vdps
+    # and vdfw capture -> 24.25 Hz; the analysis-vs-physical split of
+    # ADR-0013 does not show up in this machine's stored captures.
+    assert any(abs(v - 24.25) < 0.05 for v in speeds)
+    assert all(0.0 < v < 100.0 for v in speeds)
+    # Spectrum and waveform of the same point/timestamp share the rpm:
+    # exact duplicates collapse, so 5 captures -> 5 speed readings for M1H.
+    speed_keys = [(r["t"], r["value"]) for r in trend_rows if r["metric_id"] == "speed"]
+    assert len(speed_keys) == len(set(speed_keys))
+    loads = [r["value"] for r in trend_rows if r["metric_id"] == "load"]
+    assert loads
+    assert all(0.0 <= v <= 100.0 for v in loads)
+
+
 def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
     out = tmp_path / "dataset"
     _export_depuradora(real_rbm, out, types="trend")
