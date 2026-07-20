@@ -110,6 +110,17 @@ capturas de AMS.
 |---|---|---|
 | 2026-05-31 | BUNGE completo, `--parallel 4` | **18,6 s**; 15 áreas, 311/347 equipos con datos, **0 fallos**; **137.270 FFT + 137.208 waveform = 274.478** (cuadra exacto con AMS); 622 Parquet, 1,3 GB; carga Hive OK |
 
+### Máquinas sin muestras (GT 2026-07-20)
+
+36/347 equipos de BUNGE exportan 0 filas en todos sus parquets. Verificado
+contra AMS (screenshot PM-500 vs PM-501): son máquinas **vacías también en
+AMS** — puntos definidos pero sin ningún espectro/waveform/tendencia
+guardados. En el binario: 15 tienen puntos sin cadenas (`pdcd` sin heads,
+como PM-501) y 21 tienen cadenas de configuración cuyos walkers producen 0
+muestras (spot-check: CF-4900, PM-9765-A, PM-9606-A y el gemelo duplicado
+REDUCTOR TOASTER DT-0070). 11 de las 36 están en OBSOLETOS. El export no
+pierde nada.
+
 ### Pendiente de verificación visual
 
 - 8 áreas grandes restantes (conteos locked en tests de integración, pero
