@@ -39,7 +39,11 @@ dev = [
     "pytest>=8.0",
     "ruff>=0.6",
     "pyright>=1.1.380",
+    "vibsynth-contracts",
 ]
+
+[tool.uv.sources]
+vibsynth-contracts = { path = "../../vibsynth/vibsynth-contracts", editable = true }
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ams_extract"]
