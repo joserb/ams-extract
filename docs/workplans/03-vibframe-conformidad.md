@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: completed
 created: 2026-07-10
 updated: 2026-07-20
 ---
@@ -140,9 +140,11 @@ así que la desviación asumida en ADR-0010 §3 ya es conforme a la spec.
 - [x] **`spectra.speed_hz` corregido** (ADR-0013): `vdps.0x28` es la RPM
   del análisis que fija AMS (captura: 2900 = crudo), no "RPM × 2"; fuera
   el `/2` del decode. Re-etiquetar datasets tras re-exportar.
-- [ ] Nivel "Advertencia" de las gráficas AMS (~0,95 G's) ≠ C/D del pdla:
-  sin localizar en el binario. Mismo caso: marcas "Bs"/"Vl" de la columna
-  ALARM en "Lista Ptos de Tendc" (DT-0070 M1P) que tampoco cruzan los C/D.
+- Nota (investigación abierta, fuera del alcance de este plan — registrada
+  en los pendientes de FORMAT §5.8): el nivel "Advertencia" de las gráficas
+  AMS (~0,95 G's) y las marcas "Bs"/"Vl" de la columna ALARM en "Lista Ptos
+  de Tendc" no cruzan los umbrales C/D del pdla — alarmas blandas de AMS
+  sin localizar en el binario. No bloquean la conformidad VibFrame.
 
 ### 6. Cierre del 2026-07-20 (informe de tendencia del usuario)
 
