@@ -96,12 +96,13 @@ capturas de AMS.
 | 2026-05-29 | AG-100 M1H | 2020-02-19 | Pk(-) | -0.510 G | -0.510 G | ✓ |
 | 2026-05-31 | CONTRA INCENDIOS PM-0CI/1 M LOA H | — | unidades | mm/s | mm/s | ✓ velocidad ×25.4 (regresión del leak in/s) |
 
-### Tendencia "Valores Globales" (`vddt`, mm/s)
+### Tendencia "Valores Globales" (`vddt`)
 
 | Fecha | Punto | Gold | Resultado |
 |---|---|---|---|
 | 2026-05-30 | AG-100 M1H | PLOTDATA "Valore Globale" (47 filas) | **47/47** exacto (fecha + valor, incl. duplicado 13-jul-2017 y pico 36.43 mm/s) |
 | 2026-05-30 | AG-100 M1H (bandas) | PLOTDATA por banda (5 ficheros + Mp Wave) | **62/62** por banda (etiquetado de columnas) |
+| 2026-07-20 | DT-0070 M1P (PeakVue, G's) | "Lista Ptos de Tendc" (147 filas, 2013–2026) | **147/147** overall crudo = G's del informe (desv. máx 0.00005, el redondeo a 4 decimales); fechas ≤2 h (local vs UTC); umbrales pdla 1.5/3.0 G's = líneas ALERTA/Falla del plot (ADR-0014) |
 
 ### Export masivo (validación end-to-end)
 

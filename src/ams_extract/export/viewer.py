@@ -276,7 +276,7 @@ def _trend_png(dataset_dir: Path, row: dict[str, Any]) -> bytes:
     trend = Trend(
         record_num=0,
         point_record_num=0,
-        units="mm/s",
+        units=row.get("unit") or "mm/s",
         timestamps_utc=tuple(_dt_from_us(x["t"]) for x in rows),
         overall=np.asarray([x["value"] for x in rows], dtype=np.float32),
     )

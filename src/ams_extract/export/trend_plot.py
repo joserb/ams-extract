@@ -1,9 +1,10 @@
 """Render a "Valores Globales" trend to PNG via matplotlib.
 
 ``rbm extract --type trend`` emits one PNG per point so the analyst can
-visually compare the overall RMS velocity series against the AMS trend
-plot. The Y-axis is in calibrated display units (mm/s; the inch->mm scale
-applied in :func:`ams_extract.tree.walk_trends`), the X-axis is time.
+visually compare the overall RMS series against the AMS trend plot. The
+Y-axis is in calibrated display units (mm/s for velocity points, G's for
+PeakVue/HF points; scales applied in
+:func:`ams_extract.tree.walk_trends`), the X-axis is time.
 """
 
 # pyright: reportUnknownMemberType=false, reportUnknownVariableType=false

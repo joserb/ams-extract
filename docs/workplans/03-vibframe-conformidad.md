@@ -132,7 +132,16 @@ así que la desviación asumida en ADR-0010 §3 ya es conforme a la spec.
   del análisis que fija AMS (captura: 2900 = crudo), no "RPM × 2"; fuera
   el `/2` del decode. Re-etiquetar datasets tras re-exportar.
 - [ ] Nivel "Advertencia" de las gráficas AMS (~0,95 G's) ≠ C/D del pdla:
-  sin localizar en el binario.
+  sin localizar en el binario. Mismo caso: marcas "Bs"/"Vl" de la columna
+  ALARM en "Lista Ptos de Tendc" (DT-0070 M1P) que tampoco cruzan los C/D.
+
+### 6. Cierre del 2026-07-20 (informe de tendencia del usuario)
+
+- [x] **Tendencias de aceleración emitidas** (ADR-0014): overall PeakVue/HF
+  crudo en G's, escala ×1, validado **147/147** contra la "Lista Ptos de
+  Tendc" de DT-0070 M1P; métrica `overall_acceleration_rms` (`unit=g`,
+  `signal_family=acceleration`) + banda Mp Wave y umbrales pdla en G's.
+  Desbloquea ~1 751 puntos PeakVue/HF con cadena en BUNGE.
 
 ## Validación
 

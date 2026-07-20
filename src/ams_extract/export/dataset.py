@@ -70,7 +70,8 @@ WAVEFORM = "waveform"
 TREND = "trend"
 VALID_TYPES = frozenset({FFT, WAVEFORM, TREND})
 CONFIG_ID = ""
-TREND_METRIC_NAME = "overall_velocity_rms"
+TREND_METRIC_NAME_VELOCITY = "overall_velocity_rms"
+TREND_METRIC_NAME_ACCELERATION = "overall_acceleration_rms"
 
 
 @dataclass(frozen=True)
@@ -201,8 +202,14 @@ def _waveform_mode_id(waveform: Waveform) -> str:
     return f"WAVE_{_proc_prefix(waveform.units)}_{_fmt_num(waveform.sample_rate_hz)}"
 
 
-def _trend_metric_id(point: Point) -> str:
-    return f"{TREND_METRIC_NAME}__{point.short_code}"
+def _trend_metric_name(trend: Trend) -> str:
+    if _signal_family(trend.units) == "acceleration":
+        return TREND_METRIC_NAME_ACCELERATION
+    return TREND_METRIC_NAME_VELOCITY
+
+
+def _trend_metric_id(trend: Trend, point: Point) -> str:
+    return f"{_trend_metric_name(trend)}__{point.short_code}"
 
 
 def _slug(name: str) -> str:
@@ -346,7 +353,7 @@ def _alarm_at(alarms: Sequence[int | None], i: int) -> int | None:
 
 
 def _trend_rows(trend: Trend, point: Point) -> list[dict[str, Any]]:
-    metric_id = _trend_metric_id(point)
+    metric_id = _trend_metric_id(trend, point)
     return [
         {
             "t": _timestamp_us(trend.timestamps_utc[i]),
@@ -416,19 +423,19 @@ def _band_metric_row(band: TrendBand, point: Point) -> dict[str, Any]:
     }
 
 
-def _metric_row(point: Point) -> dict[str, Any]:
-    metric_id = _trend_metric_id(point)
+def _metric_row(trend: Trend, point: Point) -> dict[str, Any]:
+    name = _trend_metric_name(trend)
     return {
-        "metric_id": metric_id,
+        "metric_id": _trend_metric_id(trend, point),
         "config_id": CONFIG_ID,
         "point_id": point.short_code,
         "proc_mode_id": None,
-        "name": TREND_METRIC_NAME,
-        "path": f"{point.short_code}:{TREND_METRIC_NAME}",
+        "name": name,
+        "path": f"{point.short_code}:{name}",
         "statistic": "spectrum_rms",
-        "signal_family": "velocity",
+        "signal_family": _signal_family(trend.units),
         "detector": "rms",
-        "unit": "mm/s",
+        "unit": _canonical_unit(trend.units),
         "integrate": False,
         "band_type": "none",
         "band_low_hz": None,
@@ -493,7 +500,9 @@ def _process_equipment(
                     rows = _trend_rows(trend, point)
                     if rows:
                         trend_rows.extend(rows)
-                        metric_rows[_trend_metric_id(point)] = _metric_row(point)
+                        metric_rows[_trend_metric_id(trend, point)] = _metric_row(
+                            trend, point
+                        )
                     for band in trend.bands:
                         band_rows = _band_trend_rows(band, point)
                         if band_rows:

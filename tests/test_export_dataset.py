@@ -15,11 +15,13 @@ from ams_extract.export.dataset import (
     _band_metric_row,
     _band_trend_rows,
     _build_machine_doc,
+    _metric_row,
     _spectrum_row,
+    _trend_rows,
     _waveform_row,
     export_dataset,
 )
-from ams_extract.models import Equipment, Point, Spectrum, TrendBand, Waveform
+from ams_extract.models import Equipment, Point, Spectrum, Trend, TrendBand, Waveform
 
 runner = CliRunner()
 
@@ -203,6 +205,46 @@ class TestBandExport:
         band = _make_band("HOLGURAS", "mm/s", alert=1.4, danger=2.2, alarms=(2,))
         rows = _band_trend_rows(band, self.point)
         assert rows[0]["alarm"] == 2
+
+
+def _make_trend(units: str) -> Trend:
+    return Trend(
+        record_num=10,
+        point_record_num=1,
+        units=units,
+        timestamps_utc=(datetime(2020, 1, 1, tzinfo=UTC),),
+        overall=np.asarray([0.5], dtype=np.float32),
+    )
+
+
+class TestTrendMetricDescriptor:
+    def test_velocity_trend_descriptor(self) -> None:
+        point = Point(record_num=1, long_name="MOTOR LOA HORIZONTAL", short_code="M1H")
+        row = _metric_row(_make_trend("mm/s"), point)
+        assert row["metric_id"] == "overall_velocity_rms__M1H"
+        assert row["name"] == "overall_velocity_rms"
+        assert row["path"] == "M1H:overall_velocity_rms"
+        assert row["signal_family"] == "velocity"
+        assert row["unit"] == "mm/s"
+
+    def test_acceleration_trend_descriptor(self) -> None:
+        # PeakVue/HF overall trends are raw G's (validated 147/147 against
+        # the "Lista Ptos de Tendc" gold of DT-0070 M1P, ADR-0014).
+        point = Point(
+            record_num=1, long_name="Motor Lado Libre Peakvue", short_code="M1P"
+        )
+        trend = _make_trend("G's")
+        row = _metric_row(trend, point)
+        assert row["metric_id"] == "overall_acceleration_rms__M1P"
+        assert row["name"] == "overall_acceleration_rms"
+        assert row["path"] == "M1P:overall_acceleration_rms"
+        assert row["signal_family"] == "acceleration"
+        assert row["unit"] == "g"
+        assert row["statistic"] == "spectrum_rms"
+        assert row["detector"] == "rms"
+        assert _trend_rows(trend, point)[0]["metric_id"] == (
+            "overall_acceleration_rms__M1P"
+        )
 
 
 class TestRbmExportCommand:

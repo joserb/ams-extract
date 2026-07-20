@@ -372,6 +372,77 @@ def test_trend_overall_matches_ams_gold(real_rbm: Path) -> None:
     assert float(trend.overall[38]) == pytest.approx(36.43, abs=0.02)
 
 
+# AMS "Lista Ptos de Tendc" for DT-0070 M1P (Motor Lado Libre Peakvue),
+# "Valore Globale (RMSAceleración en G-s)" — all 147 readings, top-to-bottom,
+# 17-ene-13 .. 25-mar-26. Validated against the AMS export 2026-07-20 with a
+# max deviation of 0.00005 (the report's own 4-decimal rounding): the raw
+# vddt overall IS the plotted G's value, scale 1 (ADR-0014).
+_M1P_TREND_GOLD_G = (
+    0.2923, 0.6540, 0.2624, 0.2867, 0.2807, 0.2280, 0.0540, 0.1277,
+    0.2544, 0.1094, 0.1601, 0.1191, 0.1613, 0.2423, 0.1125, 0.3773,
+    0.3842, 0.0781, 0.2747, 0.9212, 0.5234, 0.1399, 0.1138, 0.0948,
+    0.6105, 0.7677, 0.5187, 0.2928, 0.1938, 0.2448, 0.2438, 0.7515,
+    0.6700, 0.5320, 0.3246, 0.2551, 0.0982, 0.1158, 0.1560, 0.1393,
+    0.1655, 0.1480, 0.1384, 0.1378, 0.0854, 0.0984, 0.0795, 0.1034,
+    0.0846, 0.0771, 0.0747, 0.1802, 0.0878, 0.0731, 0.0744, 0.0775,
+    0.0667, 0.0739, 0.0698, 0.0730, 0.0720, 0.0906, 0.1130, 0.1014,
+    0.1482, 0.0807, 0.0749, 0.0770, 0.0940, 0.0796, 0.1273, 0.1008,
+    0.0840, 0.1186, 0.0712, 0.0798, 0.1198, 0.1706, 0.1850, 0.1832,
+    0.1821, 0.1053, 0.2373, 0.3345, 0.2859, 0.1454, 0.1089, 0.3141,
+    0.1822, 0.1107, 0.2327, 0.2111, 0.1119, 0.1384, 0.7271, 0.1468,
+    0.1704, 0.1336, 0.2831, 0.1181, 0.1382, 0.3662, 0.2226, 0.1259,
+    0.2541, 0.3750, 0.0652, 0.1662, 0.2602, 0.3314, 0.3639, 0.8158,
+    0.3335, 0.2696, 0.1385, 0.7298, 0.2896, 0.7532, 0.2222, 0.4571,
+    0.4829, 0.2021, 0.5526, 0.1421, 0.1352, 0.5340, 0.0975, 0.1003,
+    0.5635, 0.0917, 0.0844, 0.0871, 0.0744, 0.0840, 0.0741, 0.0707,
+    0.0772, 0.6053, 0.0353, 0.0213, 0.1021, 0.1225, 0.1522, 0.0596,
+    0.1486, 0.0848, 0.1846,
+)
+
+
+def test_peakvue_trend_overall_matches_ams_gold(real_rbm: Path) -> None:
+    # Acceleration (PeakVue) trends must reproduce the AMS "Lista Ptos de
+    # Tendc" table exactly: the overall is raw G's, scale 1 — no x25.4.
+    with RbmReader(real_rbm) as reader:
+        point = next(
+            p
+            for area in walk_hierarchy(reader)
+            if area.long_name.startswith("EXTRACCION")
+            for eq in area.equipment
+            if "DT-0070" in eq.long_name
+            for p in eq.points
+            if p.long_name == "Motor Lado Libre Peakvue"
+        )
+        trend = next(walk_trends(reader, point))
+
+    assert trend.units == "G's"
+    assert len(trend.overall) == len(_M1P_TREND_GOLD_G) == 147
+
+    for i, gold in enumerate(_M1P_TREND_GOLD_G):
+        assert float(trend.overall[i]) == pytest.approx(gold, abs=0.0001), (
+            f"reading {i} ({trend.timestamps_utc[i]:%Y-%m-%d}): "
+            f"decoded {float(trend.overall[i]):.4f} vs gold {gold:.4f}"
+        )
+
+    assert trend.timestamps_utc[0].strftime("%Y-%m-%d") == "2013-01-17"
+    assert trend.timestamps_utc[-1].strftime("%Y-%m-%d") == "2026-03-25"
+    # The series peak sits on 2014-08-05 (matches the AMS plot).
+    assert trend.timestamps_utc[19].strftime("%Y-%m-%d") == "2014-08-05"
+
+    # Overall thresholds from the "Peakvue HP 1kHz (P)" pdla set, in G's —
+    # the ALERTA/Falla lines on the AMS plot.
+    assert trend.alert == pytest.approx(1.5)
+    assert trend.danger == pytest.approx(3.0)
+
+    # The "Peakvue HP 1000 Hz (P)" template carries one band: Mp Wave, a raw
+    # acceleration peak in G's with its own 8/12 G's thresholds.
+    assert [b.name for b in trend.bands] == ["Mp Wave"]
+    mp_wave = trend.bands[0]
+    assert mp_wave.units == "G's"
+    assert mp_wave.alert == pytest.approx(8.0)
+    assert mp_wave.danger == pytest.approx(12.0)
+
+
 def test_velocity_waveform_calibrated_to_mm_s(real_rbm: Path) -> None:
     # Velocity waveforms (vdfw units plg/segs / in/sec) must be converted to
     # mm/s (x25.4), like the velocity FFT/trend — not leaked in inches/sec.

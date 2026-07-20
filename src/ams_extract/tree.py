@@ -607,10 +607,10 @@ def _summarize_waveforms(reader: RbmReader, first_vdfw: int | None) -> TypeSumma
 
 
 def _summarize_trend(reader: RbmReader, links: PdcdLinks) -> TypeSummary:
-    """Summarize emitted (velocity) trend readings for a point."""
+    """Summarize emitted trend readings for a point."""
     if links.trend_first_vddt is None:
         return TypeSummary.empty()
-    if _point_spectrum_units(reader, links) not in VELOCITY_UNITS_RAW:
+    if _trend_overall_calibration(_point_spectrum_units(reader, links)) is None:
         return TypeSummary.empty()
     try:
         records = list(walk_vddt_chain(reader, links.trend_first_vddt))
@@ -699,6 +699,24 @@ def count_point_samples(reader: RbmReader, point: Point) -> tuple[int, int, int]
         summary.waveforms.count,
         summary.trend.count,
     )
+
+
+def _trend_overall_calibration(
+    units_raw: str | None,
+) -> tuple[float, str, int] | None:
+    """Overall ``(scale, display_units, pdla_unit_code)`` for a trend point.
+
+    Velocity points store the overall in in/s (``x 25.4`` → mm/s, validated
+    47/47 against the M1H AG-100 gold). Acceleration points (PeakVue / HF)
+    store it directly in G's, scale 1 — validated 147/147 against the AMS
+    "Lista Ptos de Tendc" of DT-0070 M1P (FORMAT §5.7). Returns ``None``
+    for units that have no gold-confirmed overall scale.
+    """
+    if units_raw in VELOCITY_UNITS_RAW:
+        return (TREND_VELOCITY_SCALE_MM_S, "mm/s", THRESHOLD_UNIT_VELOCITY)
+    if units_raw in ACCEL_UNITS_RAW:
+        return (1.0, "G's", THRESHOLD_UNIT_ACCELERATION)
+    return None
 
 
 def _point_spectrum_units(reader: RbmReader, links: PdcdLinks) -> str | None:
@@ -832,14 +850,14 @@ def walk_trends(
     Walks ``vdpm.0x10 → pdcd → 0x3C → vddt → (chain via 0x10)``, decodes
     each ``vddt`` record's sample slots, and flattens the whole chain into a
     single :class:`~ams_extract.models.Trend` with the overall calibrated to
-    mm/s (FORMAT §5.7).
+    display units (FORMAT §5.7).
 
-    Only **velocity** points are emitted (overall ``x 25.4`` → mm/s), the
-    case validated 47/47 against the AMS gold. Acceleration points (PeakVue /
-    high-frequency, units ``G's``) decode structurally too, but the overall
-    scale is not yet gold-confirmed, so they are skipped with a log rather
-    than emitting unverified values (PLAN §7.4). A missing pdcd / first-vddt,
-    an undetermined unit, or an all-skipped chain yields no trend.
+    **Velocity** points emit the overall ``x 25.4`` → mm/s (validated 47/47
+    against the M1H AG-100 gold); **acceleration** points (PeakVue /
+    high-frequency, units ``G's``) emit it raw in G's, scale 1 (validated
+    147/147 against the AMS "Lista Ptos de Tendc" of DT-0070 M1P, ADR-0014).
+    A missing pdcd / first-vddt, an undetermined unit, or an all-skipped
+    chain yields no trend.
 
     The named band series come from the point's **analysis parameter set**
     (``pdcd.0xAC`` → pdpa template, FORMAT §5.8): readings whose stored
@@ -865,13 +883,15 @@ def walk_trends(
         return
 
     units_raw = _point_spectrum_units(reader, links)
-    if units_raw not in VELOCITY_UNITS_RAW:
+    calibration = _trend_overall_calibration(units_raw)
+    if calibration is None:
         _log.info(
-            "trend_skipped_non_velocity",
+            "trend_skipped_unknown_units",
             point=point.long_name,
             spectrum_units=units_raw,
         )
         return
+    overall_scale, overall_units, overall_unit_code = calibration
 
     try:
         records = list(walk_vddt_chain(reader, links.trend_first_vddt))
@@ -901,7 +921,7 @@ def walk_trends(
             analysis_set_index=links.analysis_set_index,
         )
     overall_alert_raw, overall_danger_raw = _threshold_pair(
-        limits, 0, THRESHOLD_UNIT_VELOCITY
+        limits, 0, overall_unit_code
     )
 
     timestamps: list[datetime] = []
@@ -930,7 +950,7 @@ def walk_trends(
             continue
         for reading in readings:
             timestamps.append(reading.timestamp_utc)
-            overall.append(reading.overall_raw * TREND_VELOCITY_SCALE_MM_S)
+            overall.append(reading.overall_raw * overall_scale)
             overall_alarms.append(
                 alarm_level(reading.overall_raw, overall_alert_raw, overall_danger_raw)
             )
@@ -971,15 +991,15 @@ def walk_trends(
     yield Trend(
         record_num=links.trend_first_vddt,
         point_record_num=point.record_num,
-        units="mm/s",
+        units=overall_units,
         timestamps_utc=tuple(timestamps),
         overall=np.asarray(overall, dtype=np.float32),
         bands=bands,
         alert=None
         if overall_alert_raw is None
-        else overall_alert_raw * TREND_VELOCITY_SCALE_MM_S,
+        else overall_alert_raw * overall_scale,
         danger=None
         if overall_danger_raw is None
-        else overall_danger_raw * TREND_VELOCITY_SCALE_MM_S,
+        else overall_danger_raw * overall_scale,
         alarms=tuple(overall_alarms),
     )

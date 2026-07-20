@@ -200,24 +200,27 @@ class TrendBand:
 
 @dataclass(frozen=True, slots=True)
 class Trend:
-    """The "Valores Globales" trend series for a point (overall RMS velocity).
+    """The "Valores Globales" trend series for a point (overall RMS).
 
     Reached through ``vdpm.0x10 → pdcd → 0x3C → vddt → (chain via 0x10)``.
-    Each ``vddt`` record holds a run of 41-byte sample slots; the whole
-    chain is flattened into the parallel ``timestamps_utc`` / ``overall``
-    arrays, oldest reading first (FORMAT §5.7, ADR-0006). Only the velocity
-    template is decoded; PeakVue / acceleration trends use a different,
-    not-yet-supported layout and are skipped by the walker.
+    Each ``vddt`` record holds a run of sample slots; the whole chain is
+    flattened into the parallel ``timestamps_utc`` / ``overall`` arrays,
+    oldest reading first (FORMAT §5.7, ADR-0006). The native unit comes
+    from the point's primary FFT measurement: velocity points calibrate to
+    mm/s, acceleration points (PeakVue / high-frequency) are raw G's.
 
     Attributes:
         record_num: Zero-based record number of the first ``vddt`` in the chain.
         point_record_num: Record number of the parent ``vdpm`` (point).
-        units: Display units of ``overall`` — ``"mm/s"`` for the calibrated
-            velocity trend.
+        units: Display units of ``overall`` — ``"mm/s"`` for velocity
+            points, ``"G's"`` for acceleration points.
         timestamps_utc: Reading timestamps, one per element of ``overall``,
             oldest first. Decoded via the off-by-one date rule (FORMAT §5.7).
-        overall: Calibrated overall value per reading (``raw * 25.4`` -> mm/s).
-            Validated 47/47 against the AMS PLOTDATA gold for M1H AG-100.
+        overall: Calibrated overall value per reading — ``raw * 25.4`` →
+            mm/s for velocity (validated 47/47 against the AMS PLOTDATA gold
+            for M1H AG-100), raw G's for acceleration (validated 147/147
+            against the "Lista Ptos de Tendc" gold for DT-0070 M1P,
+            ADR-0014).
         bands: Named band series decoded through the point's analysis
             parameter set (``pdpa``, FORMAT §5.8); empty when the point has
             no resolvable template or no reading matches its column count.

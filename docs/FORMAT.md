@@ -532,9 +532,11 @@ toma su fecha del `d0` de ese record.
 la medida primaria del punto (`vdps.0x78`): **velocidad** (`plg/segs`…) → el
 overall está en in/s y AMS muestra mm/s, `mm/s = raw × 25.4` (factor de
 conversión puro, distinto del 48.5 del FFT). **Aceleración** (`G's`,
-PeakVue/HF) → en G's. `walk_trends` emite hoy **solo velocidad** (mm/s);
-los trends de aceleración decodifican estructuralmente pero su escala de
-overall no está confirmada contra gold, así que se saltan (§7.4).
+PeakVue/HF) → **G's crudos, escala ×1** (confirmado 2026-07-20, ADR-0014:
+la "Lista Ptos de Tendc" de DT-0070 M1P coincide 147/147 con el crudo,
+desviación máx 0.00005 = redondeo del informe). `walk_trends` emite ambos;
+los puntos con cadena `vddt` pero sin espectro FFT (unidad indeterminable,
+322 en BUNGE) se siguen saltando con log.
 
 **Etiquetas de las bandas** (template de velocidad, `band_count=7`), cada
 columna validada **62/62** contra el PLOTDATA por-banda de M1H AG-100.
@@ -564,9 +566,15 @@ primeros 47 coinciden **EXACTO** (fecha + valor) con la tabla gold de AMS
 (`band_<slug>__<punto>`). Desde 2026-07-19 (ADR-0012) el etiquetado, los
 rangos de frecuencia y los umbrales por banda salen de la plantilla `pdpa`
 / set `pdla` del punto (§5.8) — se emiten las lecturas cuyo nº de columnas
-coincide con los slots activos de la plantilla actual; la columna "1-20
-KHz" (tipo `0x04`) sigue sin emitirse por escala sin gold. Los trends de
-aceleración siguen pendientes.
+coincide con los slots activos de la plantilla actual. Desde 2026-07-19
+(ADR-0013) la columna "1-20 KHz" (tipo `0x04`) se emite en G's crudos, y
+desde 2026-07-20 (ADR-0014) también los trends de aceleración PeakVue/HF
+(overall crudo en G's, métrica `overall_acceleration_rms`; su template
+"Peakvue HP 1000 Hz (P)" lleva una sola banda, Mp Wave, con umbrales
+propios 8/12 G's en el set "Peakvue HP 1kHz (P)"). OJO: los informes de
+tendencia de AMS marcan lecturas "Bs"/"Vl" que no cruzan los umbrales C/D
+del pdla — alarmas de otro tipo (¿baseline/valor bajo?) aún sin localizar
+en el binario, como la "Advertencia" de §5.8.
 
 ### 5.8 `pdpa` / `pdla` — plantillas de análisis y de límites de alarma
 

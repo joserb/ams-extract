@@ -848,3 +848,56 @@ cerraron dos incógnitas a la vez:
   de órdenes que AMS; hay que re-etiquetar los datasets exportados.
 - Nivel "Advertencia" de las gráficas (~0,95 G's en la captura) ≠ C/D del
   pdla: pendiente de localizar (FORMAT §5.8).
+
+## ADR-0014 — Tendencias de aceleración (PeakVue/HF) emitidas: overall crudo en G's
+
+- **Fecha**: 2026-07-20
+- **Estado**: aceptada
+
+### Contexto
+
+`walk_trends` emitía solo puntos de velocidad (overall ×25.4 → mm/s,
+validado 47/47 con M1H AG-100); los ~2 073 puntos de aceleración de BUNGE
+(PeakVue / alta frecuencia, units `G's`) decodificaban estructuralmente
+pero se saltaban por no tener gold de escala (ADR-0010 §3).
+
+Dos evidencias del usuario sobre DT-0070 M1P ("Motor Lado Libre Peakvue",
+área EXT) lo zanjaron:
+
+1. Captura "Gráf. tendencia / Valore Globale" + "RutaEspectro" (25-mar-26):
+   el GLOBAL del espectro PkVue-HP (0.1846 A-DG) coincide a 4 decimales
+   con el `overall_raw` de la última lectura del `vddt`, y la forma/pico
+   de la curva (máx ~0.92 al día ~564) con la serie decodificada.
+2. Informe "Lista Ptos de Tendc" con la tabla completa fecha+valor:
+   **147/147 lecturas idénticas** (desviación máx 0.00005 = redondeo a 4
+   decimales del informe; fechas con desfase ≤2 h por hora local vs UTC).
+
+Además, los umbrales del set pdla "Peakvue HP 1kHz (P)" (overall 1.5/3.0
+G's, Mp Wave 8.0/12.0 G's, unit_code 3) son las líneas ALERTA/Falla del
+plot — la derivación de alarma de ADR-0012 aplica sin cambios.
+
+### Decisión
+
+1. **El overall de los trends de aceleración se emite crudo en G's**
+   (escala ×1, sin ×25.4). `Trend.units = "G's"`; umbral overall del pdla
+   comprobado contra `unit_code` de aceleración (3), no de velocidad.
+2. La métrica VibFrame se llama **`overall_acceleration_rms`**
+   (`unit=g`, `signal_family=acceleration`, `statistic=spectrum_rms`,
+   `detector=rms`) — la de velocidad sigue siendo `overall_velocity_rms`.
+3. La banda del template PeakVue ("Mp Wave", tipo 0x0B) sale por el camino
+   ya validado de ADR-0010/0012: `band_mp_wave__<punto>`, true_peak en g,
+   umbrales 8/12 G's.
+
+### Consecuencias
+
+- BUNGE pasa de ~2 897 series de tendencia (velocidad) a ~4 648: se
+  suman 1 751 puntos PeakVue/HF con cadena `vddt`. Los 322 puntos con
+  cadena pero sin espectro FFT (unidad indeterminable) se siguen saltando.
+  Hay que re-exportar y re-etiquetar con el mapper (regla nueva para
+  `overall_acceleration_rms`).
+- La columna ALARM del informe trae marcas "Bs" (9 lecturas, Mp Wave
+  2.7–5.8 G's) y "Vl" (overall 0.0213, anómalamente bajo) que NO cruzan
+  los umbrales C/D del pdla: son otros tipos de alarma de AMS (¿baseline
+  superado / valor bajo?), como la "Advertencia" ~0,95 G's de ADR-0013.
+  Siguen sin localizar en el binario; la columna `alarm` derivada no los
+  refleja.
