@@ -83,7 +83,9 @@ VERIFICATION.md).
 
 - **vibsynth-contracts**: define el layout VibFrame que el export produce
   (contrato opcional en tests: `MachineDoc`).
-- **t8-extract**: productor hermano (backups T8) y hogar del visor portable
-  `vibframe_viewer` con el que se exploran los datasets exportados.
+- **t8-extract**: productor hermano (backups T8).
+- **vibframe-viewer**: visor portable del ecosistema (repo propio, antes
+  subpaquete de t8-extract) — `vibframe-viewer serve <dataset>` sobre
+  cualquier dataset exportado.
 - **t8-metrics-mapper**: etiquetado canónico de las métricas exportadas
   (`t8-mapper vibframe <dataset> --write`).
