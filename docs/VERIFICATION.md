@@ -133,7 +133,8 @@ coincide con la unidad del texto (15 `1 - 20 KHz` de PM-0CI/1-3, 3
 
 | Fecha | Alcance | Resultado |
 |---|---|---|
-| 2026-07-27 | BUNGE completo → `bunge_cartagena_ams/ground-truth/` | **973 observaciones** `origin="system-alarm"` (461 ALERT + 512 DANGER) sobre **235 máquinas**, 2013-08-14 → 2026-03-26; 16 s de reloj (incluido el sha256 de 1,8 GB). Validado con los modelos de `vibsynth-contracts` y con `vibframe-validate` sobre el dataset (PASS, ver §5 «Export masivo») |
+| 2026-07-27 | BUNGE completo → `bunge_cartagena_ams/ground-truth/Alarmas AMS BUNGE CARTAGENA marzo 2.0.diaggt.json` | **973 observaciones** `origin="system-alarm"` (461 ALERT + 512 DANGER) sobre **235 máquinas** (202 de ellas también en el GT del analista), 2013-08-14 → 2026-03-26; 31 s de reloj incluido el sha256 de 1,8 GB. Todas con `dataset_machine_id` resuelto (0 dangling) |
+| 2026-07-27 | `vibframe-validate` sobre el dataset, antes y después | **antes**: PASS, 347 máquinas, 6 DiagGT, 2.321 obs, 0 errores / 0 avisos. **después**: **PASS**, 347 máquinas, **7 DiagGT, 3.294 obs**, **0 errores / 0 avisos** (los 2.321 «without dataset_machine_id» siguen siendo los del analista, cuyo mapeo vive en `crosswalk.csv`) |
 
 ### Export masivo (validación end-to-end)
 
