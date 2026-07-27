@@ -14,13 +14,14 @@ output.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime
 
 import numpy as np
 import structlog
 
 from ams_extract.models import (
+    AlarmNote,
     Area,
     Equipment,
     Point,
@@ -31,6 +32,16 @@ from ams_extract.models import (
 )
 from ams_extract.naming import NameSanitizer
 from ams_extract.reader import RbmReader
+from ams_extract.records.alarm_note import (
+    ALARM_LEVEL_ALERT,
+    VELOCITY_UNITS_NOTE,
+    AlarmLine,
+    AlarmNoteError,
+    parse_alarm_line,
+    parse_gdsc_status,
+    point_status_record,
+    read_gdnl_text,
+)
 from ams_extract.records.area import (
     AreaSlot,
     is_prefixed_list_record,
@@ -1008,4 +1019,160 @@ def walk_trends(
         if overall_danger_raw is None
         else overall_danger_raw * overall_scale,
         alarms=tuple(overall_alarms),
+    )
+
+
+def _note_threshold_index(
+    line: AlarmLine, template: AnalysisParameterSet | None
+) -> int | None:
+    """Index of ``line``'s band in the ``pdla`` arrays, or ``None``.
+
+    The arrays are ``[overall, slot 0, …, slot 11]`` (FORMAT §5.8), so the
+    overall is 0 and a named band is its template slot + 1. Returns
+    ``None`` when the note names a band the point's template does not
+    have — the note and the template disagree and nothing can be checked.
+    """
+    if line.is_overall:
+        return 0
+    if template is None:
+        return None
+    for i, band in enumerate(template.bands):
+        if band.name == line.band:
+            return i + 1
+    return None
+
+
+def walk_alarm_note(
+    reader: RbmReader,
+    point: Point,
+    param_sets: ParamSetIndex | None = None,
+) -> AlarmNote | None:
+    """Return AMS's stored alarm verdict for ``point``, or ``None``.
+
+    Walks ``vdpm.0x1E4 → gdsc → 0x38 → gdnl`` (FORMAT §5.9), parses the
+    note text and — when the note reports an alarm — resolves the
+    thresholds of the named band from the point's ``pdpa`` template and
+    ``pdla`` alarm limit set (FORMAT §5.8) so the reading can be
+    cross-checked: a ``C Alarm`` value must fall in ``[alert, danger)``
+    and a ``D Alarm`` value in ``[danger, ∞)``. The outcome is exposed as
+    :attr:`~ams_extract.models.AlarmNote.coherent`; callers that publish
+    ground truth should filter on
+    :attr:`~ams_extract.models.AlarmNote.emittable`.
+
+    Thresholds are converted to the note's display units (velocity limits
+    are stored in inches/s, ``x 25.4`` → mm/s) and are only used when the
+    ``pdla`` unit code agrees with the unit the note spells; a
+    disagreement is surfaced as ``unit_consistent=False`` and never
+    silently papered over. Per-record failures are logged and yield
+    ``None``. Pass a preloaded :class:`ParamSetIndex` to avoid re-scanning
+    the set directories per point.
+    """
+    try:
+        status_record = point_status_record(reader, point.record_num)
+    except IndexError as exc:
+        _log.warning(
+            "point_status_pointer_read_failed",
+            point=point.long_name,
+            vdpm_record=point.record_num,
+            error=str(exc),
+        )
+        return None
+    if status_record is None or status_record >= reader.record_count:
+        return None
+
+    try:
+        status = parse_gdsc_status(reader, status_record)
+    except AlarmNoteError as exc:
+        _log.warning(
+            "gdsc_parse_failed",
+            point=point.long_name,
+            gdsc_record=status_record,
+            error=str(exc),
+        )
+        return None
+    if status.note_record is None or status.note_record >= reader.record_count:
+        return None
+
+    try:
+        text = read_gdnl_text(reader, status.note_record)
+    except AlarmNoteError as exc:
+        _log.warning(
+            "gdnl_parse_failed",
+            point=point.long_name,
+            gdnl_record=status.note_record,
+            error=str(exc),
+        )
+        return None
+
+    note = AlarmNote(
+        point_record_num=point.record_num,
+        record_num=status.note_record,
+        status_record_num=status.record_num,
+        measured_at_utc=status.measured_at_utc,
+        severity=status.severity,
+        user=status.user,
+        text=text,
+    )
+    line = parse_alarm_line(text)
+    if line is None:
+        if status.in_alarm:
+            _log.warning(
+                "alarm_note_severity_without_line",
+                point=point.long_name,
+                gdnl_record=status.note_record,
+                severity=status.severity,
+            )
+        return note
+
+    if status.severity_level != line.level:
+        _log.warning(
+            "alarm_note_severity_level_mismatch",
+            point=point.long_name,
+            gdnl_record=status.note_record,
+            severity=status.severity,
+            level=line.level,
+        )
+
+    sets = param_sets if param_sets is not None else ParamSetIndex.load(reader)
+    links = _resolve_pdcd_links(reader, point)
+    template = sets.analysis_set(links.analysis_set_index) if links else None
+    limits = sets.alarm_set(links.alarm_set_index) if links else None
+    index = _note_threshold_index(line, template)
+
+    expected_code = (
+        THRESHOLD_UNIT_VELOCITY
+        if line.units_note == VELOCITY_UNITS_NOTE
+        else THRESHOLD_UNIT_ACCELERATION
+    )
+    scale = TREND_VELOCITY_SCALE_MM_S if expected_code == THRESHOLD_UNIT_VELOCITY else 1.0
+    alert: float | None = None
+    danger: float | None = None
+    unit_consistent = False
+    if limits is not None and index is not None:
+        unit_consistent = limits.unit_codes[index] == expected_code
+        alert_raw = limits.alert_for(index)
+        danger_raw = limits.danger_for(index)
+        alert = None if alert_raw is None else alert_raw * scale
+        danger = None if danger_raw is None else danger_raw * scale
+
+    coherent: bool | None = None
+    if alert is not None or danger is not None:
+        if line.level == ALARM_LEVEL_ALERT:
+            coherent = alert is not None and alert <= line.value and (
+                danger is None or line.value < danger
+            )
+        else:
+            coherent = danger is not None and line.value >= danger
+
+    return replace(
+        note,
+        band=line.band,
+        value=line.value,
+        units=line.units,
+        level=line.level,
+        alert=alert,
+        danger=danger,
+        limit_set=None if limits is None else limits.name,
+        unit_consistent=unit_consistent,
+        coherent=coherent,
     )

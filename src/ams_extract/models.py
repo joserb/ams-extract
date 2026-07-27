@@ -251,3 +251,112 @@ class Trend:
     alert: float | None = None
     danger: float | None = None
     alarms: tuple[int | None, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class AlarmNote:
+    """AMS's own verdict on a point: the literal alarm report it stores.
+
+    Reached through ``vdpm.0x1E4 → gdsc → 0x38 → gdnl`` (FORMAT §5.9). It
+    is a **snapshot**, not a history: AMS overwrites the note on every
+    exception analysis, so a point has exactly one, dated by the
+    measurement it was computed on.
+
+    ``value``/``alert``/``danger`` are in :attr:`units` (display units:
+    ``mm/s`` for velocity bands, ``G's`` for acceleration ones), so they
+    compare directly. The thresholds are the point's ``pdla`` limits for
+    the same slot (FORMAT §5.8) — they are *not* stored in the note;
+    resolving them is what makes :attr:`coherent` checkable.
+
+    Attributes:
+        point_record_num: Record number of the parent ``vdpm`` (point).
+        record_num: Record number of the ``gdnl`` holding the text.
+        status_record_num: Record number of the ``gdsc`` status header.
+        measured_at_utc: Timestamp of the measurement the verdict is about
+            (``gdsc.0x1C``; equals the point's newest sample date in
+            4648/4648 BUNGE points that have samples).
+        severity: AMS severity index 0-100 (0 = calm, 1-40 alert zone,
+            41-100 danger zone).
+        user: AMS user credited with the analysis (``"Administrator"`` in
+            all of BUNGE).
+        text: The note verbatim, lines joined by ``\\n``.
+        band: Band named by the alarm line (``"SUBSINCRONO"``,
+            ``"OVERALL VALUE"``…), or ``None`` when the point is not in alarm.
+        value: Value the note reports for that band, in :attr:`units`.
+        units: Display units of ``value``/``alert``/``danger``.
+        level: ``"C"`` (alert) or ``"D"`` (danger), or ``None`` if calm.
+        alert: Alert (C) threshold of the band's slot, in :attr:`units`.
+        danger: Danger (D) threshold of the band's slot, in :attr:`units`.
+        limit_set: Name of the ``pdla`` alarm limit set that supplied them.
+        unit_consistent: Whether the ``pdla`` unit code of the slot agrees
+            with the unit the note spells. ``False`` marks a mis-configured
+            template in AMS: the number still triggered the alarm, but
+            value and threshold are not in the same physical unit, so the
+            reading is *not* validated and must not be emitted as GT.
+        coherent: Whether ``value`` falls in the interval its level claims —
+            ``[alert, danger)`` for C, ``[danger, ∞)`` for D. ``None`` when
+            the band or its thresholds could not be resolved.
+    """
+
+    point_record_num: int
+    record_num: int
+    status_record_num: int
+    measured_at_utc: datetime | None
+    severity: int
+    user: str
+    text: str
+    band: str | None = None
+    value: float | None = None
+    units: str | None = None
+    level: str | None = None
+    alert: float | None = None
+    danger: float | None = None
+    limit_set: str | None = None
+    unit_consistent: bool = False
+    coherent: bool | None = None
+
+    @property
+    def in_alarm(self) -> bool:
+        """Whether the note reports an alarm (an alarm line was parsed)."""
+        return self.level is not None
+
+    @property
+    def severity_level(self) -> str | None:
+        """``"C"``/``"D"`` implied by :attr:`severity` alone (0 = calm).
+
+        Independent of the text: the level parsed from the note must agree
+        with the zone of the severity index, or one of the two decodes is
+        wrong (they agree 991/991 in BUNGE).
+        """
+        if self.severity <= 0:
+            return None
+        return "C" if self.severity <= 40 else "D"
+
+    @property
+    def alarm(self) -> int | None:
+        """VibFrame ``alarm`` level: 0 calm, 2 alert (C), 3 danger (D).
+
+        Uses the same 0/2/3 scale as the derived trend column (ADR-0012):
+        AMS has no tier between normal and alert, so level 1 is unused.
+        """
+        if self.level == "C":
+            return 2
+        if self.level == "D":
+            return 3
+        return 0 if self.severity == 0 else None
+
+    @property
+    def emittable(self) -> bool:
+        """Whether the alarm is validated well enough to publish as ground truth.
+
+        Requires an alarm line, a severity index in the same zone as the
+        parsed level, thresholds in the same unit as the value, and the
+        value falling where its level says it should (the ``pdla``
+        cross-check of FORMAT §5.9).
+        """
+        return (
+            self.in_alarm
+            and self.severity_level == self.level
+            and self.unit_consistent
+            and self.coherent is True
+        )
