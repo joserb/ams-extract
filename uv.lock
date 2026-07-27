@@ -723,7 +723,9 @@ dependencies = [
 requires-dist = [
     { name = "jinja2", marker = "extra == 'reporting'", specifier = ">=3.1" },
     { name = "plotly", marker = "extra == 'reporting'", specifier = ">=5.0" },
+    { name = "pyarrow", marker = "extra == 'dev'", specifier = ">=14.0" },
+    { name = "pyarrow", marker = "extra == 'validate'", specifier = ">=14.0" },
     { name = "pydantic", specifier = ">=2.0" },
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0" },
 ]
-provides-extras = ["dev", "reporting"]
+provides-extras = ["dev", "reporting", "validate"]
