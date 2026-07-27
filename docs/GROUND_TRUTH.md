@@ -22,6 +22,11 @@
 >   «junto al dataset» vs `<informes>/ground-truth/`.
 > - §5: `dataset_machine_id` se lista entre las columnas del consolidado
 >   (§2.4 ya lo exigía).
+> - §3.4 (misma fecha, con el primer productor `system-alarm`): familia de
+>   reglas **GT050-GT053** para bandas de alarma, y §4 recoge el consolidado
+>   propio `observations_system.parquet`. Ninguna de las dos toca el esquema:
+>   las reglas GTxxx viven en el extractor (§3.3) y `mapping_rule` es una
+>   cadena libre del namespace GT.
 
 ## 1. Motivación
 
@@ -88,7 +93,7 @@ que solo cubre la procedencia del *dato*, con la procedencia de la
 | `analysts`, `reviewers` | list[string] | autoría del análisis |
 | `extractor` | string | herramienta y versión (patrón `SourceInfo.extractor`) |
 | `extracted_at` | datetime ISO | momento de la extracción |
-| `extraction_method` | string | `"pdf_text_parse"` \| `"manual"` \| `"llm"` |
+| `extraction_method` | string | `"pdf_text_parse"` \| `"manual"` \| `"llm"`; `null` cuando ninguno aplica — un decode binario (las alarmas `gdnl` de AMS) no tiene valor propio todavía, ver §6 |
 
 ### 2.3 `observation` — una interpretación
 
@@ -253,6 +258,29 @@ cambiar la lógica de una regla obliga a nuevo id o sufijo de versión.
 | GT018 | rozamiento | — | OTHER | group |
 | GT019 | anclaje/bancada/pernos | LOOSENESS | STRUCTURE | approximate |
 
+### 3.4 Reglas de banda de alarma GT050-GT059 (origen `system-alarm`)
+
+Una alarma de sistema no nombra un fallo: nombra una **banda del análisis**
+que cruzó su umbral (`"DESEQUILIBRIO - 4.512 mm/Seg - D Alarm"`). La banda
+la bautizó el analista al configurar la plantilla, así que su nombre es una
+pista fuerte pero no una afirmación diagnóstica — de ahí una familia de
+reglas propia, un escalón por debajo de la de prosa (§3.3) para el mismo
+texto:
+
+| Regla | Banda | fault_mode | grupo | calidad |
+|---|---|---|---|---|
+| GT050 | DESEQUILIBRIO | IMBALANCE | IMBALANCE | weak |
+| GT051 | DESALINEACION | — | MISALIGNMENT | group |
+| GT052 | HOLGURAS | LOOSENESS | LOOSENESS | weak |
+| GT053 | FALLO ELECTRIC | ELECTRICAL_ROTOR | ELECTRICAL | weak |
+
+Las bandas sin semántica de fallo (SUBSINCRONO, OVERALL VALUE, Mp Wave,
+`11-40 X RPM`, `1 - 20 KHz`…) producen el finding `unmapped` obligatorio con
+`fault_group="UNMAPPED"`: se declara, no se calla ni se fuerza.
+
+Implementación de referencia: `ams_extract.export.diag_gt` (ADR-0018 de
+ams-extract), que emite las alarmas `gdnl` de una base AMS.
+
 ## 4. Convenciones de fichero
 
 ```
@@ -264,8 +292,15 @@ cambiar la lógica de una regla obliga a nuevo id o sufijo de versión.
     ├── observations.csv                 # ídem, para inspección rápida
     ├── crosswalk.csv                    # tabla explícita TAG ↔ machine_id (§2.4)
     ├── crosswalk_ambiguities.md         # no-matches y ambigüedades, con evidencia
+    ├── observations_system.parquet      # consolidado de los DiagGT origin=system-alarm
     └── FORMATO_GROUND_TRUTH.md          # esta especificación
 ```
+
+Los documentos de distinto `origin` conviven en el mismo directorio (los
+`*.diaggt.json` del analista y el del sistema) y **no se mezclan en el mismo
+consolidado**: cada familia proyecta al suyo (`observations.parquet` para los
+informes, `observations_system.parquet` para las alarmas del sistema), porque
+las reglas de deduplicación de §5 sólo tienen sentido dentro de una familia.
 
 `ground-truth/` es **un único directorio**, no dos: §2.4 dice que la tabla de
 crosswalk se mantiene junto al dataset y este §4 la sitúa bajo
@@ -322,6 +357,10 @@ previos): para cada (normalized_tag, observed_at, modality) gana el registro
   (¿ventana de acierto?, ¿multi-etiqueta parcial?) es análogo a
   `EvaluationPolicy` de BenchmarkCase y queda para cuando exista el primer
   consumidor.
+- **`extraction_method` para orígenes binarios**: el vocabulario cubre PDF,
+  manual y LLM; las alarmas que se leen de un binario (`gdnl` de AMS,
+  `alarms.db` del T8) declaran `null` a la espera de un `"binary_decode"`,
+  que sería un cambio menor del contrato.
 - **Eventos de mantenimiento**: las intervenciones se infieren del texto
   («tras su intervención…»). Un `record_kind="intervention"` sería la
   extensión natural cuando haya fuente estructurada (CMMS).

@@ -12,8 +12,9 @@ extracción de los 6 informes BUNGE 2026 completada y verificada, revisión de
 `bunge_cartagena_ams` resuelto** (Hecho §5: 273/283 tags, 95,7 % de las
 observaciones), `ground-truth/` registrado en `VIBFRAME.md` (Hecho §6) y
 **contrato DiagGT mudado a `vibsynth-contracts`** con validador y goldens
-(Hecho §8, ADR-0016). Pendiente: cerrar los 10 tags sin match, overlay del
-visor y fuentes casi-GT (`gdnl`, `alarms.db`).
+(Hecho §8, ADR-0016) y **alarmas `gdnl` de AMS emitidas como DiagGT
+`origin="system-alarm"`** (Hecho §9, ADR-0018: 973 observaciones sobre 235
+máquinas). Pendiente: overlay del visor y el lado T8 (`alarms.db`).
 
 ## Contexto
 
@@ -237,6 +238,48 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
      t8-extract, así que un bump obligaría a una edición coordinada a cambio
      de nada.
 
+9. **Alarmas nativas de AMS (`gdnl`) → DiagGT `origin="system-alarm"`**
+   (2026-07-27, ADR-0018; era el Pendiente §4 de este plan):
+   - **Ingeniería inversa** (FORMAT §5.9): el informe de alarma que AMS
+     enseña por punto vive en `vdpm.0x1E4 → gdsc → 0x38 → gdnl`. El `gdsc`
+     aporta la **fecha de la medida analizada** (`0x1C`), un **índice de
+     severidad 0-100** (`0x1A`: 1-40 zona C, 41-100 zona D), el usuario y
+     una fecha de revisión derivada (`0x24` = `0x1C` + 30 días). El `gdnl`
+     es texto cp1252 de dos líneas: encabezado (español o inglés según el
+     código de formato `gdsc.0x18` = 13 / 20 / 51) y `"<banda> - <valor>
+     <mm/Seg|G-s> -  <C|D> Alarm"`. **Es una foto, no un histórico**: AMS
+     la sobrescribe en cada análisis por excepción. En BUNGE: 5.783 `gdnl`,
+     4.970 colgando de puntos vivos, **991 en alarma** (462 C + 529 D).
+   - **Validación** (VERIFICATION §«Alarmas almacenadas»): `gdsc.0x1C`
+     coincide con el timestamp de una muestra del punto en **4.648/4.648**
+     (100 %, y en 4.627 con la más reciente); el valor del texto cae en el
+     intervalo de su nivel contra los umbrales `pdla` del punto (§5.8) en
+     **991/991 (100 %)** sin tolerancia — test de nulidad barajando sets:
+     53,8 % en las alarmas C; y la zona de severidad concuerda con el nivel
+     del texto en **991/991**. La severidad C se ajusta además a
+     `1 + 40·(v − C)/(D − C)` en 461/462 (±1).
+   - **No emitido**: 18 alarmas (1,8 %) con el código de unidad del `pdla`
+     en desacuerdo con la unidad del texto (15 `1 - 20 KHz` de PM-0CI/1-3,
+     3 `Mp Wave` en sets HF) — plantillas mal configuradas en AMS; se
+     cuentan y quedan documentadas, no se publican.
+   - **Código**: `records/alarm_note.py`, `tree.walk_alarm_note`,
+     `models.AlarmNote`, `export/diag_gt.py` y el comando **`rbm alarms`**
+     (JSON siempre; `--consolidate` añade `observations_system.parquet`
+     /`.csv`, fichero propio que no toca el consolidado del analista).
+     39 tests nuevos (18 unitarios de récord, 17 de export, 4 de
+     integración que fijan las cifras de BUNGE).
+   - **Emitido**: `bunge_cartagena_ams/ground-truth/BUNGE CARTAGENA marzo
+     2.0.diaggt.json` — **973 observaciones** (461 ALERT + 512 DANGER),
+     **235 máquinas**, 2013-08-14 → 2026-03-26, con `dataset_machine_id`
+     resuelto en el 100 % (el productor conoce el `machine_id`: no hace
+     falta crosswalk) y `normalized_tag` compatible con el del analista
+     (`AG-100` y `AG.100` → `AG100`). `vibframe-validate`: PASS.
+   - **Spec**: `GROUND_TRUTH.md` §3.4 añade la familia de reglas
+     **GT050-GT053** (banda en alarma = evidencia, no diagnóstico: calidad
+     `weak`/`group`, un escalón por debajo de las reglas de prosa) y §4 el
+     consolidado propio. `extraction_method` queda `null`: el vocabulario
+     no contempla un decode binario (propuesto `"binary_decode"`).
+
 ## Limitaciones conocidas (v0.1)
 
 - Los pies de figura («Tendencia de…», «Espectros…») quedan al final de
@@ -270,9 +313,12 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
    el dataset publicado valide (~19 s con `--parallel 4`); y queda como tema
    aparte, con gold propio, si el array emitido debe recortarse al payload
    real en vez de publicar la cola de ceros.
-4. Posible extracción de los récords `gdnl` del `.rbm` (informes de alarma en
-   texto literal, FORMAT §4): serían observaciones DiagGT con
-   `origin="ams-rbm"` — GT de alarma nativo del sistema, complementario al
-   del analista. Simétrico en el lado T8: `data/alarms.db` y
-   `annotations/*.json` del backup (hoy sin extraer) podrían emitirse como
-   DiagGT con su propio `origin`.
+4. ~~Extracción de los récords `gdnl` del `.rbm`~~ — **hecho 2026-07-27**
+   (Hecho §9, ADR-0018): 973 observaciones `origin="system-alarm"` emitidas
+   y validadas 991/991 contra los umbrales `pdla`. Queda el **lado T8**:
+   `data/alarms.db` y `annotations/*.json` del backup, hoy sin extraer,
+   podrían emitirse igual (`system-alarm` para las alarmas,
+   `analyst-annotation` para las anotaciones) — trabajo en t8-extract.
+   Sub-pendientes menores heredados del decode: la ley de la severidad
+   `gdsc.0x1A` en la zona D (41-100) y las 18 alarmas con unidad
+   inconsistente, ambos en FORMAT §5.9.

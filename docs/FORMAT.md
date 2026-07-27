@@ -216,10 +216,10 @@ verificada en cada fase:
 | `vdpm` | 6 141 | point descriptor (config: template, RPM, alarmas; incluye plantillas) | Fase 2b + 3a |
 | `pdcd` | (no listado por scan) | índice de tipos de medida por punto ("Set Colección Datos Primar") | Fase 3a |
 | `vddt` | (no listado por scan) | series de tendencias (Valores Globales + bandas). **RESUELTO**: slots de `13+band_count·4` B, overall en `+0x04`, ts de la muestra siguiente off-by-one; unidad por el espectro del punto (velocidad ×25.4 → mm/s). Validado 47/47; 7 bandas etiquetadas (§5.7) | 2026-05-30 |
-| `gdsc` | 6 504 | aún sin confirmar (¿descriptor general?) | — |
+| `gdsc` | 6 504 | cabecera de estado por punto (fecha analizada, severidad 0-100, usuario) + puntero al `gdnl` | §5.9 |
 | `gicm` | 26 | equipment list chunk (20 slots + continuation) | Fase 2b (ADR-0004) |
 | `gdcm` | 347 | equipment instance | Fase 2b (ADR-0003) |
-| `gscm` | 347 | sibling de `gdcm` — función pendiente | — |
+| `gscm` | 347 | sibling de `gdcm`; su `0xD4` apunta al `gdsc` del equipo (sin nota en BUNGE) | §5.9 |
 | `gipm` | 344 | point list per equipment | Fase 2b (ADR-0003) |
 | `gdts` | 16 | índice área → equipment chain | Fase 2b (ADR-0003) |
 | `gits` | 1 | área list "prefix-list" | Fase 2a (ADR-0002) |
@@ -227,7 +227,7 @@ verificada en cada fase:
 | `pdpa` | 41 | plantilla de análisis (bandas + rangos por slot); compartida entre puntos | §5.8 |
 | `pdla` | 92 | set de límites de alarma (umbrales C/D por slot); compartido entre puntos | §5.8 |
 | `gipa`/`gila` | 2+ | directorios índice→record de los sets `pdpa`/`pdla` | §5.8 |
-| `gdnl` | 5783 | informes de alarma en texto literal (`"SUBSINCRONO - … - C Alarm"`) | §5.8 |
+| `gdnl` | 5 783 | informe de alarma en texto literal (`"SUBSINCRONO - … - C Alarm"`); una nota por punto, la última | §5.9 |
 
 ## 5. Sample records — FFT chain
 
@@ -730,6 +730,124 @@ los informes `gdnl`) — dónde se almacena ese nivel warning, sin localizar
 (candidato: los arrays sin interpretar del `pdla`).
 
 
+### 5.9 `gdsc` / `gdnl` — informe de alarma almacenado por punto
+
+**RESUELTO** (2026-07-27). Cada punto guarda el veredicto de su última
+«Medición de Análisis por Excepción»: el informe literal que AMS enseña
+como `"SUBSINCRONO - 1.986 mm/Seg - C Alarm"`. Vive en dos records:
+
+```
+vdpm (punto)
+  └── 0x1E4 → gdsc  (cabecera de estado: cuándo, cuánto, quién)
+                └── 0x38 → gdnl  (el texto del informe)
+```
+
+En BUNGE: **6 504 `gdsc`** (uno por cada uno de los 6 141 `vdpm` —
+incluidas plantillas— más 347 de equipo vía `gscm.0xD4` y unos pocos
+sueltos) y **5 783 `gdnl`**, todos apuntados desde un `gdsc.0x38`. De
+ellos, **4 970 cuelgan de puntos vivos** del árbol (los otros 813 son de
+`vdpm` no enlazados: plantillas e históricos, misma diferencia que en
+§3.2). Los `gdsc` de equipo **nunca** llevan nota (`0x38 = 0` en los 347).
+
+#### `gdsc` — cabecera de estado del punto
+
+| Offset | Tamaño | Campo |
+|---|---|---|
+| `0x00` | 8 | preámbulo (`0x04` = marcador de versión `02 00 vv 00`) |
+| `0x08` | 4 | tag ASCII `gdsc` |
+| `0x0C` | 4 | i32 LE (delta de asignación, sin interpretar) |
+| `0x18` | 2 | u16 **código de formato de la nota** (= `vv` del marcador: 13, 20 o 51) |
+| `0x1A` | 2 | u16 **índice de severidad 0-100**: `0` = no en alarma, `1-40` = zona C (alerta), `41-100` = zona D (peligro) |
+| `0x1C` | 4 | u32 LE — **Unix ts de la medida analizada** (la que disparó el veredicto) |
+| `0x20` | 4 | i32 LE (delta, sin interpretar) |
+| `0x24` | 4 | u32 LE — Unix ts de **revisión**: es exactamente `0x1C + 30 días` de calendario local (2 592 000 s, o 30 d −1 h/−2 h según el salto CET/CEST) → **derivado, no dato nuevo** |
+| `0x28` | 16 | usuario AMS que firmó el análisis (cp1252; `"Administrator"` en todo BUNGE) |
+| `0x38` | 4 | u32 LE (+1 encoded) — **puntero al `gdnl`** (`0` = sin nota) |
+| `0x40+` | 6×80 | slots de 80 B con un string de 16 B en `+0x38`; vacíos en BUNGE, sin decodificar |
+
+La severidad de `0x1A` no es un simple flag: en la zona C sigue
+`1 + 40·(v − C)/(D − C)` (dentro de ±1 en **461 de 462** alarmas C de
+BUNGE, con el redondeo a 3 decimales del texto como fuente del error), es
+decir, **dónde cae el valor entre los dos umbrales**. La ley de la zona D
+(41-100, saturada a 100) no se ha ajustado a ninguna fórmula simple y
+queda pendiente; para lo que se emite basta el **signo y la zona**, que
+concuerdan con el nivel del texto en 991/991.
+
+#### `gdnl` — el texto del informe
+
+| Offset | Tamaño | Campo |
+|---|---|---|
+| `0x00` | 8 | preámbulo (`0x04` = marcador `01 00 vv 00`) |
+| `0x08` | 4 | tag ASCII `gdnl` |
+| `0x0C` | 4 | i32 LE (delta, sin interpretar) |
+| `0x10` | 8 | ceros |
+| `0x18` | 32 | espacios en los 5 783 records (¿título de nota sin usar?) |
+| `0x38` | 456 | **texto** cp1252, líneas separadas por CRLF, relleno con espacios hasta `0x200` |
+
+El texto tiene **siempre dos líneas** (5 783/5 783): un encabezado y el
+resultado. El encabezado depende del código de formato (`gdsc.0x18`):
+13 escribe la versión española antigua, 20 y 51 la inglesa.
+
+```
+Stored Parameter Analysis                    Medición de Análisis por Excepción:
+1 - 20 KHz - 11.278 G-s      -  D Alarm      NO en Alarma
+```
+
+Gramática de la línea de alarma (única forma observada):
+
+```
+<banda> - <valor> <unidad> -  <C|D> Alarm
+```
+
+con `<unidad>` ∈ {`mm/Seg`, `G-s`} y `<banda>` = el nombre de un slot de
+la plantilla `pdpa` del punto (§5.8) o el literal `OVERALL VALUE` (el
+overall, índice 0 de los arrays `pdla`). Ojo: **el nombre de banda puede
+contener el separador** (`"1 - 20 KHz - 11.278 G-s - D Alarm"`), así que
+el parser ancla por el vocabulario cerrado de unidades.
+
+**La nota es una foto, no un histórico**: AMS la sobrescribe en cada
+análisis por excepción, así que un punto tiene exactamente una, fechada
+por `gdsc.0x1C`. No hay cadena ni versiones anteriores en el fichero.
+
+#### Validación
+
+1. **Fecha (`gdsc.0x1C`)** — para los 4 648 puntos con muestras, coincide
+   con el timestamp de una muestra suya (FFT/waveform/tendencia) dentro de
+   1 s en **4 648/4 648 (100 %)**; 4 628 son idénticos al segundo y 4 627
+   son exactamente la muestra más reciente. Es decir: la nota fecha la
+   **última medida del punto**. Los 322 puntos sin muestras conservan nota
+   y fecha (datos purgados).
+2. **Valor vs umbrales `pdla`** (la validación clave, §5.8) — resolviendo
+   la banda del texto contra la plantilla `pdpa` del punto y sus umbrales
+   `pdla` (velocidad ×25,4 → mm/s; aceleración cruda en G's), **991/991
+   (100 %)** de las alarmas caen donde su nivel dice: `C Alarm` en
+   `[C, D)` y `D Alarm` en `[D, ∞)`, sin tolerancia. Test de nulidad
+   (barajando el set `pdla` entre alarmas): 53,8 % para las C, que son las
+   de intervalo cerrado — el 100 % no es trivial.
+3. **Severidad vs texto** — la zona de `gdsc.0x1A` (1-40 C, 41+ D)
+   coincide con el nivel del texto en **991/991**, dos decodificaciones
+   independientes de la misma cosa.
+4. **Ancla gold M1H (AG-100)** — el punto piloto de §5.3 usa el set `pdla`
+   5 «Motor Horizontal P<300 kW (S)» (SUBSINCRONO alerta 1,4 / peligro
+   2,2 mm/s) y su nota es la calma `"NO en Alarma"` fechada 2020-02-19,
+   la fecha de su último espectro. Una nota `"SUBSINCRONO - 1.986 mm/Seg -
+   C Alarm"` de ese set cae dentro de `[1,4 · 2,2)` — el ejemplo de §5.8.
+
+**Familia no emitida como GT**: 18 de las 991 alarmas (1,8 %) tienen el
+código de unidad del slot `pdla` en desacuerdo con la unidad que escribe
+la nota — 15 de la banda `1 - 20 KHz` de las tres PM-0CI (nota en G's,
+umbral 0,067/0,106 declarado velocidad) y 3 de `Mp Wave` en sets HF (nota
+en mm/Seg, umbral declarado aceleración). El número «cuadra» y AMS disparó
+la alarma comparándolo tal cual, pero valor y umbral no están en la misma
+magnitud física: es una plantilla mal configurada en AMS, no un fallo del
+decode. Se cuentan y se dejan fuera del ground truth (ADR-0018).
+
+**Implementado** (2026-07-27): `records/alarm_note.py` (parsers `gdsc` /
+`gdnl` + gramática de la línea), `tree.walk_alarm_note` (resuelve umbrales
+y marca `coherent`/`emittable`), `models.AlarmNote`, `export/diag_gt.py` y
+el comando `rbm alarms` (§ ADR-0018).
+
+
 ## 6. Encoding y strings
 
 - **cp1252 (Windows-1252)** confirmado en el fichero real: `0xC1 = 'Á'`
@@ -779,6 +897,9 @@ Pendientes:
 - ~~**`vddt` — etiquetado de las 7 bandas**~~: RESUELTO (§5.8,
   2026-07-19). Las columnas siguen el orden de slots activos del `pdpa`
   del punto (`pdcd.0xAC`); rangos y umbrales validados numéricamente.
+- Ley exacta del índice de severidad `gdsc.0x1A` en la zona D (41-100);
+  la zona C está ajustada (§5.9).
+- Los 6 slots de 80 B de `gdsc.0x40+` (vacíos en BUNGE).
 - Marker para distinguir un `vdpm` "real" de uno "plantilla". Hoy se
   filtran por construcción al recorrer sólo lo enlazado.
 - Significado preciso de los i32 signed deltas en `gicm.0x60+`,

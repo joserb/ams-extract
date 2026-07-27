@@ -5,7 +5,8 @@
 
 Estado: jerarquía verificada en 7/15 áreas; FFT (velocidad mm/s + aceleración
 G's), waveform (G's / mm/s) y tendencia "Valores Globales" (mm/s, 47/47)
-validados contra el gold de AMS. **Export completo validado end-to-end**
+validados contra el gold de AMS; alarmas almacenadas (`gdnl`) cruzadas contra
+los umbrales `pdla` (991/991). **Export completo validado end-to-end**
 (274.478 muestras, conteo exacto, 2026-05-31). Registro concreto en §5.
 
 ## 1. Objetivo
@@ -107,6 +108,32 @@ capturas de AMS.
 | 2026-05-30 | AG-100 M1H | PLOTDATA "Valore Globale" (47 filas) | **47/47** exacto (fecha + valor, incl. duplicado 13-jul-2017 y pico 36.43 mm/s) |
 | 2026-05-30 | AG-100 M1H (bandas) | PLOTDATA por banda (5 ficheros + Mp Wave) | **62/62** por banda (etiquetado de columnas) |
 | 2026-07-20 | DT-0070 M1P (PeakVue, G's) | "Lista Ptos de Tendc" (147 filas, 2013–2026) | **147/147** overall crudo = G's del informe (desv. máx 0.00005, el redondeo a 4 decimales); fechas ≤2 h (local vs UTC); umbrales pdla 1.5/3.0 G's = líneas ALERTA/Falla del plot (ADR-0014) |
+
+### Alarmas almacenadas por AMS (`gdnl` / `gdsc`)
+
+Validación **estructural sobre el binario** (no gold de pantalla): las notas
+de alarma se cotejan contra decodificaciones ya validadas del mismo fichero
+— los umbrales `pdla` (§5.8, con su propio gold M1H) y los timestamps de las
+muestras (§5.3/§5.5/§5.7, validados contra AMS). Es el mismo criterio de la
+fila de "longitud almacenada" de la waveform.
+
+| Fecha | Alcance | Comprobación | Resultado |
+|---|---|---|---|
+| 2026-07-27 | 4 970 notas de puntos vivos de BUNGE | `gdsc.0x1C` = timestamp de una muestra del punto (±1 s) | **4 648/4 648** de los puntos con muestras (100 %); 4 627 son exactamente la muestra más reciente |
+| 2026-07-27 | 991 alarmas de BUNGE | valor del texto dentro del intervalo de su nivel según el `pdla` del punto (`C` → `[C, D)`, `D` → `[D, ∞)`), sin tolerancia | **991/991 (100 %)**. Test de nulidad barajando el set `pdla`: 53,8 % en las alarmas C (intervalo cerrado), 66,2 % en total |
+| 2026-07-27 | 991 alarmas de BUNGE | zona del índice de severidad `gdsc.0x1A` (1-40 = C, 41+ = D) = nivel del texto | **991/991 (100 %)** — dos campos independientes coinciden |
+| 2026-07-27 | 462 alarmas C de BUNGE | modelo de severidad `1 + 40·(v − C)/(D − C)` | **461/462 dentro de ±1** (el texto redondea a 3 decimales). La zona D no se ajusta: pendiente |
+| 2026-07-27 | 347 equipos de BUNGE | TAG extraído del nombre AMS vs `crosswalk.csv` del GT del analista | **270 de acuerdo, 1 discrepancia** (`MA-9606` duplicado en AMS: el crosswalk eligió el gemelo sin sufijo), 68 TAGs que el informe no nombra |
+
+**No emitido**: 18 alarmas (1,8 %) cuyo código de unidad del `pdla` no
+coincide con la unidad del texto (15 `1 - 20 KHz` de PM-0CI/1-3, 3
+`Mp Wave` en sets HF). Documentadas en FORMAT §5.9 y ADR-0018.
+
+### Export DiagGT de alarmas (`rbm alarms`)
+
+| Fecha | Alcance | Resultado |
+|---|---|---|
+| 2026-07-27 | BUNGE completo → `bunge_cartagena_ams/ground-truth/` | **973 observaciones** `origin="system-alarm"` (461 ALERT + 512 DANGER) sobre **235 máquinas**, 2013-08-14 → 2026-03-26; 16 s de reloj (incluido el sha256 de 1,8 GB). Validado con los modelos de `vibsynth-contracts` y con `vibframe-validate` sobre el dataset (PASS, ver §5 «Export masivo») |
 
 ### Export masivo (validación end-to-end)
 

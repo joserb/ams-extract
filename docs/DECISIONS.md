@@ -1072,3 +1072,89 @@ Con el nominal, la duración declarada (0,200 s) no era la del wave emitido
   recortarse al payload real (`nominal − 150`); hasta entonces un RMS o
   factor de cresta calculado aguas abajo sobre `waves.data` incluye la
   cola de ceros (~26% de las muestras en el caso 512 → 488).
+
+## ADR-0018 — Las alarmas `gdnl` de AMS se emiten como DiagGT `origin="system-alarm"`
+
+- **Fecha**: 2026-07-27
+- **Estado**: aceptada
+
+### Contexto
+
+Cada punto de un `.rbm` guarda el veredicto de su última «Medición de
+Análisis por Excepción» en un record `gdnl` — el informe literal
+`"SUBSINCRONO - 1.986 mm/Seg - C Alarm"` — fechado y graduado por su
+`gdsc` (FORMAT §5.9, resuelto el mismo día). Son **991 alarmas** sobre
+4.970 puntos en BUNGE: un juicio sobre el estado de una máquina en un
+instante, es decir, exactamente lo que DiagGT representa, y la fuente que
+el workplan 04 §4 tenía apuntada como «GT de alarma nativo del sistema».
+
+A diferencia del GT del analista (6 informes PDF, 2.321 observaciones),
+este juicio es **automático por umbral**: no dice qué falla, dice que una
+banda cruzó su límite. El vocabulario `origin` de la spec DiagGT ya
+reserva `"system-alarm"` para esto (§2.2, v0.1.1).
+
+### Decisión
+
+1. **Un documento DiagGT por `.rbm`**, `origin="system-alarm"`, escrito
+   por el comando nuevo `rbm alarms` en `<dataset>/ground-truth/`. La
+   unidad de intercambio de DiagGT es el documento fuente y aquí el
+   documento fuente es la base de datos: `source_ref` = el `.rbm` y
+   `source_sha256` su hash (16 s para 1,8 GB; `--skip-hash` lo evita).
+2. **Una observación por punto en alarma**, no por máquina: una máquina
+   puede tener varios puntos en alarma con bandas y fechas distintas, y
+   agregarlas perdería el dato. El punto va en `analysis_text` (DiagGT
+   v0.1 no tiene referencia de componente, spec §6) y la máquina es la
+   clave de join: `dataset_machine_id` = `equipment.short_code`, que es
+   literalmente el nombre de la partición `machine=` que produce
+   `rbm export` — este productor **sí** conoce el `machine_id`, así que
+   lo rellena en origen y no necesita crosswalk (las 347 particiones de
+   `bunge_cartagena_ams` resuelven, 0 dangling). El `external_tag` (TAG
+   de planta extraído del nombre AMS) y su `normalized_tag` se emiten
+   igual, para poder unir con el GT del analista: `AG-100` y `AG.100`
+   normalizan ambos a `AG100`.
+3. **Mapeo de estado**: `C Alarm` → `ALERT` / `alarm=2`, `D Alarm` →
+   `DANGER` / `alarm=3`. Es la misma escala 0/2/3 que ya deriva la
+   columna `alarm` de las tendencias (ADR-0012) y la traducción directa
+   de la spec §3.1 («Alerta»/«Peligro»). `WATCH`/1 queda sin usar porque
+   AMS no tiene escalón entre normal y alerta. Los puntos calmados **no**
+   generan observación: la ausencia significaría «no en alarma **o** no
+   analizado», y un OK falso es peor que un hueco.
+4. **Sólo se emite lo validado** (regla del repo): la alarma debe caer
+   donde su nivel dice, contra los umbrales `pdla` del punto y en la
+   misma unidad. Las **18** alarmas cuyo código de unidad del `pdla`
+   contradice la unidad del texto (plantillas mal configuradas en AMS,
+   FORMAT §5.9) se cuentan, se registran y **no se emiten** → 973 de 991.
+5. **Findings con reglas propias GT050-GT053**: una banda en alarma es
+   *evidencia*, no diagnóstico. Las bandas cuyo nombre nombra un fallo
+   (DESEQUILIBRIO, DESALINEACION, HOLGURAS, FALLO ELECTRIC) se mapean con
+   `label_quality="weak"` (o `"group"`), un escalón por debajo de lo que
+   las reglas de prosa de analista (GT001/GT002/GT004/GT013) declaran
+   para el mismo texto; el resto (SUBSINCRONO, OVERALL VALUE, Mp Wave,
+   `11-40 X RPM`, `1 - 20 KHz`) produce el finding `unmapped` obligatorio.
+   Nuevo id de regla en vez de reusar el de analista con otra calidad:
+   cambiar la calidad de una regla existente rompería su versionado.
+6. **Consolidado aparte y opcional**: `--consolidate` escribe
+   `observations_system.parquet`/`.csv` con las columnas de la spec §5.
+   Nunca se toca `observations.parquet`, que es el consolidado del
+   analista.
+7. **Sin dependencia de contracts en runtime** (ADR-0009): el documento
+   se construye con dicts y los modelos normativos se aplican en los
+   tests (`test_diag_gt.py`, `test_integration_alarms.py`).
+
+### Consecuencias
+
+- `bunge_cartagena_ams/ground-truth/` gana un séptimo `*.diaggt.json`
+  con **973 observaciones** (461 ALERT + 512 DANGER) sobre 235 máquinas,
+  2013-08-14 → 2026-03-26, junto a los 6 del analista;
+  `vibframe-validate` sigue en PASS.
+- Los dos ground truths conviven y se distinguen por `provenance.origin`:
+  un consumidor puede evaluar contra el analista, contra el sistema, o
+  medir el acuerdo entre ambos (el segundo es más denso en el tiempo y
+  más débil como diagnóstico).
+- `extraction_method` queda **`null`**: el vocabulario de la spec
+  (`pdf_text_parse` | `manual` | `llm`) no contempla un decode binario.
+  Añadir `binary_decode` es un cambio menor de contracts y queda
+  propuesto, no forzado.
+- La nota es una foto: si AMS reanaliza, la alarma anterior desaparece
+  del fichero. El documento no es reproducible desde un `.rbm` posterior,
+  de ahí que el hash del fichero sea parte de la procedencia.
