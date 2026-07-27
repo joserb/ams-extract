@@ -75,7 +75,7 @@ que solo cubre la procedencia del *dato*, con la procedencia de la
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `origin` | string | tipo de fuente: `"inspection-report"` (otros futuros: `"cmms"`, `"work-order"`, `"analyst-annotation"`) |
+| `origin` | string | tipo de fuente: `"inspection-report"`, `"analyst-annotation"`, `"system-alarm"` (alarma del propio sistema: `gdnl` de AMS, `alarms.db` del T8 — juicio automático por umbral, no de analista); otros futuros: `"cmms"`, `"work-order"` |
 | `provider` | string | organización autora (p. ej. `"Preditec"`) |
 | `document_id` | string | referencia del documento (`"P25/81115-260126"`) |
 | `document_title` | string | título legible |
