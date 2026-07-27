@@ -954,3 +954,61 @@ CARGA. No hay estado de máquina en el `.rbm` → no hay `state` que emitir.
   las capturas almacenadas de esa máquina.
 - `trends.parquet` de máquinas exportadas solo con `--types fft,waveform`
   deja de estar vacío: lleva las filas de contexto.
+
+---
+
+## ADR-0016 — DiagGT: modelos normativos en `vibsynth-contracts`, spec de referencia aquí
+
+- **Fecha**: 2026-07-27
+- **Estado**: aceptada
+
+### Contexto
+
+`docs/GROUND_TRUTH.md` define DiagGT, el formato de ground truth de
+diagnóstico externo (informes de analista, etiquetas de campo) que faltaba en
+el ecosistema, y este repo lo produce desde los informes Preditec de BUNGE
+Cartagena (workplan 04). El formato lo consumirán varios repos —
+vibsynth-diagnostics para evaluar, t8-extract para emitir GT desde
+`alarms.db`/`annotations`, el visor para pintar bandas de estado — y todos
+ellos ya dependen de `vibsynth-contracts` para el layout VibFrame. Mantener
+el esquema sólo como prosa en ams-extract obligaría a cada consumidor a
+reimplementar su propia validación, con deriva garantizada.
+
+Es la misma situación que resolvió ADR-0009 con VibFrame: el formato lo
+define contracts, este repo lo produce sin depender de él en runtime.
+
+### Decisión
+
+1. **Los modelos normativos de DiagGT viven en `vibsynth-contracts`**
+   (`vibsynth_contracts/diagnosis/external.py`, Pydantic v2 frozen):
+   documento raíz, `provenance`, `observation`, `machine`, `finding` y los
+   vocabularios (`status`, `fault_group`, `label_quality`, `record_kind`,
+   `origin`). Ante discrepancia con la prosa, gana el modelo.
+2. **`docs/GROUND_TRUTH.md` queda como spec de referencia**: el porqué, los
+   vocabularios, las reglas GTxxx de mapeo y CWxxx de crosswalk, y el
+   texto que `docs/VIBFRAME.md` de contracts cita como referencia normativa
+   del contenido de los ficheros. Sube a **v0.1.1** con las fricciones
+   detectadas al hacer el crosswalk real (reglas CW001–CW004 en §2.4,
+   `dataset_machine_id` en las columnas del consolidado §5, `crosswalk.csv`
+   y `crosswalk_ambiguities.md` en §4).
+3. **Sin dependencia runtime**: el extractor de informes
+   (`../Informes Bunge Cartagena 2026/ground-truth/extract_informes_gt.py`)
+   sigue siendo stdlib + pdfplumber + pandas, sin importar
+   `vibsynth_contracts`. La conformidad se comprueba desde fuera, con el CLI
+   `vibframe-validate` de contracts sobre el `ground-truth/` del dataset.
+4. **El crosswalk no es destructivo**: `crosswalk.csv` es la fuente del mapeo
+   TAG ↔ `machine_id` y el consolidado su proyección; los `*.diaggt.json` no
+   se reescriben nunca tras la extracción.
+
+### Consecuencias
+
+- Un consumidor valida un DiagGT con
+  `DiagGTDocument.model_validate_json(...)` en vez de confiar en la prosa;
+  los 6 informes BUNGE validan contra los modelos sin cambios.
+- Un cambio de esquema DiagGT es ahora un PR a contracts (modelos + spec
+  citada) y no una edición suelta de este repo; el número de versión del
+  documento y el de los modelos deben moverse juntos.
+- La copia de cortesía
+  `../Informes Bunge Cartagena 2026/ground-truth/FORMATO_GROUND_TRUTH.md`
+  es un snapshot de v0.1.0 y queda desalineada hasta que se regenere; la
+  copia normativa es `docs/GROUND_TRUTH.md`.
