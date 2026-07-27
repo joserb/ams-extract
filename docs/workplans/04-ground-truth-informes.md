@@ -229,8 +229,8 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
      mientras el array almacenado tiene otra longitud (488, 4148, 244) — 311
      de las 347 máquinas de `bunge_cartagena_ams`. Es el único incumplimiento
      del dataset: columnas, tipos, join trends↔metrics y escala de `alarm`
-     pasan limpios en las 347. Pendiente de arreglar en el export (fuera del
-     alcance de este plan, que sólo toca `docs/`).
+     pasan limpios en las 347. **Arreglado el mismo día** en el export
+     (ADR-0017, Pendiente §3); el dataset publicado necesita re-export.
    - Sin subir `SCHEMA_VERSION` de VibFrame (sigue 0.1.0): añadir el origen
      `t8-api` al literal `Origin` es aditivo y no cambia la forma de ningún
      campo ni columna; además la constante está vendorizada aquí y en
@@ -249,20 +249,27 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
 
 ## Pendiente
 
-1. **Cerrar los 10 tags sin `dataset_machine_id`** con la lista de equipos de
-   planta (`PM.OSMOSIS1/2`, `AG.8011B`/`AG.8013`/`AG.8033E`, `MA.9306`,
-   `MA.9451`, `FLOT.4500`, `PM.9645B`, `PM.9704B`) — ver
-   `crosswalk_ambiguities.md` §2. La vía es una entrada manual en
-   `crosswalk.csv`, que la spec v0.1.1 ya declara fuente del mapeo.
+1. ~~Cerrar los 10 tags sin `dataset_machine_id`~~ — **descartado 2026-07-27**:
+   no hay lista de equipos de planta y sin pistas claras no se fuerzan
+   matches (decisión de Jose). Las propuestas quedan documentadas en
+   `crosswalk_ambiguities.md` §2 por si algún día llega la lista; la vía
+   sigue siendo una entrada manual en `crosswalk.csv`. Descartada también,
+   de momento, la evaluación contra abr–jun 2026: no hay `.rbm` más
+   reciente que 2026-03-26 ni informes nuevos previstos.
 2. **Overlay en el visor** (opcional, tras la mudanza a repo
    `vibframe-viewer`): endpoint `/api/diaggt/<key>` + bandas de estado en el
    timeline (`setBands()`) y/o `layout.shapes` en las tendencias; badge de
    status DiagGT en el panel. Todo aditivo, sin colisiones detectadas.
-3. **Regenerar la copia de cortesía** de la spec en
-   `../Informes Bunge Cartagena 2026/ground-truth/FORMATO_GROUND_TRUTH.md`:
-   es un snapshot de v0.1.0 y ha quedado desalineada (la copia normativa es
-   `docs/GROUND_TRUTH.md`). Y **arreglar `waves.n_samples`** en `rbm export`
-   (Hecho §8): debe ser la longitud real del array, no el nominal del modo.
+3. ~~Regenerar la copia de cortesía~~ — hecho 2026-07-27 (sincronizada a
+   v0.1.1). ~~**Arreglar `waves.n_samples`**~~ — **hecho 2026-07-27**
+   (ADR-0017): `Waveform.n_samples` es ya la longitud del array emitido y el
+   bloque nominal de AMS viaja en `nominal_n_samples` → notas del
+   `proc_mode`. De paso queda cerrada la incógnita del padding (FORMAT §5.5:
+   `stored = 244 · ceil((nominal − 150) / 244)`, verificado en las 137.208
+   waveforms de BUNGE). Falta **re-exportar `bunge_cartagena_ams`** para que
+   el dataset publicado valide (~19 s con `--parallel 4`); y queda como tema
+   aparte, con gold propio, si el array emitido debe recortarse al payload
+   real en vez de publicar la cola de ceros.
 4. Posible extracción de los récords `gdnl` del `.rbm` (informes de alarma en
    texto literal, FORMAT §4): serían observaciones DiagGT con
    `origin="ams-rbm"` — GT de alarma nativo del sistema, complementario al

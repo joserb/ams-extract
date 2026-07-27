@@ -32,7 +32,10 @@ capturas de AMS.
 1. **Localizar el punto y timestamp** en AMS y anotar el gold:
    - FFT: Fmax, n_lines, units, RPM, CARGA, y la "Lista de Picos"
      (frecuencia Hz + amplitud en unidad de display).
-   - Waveform: sample_rate, n_samples, units, Pc(+) y Pk(-).
+   - Waveform: sample_rate, n_samples, units, Pc(+) y Pk(-). Ojo: el
+     `n_samples` que muestra AMS es el **bloque nominal** (512, 4096…); lo
+     emitido es la longitud almacenada (488, 4148…), que es lo que debe
+     casar con `len(samples)` (FORMAT §5.5, ADR-0017).
 2. **Extraer con la herramienta**:
    ```bash
    RBM_TEST_FILE="…/BUNGE CARTAGENA marzo 2.0.rbm" \
@@ -95,6 +98,7 @@ capturas de AMS.
 | 2026-05-29 | AG-100 M1H | 2020-02-19 | Pc(+) | 0.483 G | 0.483 G | ✓ <0.3% (calibrado `vdfw.0x28`) |
 | 2026-05-29 | AG-100 M1H | 2020-02-19 | Pk(-) | -0.510 G | -0.510 G | ✓ |
 | 2026-05-31 | CONTRA INCENDIOS PM-0CI/1 M LOA H | — | unidades | mm/s | mm/s | ✓ velocidad ×25.4 (regresión del leak in/s) |
+| 2026-07-27 | BUNGE completo (137.208 waveforms) | todos | longitud almacenada | n_samples nominal (256…16384) | `244 · ceil((nominal − 150) / 244)` | ✓ 137.208/137.208, sin excepciones (FORMAT §5.5, ADR-0017) — verificación estructural sobre el binario, no gold de AMS |
 
 ### Tendencia "Valores Globales" (`vddt`)
 
@@ -109,6 +113,7 @@ capturas de AMS.
 | Fecha | Alcance | Resultado |
 |---|---|---|
 | 2026-05-31 | BUNGE completo, `--parallel 4` | **18,6 s**; 15 áreas, 311/347 equipos con datos, **0 fallos**; **137.270 FFT + 137.208 waveform = 274.478** (cuadra exacto con AMS); 622 Parquet, 1,3 GB; carga Hive OK |
+| 2026-07-27 | Área CONTRA INCENDIOS (4 equipos, `--types fft,waveform,trend`), conformidad `vibframe-validate` | **antes** (dataset publicado, copia): FAIL, 4/4 máquinas con `waves.data-length`; **después** (ADR-0017): **PASS 4/4**, 0 errores / 0 avisos con `--sample-rows 100000` (todas las filas). 34 s de reloj incl. arranque (0,2 s de export) |
 
 ### Máquinas sin muestras (GT 2026-07-20)
 

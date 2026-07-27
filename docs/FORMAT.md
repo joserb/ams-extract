@@ -367,7 +367,7 @@ Pk(-)=-0.510 G, idéntico al gold de AMS (error < 0.3%). El factor es
 > En BUNGE: 503 waveforms son de velocidad (resto G's).
 
 Para M1H 19-feb-2020 BUNGE: 2 vcfw records → 488 muestras decoded
-(24 menos que las 512 nominales — pendiente entender el padding).
+(24 menos que las 512 nominales — ver "Longitud almacenada" abajo).
 Cotejado contra el screenshot AMS:
 
 | Métrica | AMS | Decodificado | Match |
@@ -383,6 +383,49 @@ Cotejado contra el screenshot AMS:
 > **Actualización sub-5b**: con `scale_factor` (vdfw.0x28) aplicado, Pc/Pk
 > mejoran a 0.483 / -0.510 (antes 0.482 / -0.500 con la escala empírica
 > de sub-5a). La calibración deja de ser deuda para la waveform.
+
+**Longitud almacenada vs `n_samples` — RESUELTO (2026-07-27)**. El
+`n_samples` de `vdfw.0x2C` (256, 512, 1024, 2048, 4096, 8192, 16384 =
+2.56 × líneas del FFT) es el **bloque nominal de adquisición**, no la
+longitud de lo almacenado. Barridas las 137.208 waveforms de BUNGE, la
+ley es exacta y sin excepciones:
+
+```
+payload  = n_samples − 150          # últimas muestras reales del buffer
+stored   = 244 · ceil(payload/244)  # cadena de vcfw completos, cola a 0
+```
+
+| nominal | payload (real) | vcfw | stored | stored − nominal | waveforms |
+|---|---|---|---|---|---|
+| 256 | 106 | 1 | 244 | −12 | 1.813 |
+| 512 | 362 | 2 | 488 | −24 | 61.312 |
+| 1.024 | 874 | 4 | 976 | −48 | 5.022 |
+| 2.048 | 1.898 | 8 | 1.952 | −96 | 18.010 |
+| 4.096 | 3.946 | 17 | 4.148 | **+52** | 50.841 |
+| 8.192 | 8.042 | 33 | 8.052 | −140 | 202 |
+| 16.384 | 16.234 | 67 | 16.348 | −36 | 8 |
+
+Es decir: AMS **no escribe las últimas 150 muestras** del bloque nominal
+(constante en todos los tamaños, unidades y sample rates; las ~30
+waveforms con payload `nominal−151` son sólo aquellas cuya última muestra
+real vale 0), y luego redondea el almacenamiento al múltiplo de 244 que
+cubre ese payload, rellenando la cola con ceros. De ahí que lo decoded
+salga a veces **más corto** que el nominal (488 < 512) y a veces **más
+largo** (4148 > 4096): no es recorte de calibración ni bins de cabecera,
+es cuantización de records + una cola no escrita.
+
+Consecuencias, implementadas en ADR-0017:
+
+- `Waveform.n_samples` es **`len(samples)`** (la longitud emitida); el
+  nominal se conserva aparte en `Waveform.nominal_n_samples` y viaja al
+  `machine.json` como prosa en las notas del `proc_mode`. El campo
+  `waves.n_samples` de VibFrame es por contrato la longitud del array.
+- **Pendiente (dato, no metadato)**: recortar el array emitido al payload
+  (`nominal − 150`) para no publicar la cola de ceros. Se documenta pero
+  **no se aplica**: cambia los datos y exige su propio gold de AMS (la
+  cola de ceros no afecta a Pc/Pk, sí a un RMS/factor de cresta calculado
+  aguas abajo). Constante `VDFW_TAIL_NOT_STORED = 150` en
+  `records/waveform.py`.
 
 **Hipótesis descartada en sub-5a**: "AMS reconstruye FFT desde
 waveform". La waveform almacenada (488 muestras / 0.19 s) no permite

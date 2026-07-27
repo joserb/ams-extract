@@ -1012,3 +1012,63 @@ define contracts, este repo lo produce sin depender de él en runtime.
   `../Informes Bunge Cartagena 2026/ground-truth/FORMATO_GROUND_TRUTH.md`
   es un snapshot de v0.1.0 y queda desalineada hasta que se regenere; la
   copia normativa es `docs/GROUND_TRUTH.md`.
+
+---
+
+## ADR-0017 — `waves.n_samples` es la longitud del array; el bloque nominal de AMS es prosa
+
+- **Fecha**: 2026-07-27
+- **Estado**: aceptada
+
+### Contexto
+
+`vibframe-validate` marcaba `waves.data-length` (severidad *error*) en 311
+de las 347 máquinas de `bunge_cartagena_ams`: `len(data) != n_samples`. El
+export escribía en `waves.n_samples` el `vdfw.0x2C` del descriptor —el
+**bloque nominal de adquisición** (256, 512, … 16384 = 2,56 × líneas del
+FFT)— mientras el array emitido tiene otra longitud (488, 4148, 244…).
+
+La causa está caracterizada sobre las 137.208 waveforms de BUNGE
+(FORMAT §5.5): AMS **no escribe las últimas 150 muestras** del bloque
+nominal y redondea el almacenamiento al múltiplo de 244 (la capacidad de
+un `vcfw`) que cubre ese payload, rellenando la cola con ceros:
+`stored = 244 · ceil((nominal − 150) / 244)`. Por eso lo decoded sale
+más corto que el nominal (488 < 512) o más largo (4148 > 4096). No es
+recorte de calibración ni bins de cabecera.
+
+El contrato VibFrame deriva el eje temporal de `t + i / sample_rate_hz`,
+así que `n_samples` sólo puede significar una cosa: cuántas muestras hay.
+Con el nominal, la duración declarada (0,200 s) no era la del wave emitido
+(0,191 s) — incoherencia interna, no sólo un campo mal.
+
+### Decisión
+
+1. **`Waveform.n_samples` = `len(samples)`** (lo decodificado y emitido).
+   Arrastra a todo lo derivado sin más cambios: `waves.n_samples`,
+   `manifest.parquet`, el parquet de `rbm extract`, el eje temporal de los
+   PNG y el visor, que ya usaban ese campo o la longitud del array.
+2. **El nominal no se pierde**: `Waveform.nominal_n_samples` lo conserva
+   verbatim desde `vdfw.0x2C`. En `machine.json`, el `proc_mode` del
+   waveform lleva `n_samples` = longitud emitida y el nominal en `notes`
+   ("AMS acquisition block is 512 samples; 488 are stored and emitted").
+   Se prefiere prosa a un campo del contrato: `AcquisitionModeDoc` no tiene
+   hueco para "bloque pedido vs bloque almacenado", y meter el nominal en
+   `n_samples` reproduciría la incoherencia un nivel más arriba.
+3. **No se recorta el array**: la cola de ceros (`nominal − 150` en
+   adelante) se sigue emitiendo. Cambiar los datos exige gold de AMS
+   propio ("no emitir lo no validado"); queda registrado en FORMAT §5.5
+   con la constante `VDFW_TAIL_NOT_STORED = 150`.
+
+### Consecuencias
+
+- `vibframe-validate` deja de reportar `waves.data-length`; el productor
+  AMS queda sin incumplimientos.
+- Los datasets exportados antes de este ADR llevan el nominal en
+  `waves.n_samples` y hay que **re-exportarlos** para que validen
+  (`bunge_cartagena_ams` completo: ~19 s con `--parallel 4`).
+- Un consumidor que quiera el bloque nominal lo lee de las notas del
+  `proc_mode`, no de una columna.
+- Pendiente separado: decidir, con gold, si el array emitido debe
+  recortarse al payload real (`nominal − 150`); hasta entonces un RMS o
+  factor de cresta calculado aguas abajo sobre `waves.data` incluye la
+  cola de ceros (~26% de las muestras en el caso 512 → 488).
