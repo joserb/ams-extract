@@ -512,16 +512,22 @@ def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
         if desc.units in VELOCITY_UNITS_RAW:
             samples = samples * WAVEFORM_VELOCITY_SCALE_MM_S
             units = VELOCITY_UNITS_CALIBRATED
+        calibrated = samples.astype(np.float32)
         yield Waveform(
             record_num=desc.record_num,
             point_record_num=point.record_num,
             timestamp_utc=desc.timestamp_utc,
-            n_samples=desc.n_samples,
+            # The decoded length, NOT vdfw.0x2C: the stored buffer holds
+            # `nominal - 150` real samples rounded up to whole 244-sample
+            # vcfw records, so it is shorter (488 vs 512) or longer (4148
+            # vs 4096) than the nominal block (FORMAT §5.5, ADR-0017).
+            n_samples=int(calibrated.size),
             sample_rate_hz=desc.sample_rate_hz,
             rpm=desc.rpm,
             units=units,
             carga_pct=desc.carga_pct,
-            samples=samples.astype(np.float32),
+            samples=calibrated,
+            nominal_n_samples=desc.n_samples,
         )
 
 

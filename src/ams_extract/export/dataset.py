@@ -273,6 +273,24 @@ def _build_machine_doc(
     }
 
 
+PROC_MODE_NOTES = "Decoded from AMS RBM; detailed acquisition metadata not decoded yet."
+
+
+def _proc_mode_notes(n_samples: int | None, nominal_n_samples: int | None) -> str:
+    """Base note plus, for waveforms, the nominal block the analyzer asked for.
+
+    ``n_samples`` is always the emitted array length; the AMS acquisition
+    block (``vdfw.0x2C``) differs from it by design (FORMAT §5.5), so it is
+    recorded here as prose instead of overwriting the length field.
+    """
+    if nominal_n_samples is None or nominal_n_samples == n_samples:
+        return PROC_MODE_NOTES
+    return (
+        f"{PROC_MODE_NOTES} AMS acquisition block is {nominal_n_samples} samples; "
+        f"{n_samples} are stored and emitted (FORMAT §5.5)."
+    )
+
+
 def _add_proc_mode(
     modes: dict[tuple[str, str], dict[str, Any]],
     *,
@@ -281,6 +299,7 @@ def _add_proc_mode(
     signal_family: str,
     sample_rate_hz: float | None = None,
     n_samples: int | None = None,
+    nominal_n_samples: int | None = None,
     fmax_hz: float | None = None,
     lines: int | None = None,
 ) -> None:
@@ -306,7 +325,7 @@ def _add_proc_mode(
         "integrate_waveform": None,
         "hp_filter_freq_hz": None,
         "hp_filter_order": None,
-        "notes": "Decoded from AMS RBM; detailed acquisition metadata not decoded yet.",
+        "notes": _proc_mode_notes(n_samples, nominal_n_samples),
     }
 
 
@@ -333,6 +352,11 @@ def _spectrum_row(spectrum: Spectrum, point: Point) -> dict[str, Any]:
 
 
 def _waveform_row(waveform: Waveform, point: Point) -> dict[str, Any]:
+    # VibFrame requires n_samples == len(data): the time axis is derived
+    # from t + i / sample_rate_hz, so any other value breaks the wave
+    # (vibframe-validate `waves.data-length`). Waveform.n_samples already
+    # is the emitted length; the AMS nominal block lives in the proc mode
+    # notes (FORMAT §5.5, ADR-0017).
     rpm = float(waveform.rpm)
     return {
         "t": _timestamp_us(waveform.timestamp_utc),
@@ -578,6 +602,7 @@ def _process_equipment(
                         signal_family=_signal_family(waveform.units),
                         sample_rate_hz=waveform.sample_rate_hz,
                         n_samples=waveform.n_samples,
+                        nominal_n_samples=waveform.nominal_n_samples,
                     )
             if TREND in types:
                 for trend in walk_trends(reader, point, param_sets):

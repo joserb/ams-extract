@@ -17,6 +17,7 @@ from typer.testing import CliRunner
 
 from ams_extract.cli import app as rbm_app
 from ams_extract.reader import RbmReader
+from ams_extract.records.waveform import VCFW_DATA_SAMPLES, VDFW_TAIL_NOT_STORED
 from ams_extract.tree import (
     walk_hierarchy,
     walk_spectra,
@@ -317,12 +318,14 @@ def test_extract_waveform_payload_matches_ams_gold(
 
     assert row["sample_type"] == "WAVEFORM"
     assert row["sample_rate_hz"] == pytest.approx(2560.0)
-    assert row["n_samples"] == 512
+    # The stored length, not the nominal 512 block (FORMAT §5.5, ADR-0017).
+    assert row["n_samples"] == 488
     assert row["rpm"] == pytest.approx(1455.0, rel=0.01)
     assert row["units"] == "G's"
 
     samples = np.array(row["samples"], dtype=np.float32)
     assert samples.shape == (488,)
+    assert row["n_samples"] == len(row["samples"])
     assert np.isfinite(samples).all()
     assert samples.max() == pytest.approx(0.483, abs=0.02)
     assert samples.min() == pytest.approx(-0.510, abs=0.02)
@@ -441,6 +444,35 @@ def test_peakvue_trend_overall_matches_ams_gold(real_rbm: Path) -> None:
     assert mp_wave.units == "G's"
     assert mp_wave.alert == pytest.approx(8.0)
     assert mp_wave.danger == pytest.approx(12.0)
+
+
+def test_waveform_n_samples_is_the_stored_length_not_the_nominal(
+    real_rbm: Path,
+) -> None:
+    # VibFrame requires n_samples == len(data). AMS stores `nominal - 150`
+    # real samples rounded up to whole 244-sample vcfw records, so the two
+    # never coincide: 512 -> 488 stored, 4096 -> 4148 (FORMAT §5.5).
+    with RbmReader(real_rbm) as reader:
+        points = [
+            p
+            for area in walk_hierarchy(reader)
+            if "DEPURADORA" in area.long_name
+            for eq in area.equipment
+            if "AG-100" in eq.long_name
+            for p in eq.points
+        ]
+        waveforms = [w for point in points for w in walk_waveforms(reader, point)]
+
+    assert waveforms, "expected waveforms for AG-100"
+    for w in waveforms:
+        assert w.n_samples == w.samples.size
+        assert w.nominal_n_samples is not None
+        # Stored length: whole vcfw records covering the real payload.
+        payload = w.nominal_n_samples - VDFW_TAIL_NOT_STORED
+        expected = -(-payload // VCFW_DATA_SAMPLES) * VCFW_DATA_SAMPLES
+        assert w.n_samples == expected
+        # The tail past the payload is zero padding, never signal.
+        assert not w.samples[payload:].any()
 
 
 def test_velocity_waveform_calibrated_to_mm_s(real_rbm: Path) -> None:

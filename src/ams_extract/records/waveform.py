@@ -20,6 +20,14 @@ M1H of AG-100, BUNGE)::
     sample buffer is the concatenation of every vcfw in the chain that
     descends from the waveform's vdfw.
 
+    The buffer length is NOT ``n_samples``: AMS stores ``n_samples - 150``
+    real samples and rounds the storage up to whole 244-sample records,
+    zero-padding the tail. Hence 512 → 2 records → 488 stored (362 real)
+    and 4096 → 17 records → 4148 stored (3946 real). Verified over the
+    137 208 waveforms of BUNGE, every nominal size (FORMAT §5.5,
+    ADR-0017). ``n_samples`` is the acquisition block AMS was configured
+    for; the emitted length is always ``len(samples)``.
+
 Unlike the FFT amplitudes (whose calibration is still open, FORMAT §5.6),
 the waveform calibration is solved: multiplying the raw int16 counts by
 ``vdfw.0x28`` (``scale_factor``) yields the displayed units. For M1H
@@ -51,6 +59,16 @@ VDFW_FIRST_VCFW_OFFSET = 0x18
 VDFW_SAMPLE_PERIOD_OFFSET = 0x24
 VDFW_SCALE_OFFSET = 0x28
 VDFW_N_SAMPLES_OFFSET = 0x2C
+"""Nominal acquisition block size (2.56 x FFT lines), not the stored length."""
+
+VDFW_TAIL_NOT_STORED = 150
+"""Samples of the nominal block AMS never writes (FORMAT §5.5, ADR-0017).
+
+The stored buffer holds ``n_samples - 150`` real samples, padded with
+zeros up to the 244-sample ``vcfw`` record boundary. Documented, not
+applied: trimming the emitted array to the real payload would change the
+data and needs its own AMS gold.
+"""
 VDFW_TIMESTAMP_OFFSET = 0x34
 VDFW_RPM_OFFSET = 0x38
 VDFW_CARGA_OFFSET = 0x3C
@@ -169,9 +187,11 @@ def read_vcfw_samples(reader: RbmReader, first_vcfw: int) -> np.ndarray:
 
     Returns a 1-D ``np.ndarray`` of dtype ``float32`` (int16 samples cast
     up so downstream plotting/scaling never has to worry about overflow)
-    whose length is ``244 * <chain length>`` — typically ~488 for a BUNGE
-    waveform (2 records of 244 samples), close to the nominal ``n_samples``
-    (512); see the padding note in FORMAT §5.5.
+    whose length is ``244 * <chain length>`` — 488 for the typical BUNGE
+    waveform (2 records of 244 samples). The chain length is
+    ``ceil((nominal - 150) / 244)``, so the buffer can be shorter (488 for
+    a nominal 512) or longer (4148 for a nominal 4096) than the nominal
+    block; the tail past ``nominal - 150`` is zero padding (FORMAT §5.5).
 
     Raises:
         WaveformChainError: If any record in the chain has the wrong tag

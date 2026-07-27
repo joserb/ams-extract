@@ -12,6 +12,7 @@ from typer.testing import CliRunner
 
 from ams_extract.cli import app as rbm_app
 from ams_extract.export.dataset import (
+    _add_proc_mode,
     _band_metric_row,
     _band_trend_rows,
     _build_machine_doc,
@@ -70,6 +71,54 @@ class TestExportDataset:
         assert machine_doc["config_generations"] == []
         # Location levels only: the machine is its own level in the viewers.
         assert machine_doc["machine"]["path"] == ["AREA"]
+
+    def test_wave_row_n_samples_matches_the_emitted_array(self) -> None:
+        # VibFrame derives the time axis from t + i / sample_rate_hz, so
+        # n_samples must be len(data); the AMS nominal block (512 for these
+        # 488 stored samples) is documentary only (FORMAT §5.5, ADR-0017).
+        point = Point(record_num=1, long_name="MOTOR", short_code="MOTOR")
+        waveform = Waveform(
+            record_num=3,
+            point_record_num=point.record_num,
+            timestamp_utc=datetime(2020, 1, 1, tzinfo=UTC),
+            n_samples=488,
+            sample_rate_hz=2_560.0,
+            rpm=1_455.0,
+            units="G's",
+            carga_pct=0.0,
+            samples=np.zeros(488, dtype=np.float32),
+            nominal_n_samples=512,
+        )
+
+        row = _waveform_row(waveform, point)
+
+        assert row["n_samples"] == len(row["data"]) == 488
+
+    def test_wave_proc_mode_keeps_the_length_and_notes_the_nominal(self) -> None:
+        modes: dict[tuple[str, str], dict[str, object]] = {}
+        _add_proc_mode(
+            modes,
+            point_id="MOTOR",
+            mode_id="WAVE_ACC_2560",
+            signal_family="acceleration",
+            sample_rate_hz=2_560.0,
+            n_samples=488,
+            nominal_n_samples=512,
+        )
+        _add_proc_mode(
+            modes,
+            point_id="MOTOR",
+            mode_id="VEL_1000",
+            signal_family="velocity",
+            fmax_hz=1_000.0,
+            lines=1_600,
+        )
+
+        wave_mode = modes[("MOTOR", "WAVE_ACC_2560")]
+        assert wave_mode["n_samples"] == 488
+        assert "512" in str(wave_mode["notes"]) and "488" in str(wave_mode["notes"])
+        # Spectrum modes carry no sample count and keep the plain note.
+        assert "acquisition block" not in str(modes[("MOTOR", "VEL_1000")]["notes"])
 
     def test_machine_doc_validates_against_optional_vibframe_contract(self) -> None:
         contracts = pytest.importorskip("vibsynth_contracts.dataset")
