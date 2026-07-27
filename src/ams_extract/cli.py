@@ -11,6 +11,11 @@ from rich.console import Console
 from rich.table import Table
 
 from ams_extract.export.dataset import VALID_TYPES, export_dataset
+from ams_extract.export.diag_gt import (
+    build_alarm_ground_truth,
+    file_sha256,
+    write_alarm_ground_truth,
+)
 from ams_extract.export.html_report import write_inventory_html
 from ams_extract.export.json_tree import build_tree_document, write_tree_json
 from ams_extract.export.parquet_samples import (
@@ -453,6 +458,79 @@ def export(
         f"{summary.trend_samples} trend  "
         f"({summary.parquet_files} parquet files)"
     )
+
+
+@app.command("alarms")
+def alarms(
+    file: Annotated[Path, typer.Argument(help="Path to a .rbm database file.")],
+    out: Annotated[
+        Path,
+        typer.Option(
+            "--out",
+            help="Directory for the DiagGT document, normally <dataset>/ground-truth.",
+        ),
+    ] = Path("ground-truth"),
+    name: Annotated[
+        str | None,
+        typer.Option("--name", help="Stem of the .diaggt.json; defaults to <file stem>."),
+    ] = None,
+    client: Annotated[
+        str, typer.Option("--client", help="Client name for the provenance block.")
+    ] = "",
+    plant: Annotated[
+        str, typer.Option("--plant", help="Plant name for the provenance block.")
+    ] = "",
+    consolidate: Annotated[
+        bool,
+        typer.Option(
+            "--consolidate",
+            help="Also write observations_system.parquet/.csv (flat view).",
+        ),
+    ] = False,
+    skip_hash: Annotated[
+        bool,
+        typer.Option("--skip-hash", help="Do not hash the .rbm (faster, weaker provenance)."),
+    ] = False,
+) -> None:
+    """Export the alarms AMS stored in the database as DiagGT ground truth.
+
+    Reads every point's alarm note (``gdsc`` + ``gdnl``, FORMAT §5.9) and
+    writes one observation per alarm whose value is confirmed against the
+    point's ``pdla`` thresholds, with ``origin="system-alarm"``. Alarms
+    that fail the cross-check are counted and left out.
+    """
+    if not file.exists():
+        raise _abort(f"file not found: {file}")
+
+    try:
+        with RbmReader(file) as reader:
+            digest = None if skip_hash else file_sha256(file)
+            document, summary = build_alarm_ground_truth(
+                reader,
+                source_path=file,
+                source_sha256=digest,
+                client=client,
+                plant=plant,
+            )
+    except RbmFileError as exc:
+        raise _abort(str(exc)) from exc
+
+    written = write_alarm_ground_truth(
+        document, out, stem=name or file.stem, consolidate=consolidate
+    )
+    skipped = summary.skipped_unit_mismatch + summary.skipped_incoherent
+    _console.print(
+        f"wrote [bold]{summary.emitted}[/bold] system-alarm observations "
+        f"({summary.alert} ALERT + {summary.danger} DANGER) on "
+        f"[bold]{summary.machines}[/bold] machines to {written[0]}\n"
+        f"  notes: {summary.notes}/{summary.points} points  "
+        f"alarms: {summary.alarms}  "
+        f"coherent with pdla: {summary.coherent_pct:.1f}%"
+        + (f"  ([yellow]{skipped} skipped[/yellow])" if skipped else "")
+        + f"\n  observed: {summary.first_observed} .. {summary.last_observed}"
+    )
+    for path in written[1:]:
+        _console.print(f"  also wrote {path}")
 
 
 @app.command("serve")

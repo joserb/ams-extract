@@ -42,6 +42,9 @@ rbm extract FILE --point NAME [--equipment SUBSTR] \
 rbm export FILE --out dataset/ [--types fft,waveform,trend] \
                 [--areas …] [--parallel N]    # VibFrame (dataset.json +
                                               # machine=<asset>/... + report.html)
+rbm alarms FILE [--out dataset/ground-truth] [--name STEM] \
+                [--client C] [--plant P] [--consolidate]   # AMS's own alarms
+                                              # as a DiagGT ground-truth document
 rbm serve  FILE.rbm | dataset/ [--host H] [--port N] [--no-browser]  # on-demand viewer
 ```
 
@@ -52,6 +55,14 @@ self-contained HTML file: a collapsible locations → machines tree where each
 machine shows how many spectra/waveforms/trends it holds and the date span
 (first → last) of each type, plus a live machine filter. `rbm export` drops the
 same `report.html` into the dataset directory.
+
+`rbm alarms` publishes the alarm verdicts AMS itself stored per point
+(`"SUBSINCRONO - 1.986 mm/Seg - C Alarm"`, FORMAT §5.9) as a DiagGT document
+with `origin="system-alarm"` — one observation per alarm whose value is
+confirmed against the point's `pdla` thresholds (991/991 coherent in the
+reference database; 973 emitted, 18 skipped for a unit mismatch). It is
+ground truth *about* the dataset, written next to it, never inside the
+`machine=` partitions.
 
 `rbm serve` opens an interactive on-demand viewer and picks its backend from
 the argument:
