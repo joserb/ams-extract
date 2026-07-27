@@ -7,9 +7,9 @@ updated: 2026-07-27
 # Plan: ground truth de diagnóstico externo (DiagGT) desde los informes Preditec
 
 **Fecha**: 2026-07-27 · **Estado**: formato v0.1 definido y extracción de los
-6 informes BUNGE 2026 completada y verificada; pendiente el crosswalk contra
-`bunge_cartagena_ams` y la revisión de `t8-extract` (repo en WSL, fuera del
-alcance de la sesión Windows).
+6 informes BUNGE 2026 completada y verificada; revisión de `t8-extract` hecha
+(compatible, ver Hecho §4); pendiente el crosswalk contra
+`bunge_cartagena_ams` y las decisiones de spec derivadas de la revisión.
 
 ## Contexto
 
@@ -66,6 +66,39 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
    páginas con `DIAGNÓSTICO:`), fidelidad 240/240 muestras aleatorias contra
    el texto crudo de página, y contraste visual página↔JSON (PM.9121A mayo).
 
+4. **Revisión de `t8-extract`** (2026-07-27, repo en
+   `~/wslprojects/RESONINS/t8-extract`, HEAD `869abc6`) — **DiagGT es
+   compatible**; hallazgos:
+   - t8-extract no tiene ninguna representación propia de GT/diagnóstico; su
+     única señal de estado es la columna `alarm` int8 0–3 nullable de
+     `trends.parquet`, passthrough del protobuf T8 (la alarma de máquina
+     cuelga de la métrica reservada `speed`). La escala coincide con la
+     proyección DiagGT §3.1.
+   - El visor `vibframe_viewer` descubre datasets por `dataset.json` y
+     particiones por `glob("machine=*")`: un `ground-truth/` extra en la raíz
+     del dataset **se ignora limpiamente** y sobrevive a re-extracciones
+     (el extractor no limpia el directorio de salida). No sirve ficheros del
+     dataset: el overlay de observaciones exigiría un endpoint nuevo
+     (`server.py`) + bandas en `timeline.js` (`setBands()`; hoy ni
+     `layout.shapes` ni `annotations` de Plotly se usan — terreno libre).
+   - Crosswalk aplicable también a T8: `machine_id = sanitize(tag)` = nombre
+     de partición, ya normalizado. Avisos: el nombre legible va en
+     `machine.name` (≠ id), y la unicidad global requiere
+     `(dataset, machine_id)` — el visor ya usa esa clave.
+   - Fricciones de spec detectadas (no de código): `MachineDoc.ground_truth`
+     ya significa `FailureModeCase` sintético (misma palabra, otro concepto);
+     `mapping_rule` existe en `metrics.parquet` con namespace Rxxx/IRxxx (el
+     prefijo GTxxx desambigua, dejarlo explícito); `STOPPED`/`NOT_MEASURED`
+     no caben en 0–3 (no escribir jamás en `trends.parquet`, mantener la
+     proyección en `observations.parquet`); el futuro CLI `vibframe-validate`
+     (workplan 03 de t8-extract, Parte 2) podría rechazar directorios no
+     declarados, y el visor se muda a repo propio (Parte 1) — timing crítico
+     para registrar `ground-truth/` en `VIBFRAME.md`.
+   - El backup T8 trae fuentes «casi-GT» aún sin extraer (`data/alarms.db`,
+     `annotations/*.json`, FORMATO-BACKUP-T8 §): candidatas naturales a
+     emitirse como DiagGT con `origin` propio, simétrico al punto gdnl de
+     AMS.
+
 ## Limitaciones conocidas (v0.1)
 
 - Los pies de figura («Tendencia de…», «Espectros…») quedan al final de
@@ -82,14 +115,22 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
    `bunge_cartagena_ams` (rellenar `dataset_machine_id`; tabla explícita para
    ambigüedades). Con eso, `observations.parquet` se une directamente a las
    features del VibFrame para evaluar diagnostics con GT real.
-2. **Revisar `t8-extract`** (repo en `~/wslprojects`, inaccesible desde la
-   sesión Windows): contrastar que DiagGT no choca con nada de su lado y
-   valorar si el visor puede superponer las observaciones.
-3. **Decidir el hogar definitivo del contrato**: si DiagGT se consolida,
+2. **Registrar `ground-truth/` como directorio opcional reconocido en
+   `VIBFRAME.md`** (vibsynth-contracts) antes de que el `vibframe-validate`
+   del workplan 03 de t8-extract endurezca el layout, y decidir si el
+   empaquetado `.vibframe.zip` lo incluye. Documentar allí también la
+   distinción DiagGT vs `MachineDoc.ground_truth` (FailureModeCase).
+3. **Overlay en el visor** (opcional, tras la mudanza a repo
+   `vibframe-viewer`): endpoint `/api/diaggt/<key>` + bandas de estado en el
+   timeline (`setBands()`) y/o `layout.shapes` en las tendencias; badge de
+   status DiagGT en el panel. Todo aditivo, sin colisiones detectadas.
+4. **Decidir el hogar definitivo del contrato**: si DiagGT se consolida,
    mover los modelos a `vibsynth-contracts` (p. ej.
    `vibsynth_contracts/diagnosis/external.py`) y dejar aquí solo la
    referencia, como se hizo con VibFrame (ADR-0009).
-4. Posible extracción de los récords `gdnl` del `.rbm` (informes de alarma en
+5. Posible extracción de los récords `gdnl` del `.rbm` (informes de alarma en
    texto literal, FORMAT §4): serían observaciones DiagGT con
    `origin="ams-rbm"` — GT de alarma nativo del sistema, complementario al
-   del analista.
+   del analista. Simétrico en el lado T8: `data/alarms.db` y
+   `annotations/*.json` del backup (hoy sin extraer) podrían emitirse como
+   DiagGT con su propio `origin`.
