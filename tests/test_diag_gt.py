@@ -17,6 +17,8 @@ from ams_extract.export.diag_gt import (
     CONSOLIDATED_COLUMNS,
     CONSOLIDATED_STEM,
     DIAGGT_FILE_SUFFIX,
+    DIAGGT_SCHEMA_VERSION,
+    EXTRACTION_METHOD,
     _findings,
     _observation,
     consolidated_rows,
@@ -142,7 +144,7 @@ class TestObservation:
 
 def _document(observations: list[dict[str, object]]) -> dict[str, object]:
     return {
-        "$schema_version": "0.1.1",
+        "$schema_version": DIAGGT_SCHEMA_VERSION,
         "kind": "diagnosis_ground_truth",
         "provenance": {
             "origin": "system-alarm",
@@ -160,7 +162,7 @@ def _document(observations: list[dict[str, object]]) -> dict[str, object]:
             "reviewers": [],
             "extractor": "ams-extract 0.0.0",
             "extracted_at": "2026-07-27T00:00:00Z",
-            "extraction_method": None,
+            "extraction_method": EXTRACTION_METHOD,
         },
         "machines_stopped": [],
         "machines_not_measured": [],
@@ -175,6 +177,9 @@ class TestDocument:
         assert observation is not None
         document = external.DiagGTDocument.model_validate(_document([observation]))
         assert document.provenance.origin == "system-alarm"
+        # Spec 0.1.2: decoding the gdnl record is a deterministic read of a
+        # structured source, not a parse of free text.
+        assert document.provenance.extraction_method == "structured_read"
         assert len(document.observations) == 1
         emitted = document.observations[0]
         assert emitted.status == "ALERT"

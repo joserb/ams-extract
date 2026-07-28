@@ -1,6 +1,6 @@
 # DiagGT — Formato de intercambio de ground truth de diagnóstico externo
 
-**Versión de esquema: 0.1.1** · Estado: propuesta · Ámbito: ecosistema VibFrame
+**Versión de esquema: 0.1.2** · Estado: propuesta · Ámbito: ecosistema VibFrame
 (vibsynth-contracts, vibsynth-diagnostics, ams-extract, t8-extract, t8-mapper)
 
 > **Hogar del contrato**: los **modelos normativos** de DiagGT viven en
@@ -11,6 +11,20 @@
 > el texto citado por `docs/VIBFRAME.md` de contracts. Ante una discrepancia
 > entre este documento y los modelos, gana el modelo — y la discrepancia es un
 > bug de esta spec.
+>
+> **Cambios en 0.1.2** (2026-07-28, retrocompatible con 0.1.1 y 0.1.0 —
+> ningún campo nuevo, ningún campo nuevo obligatorio, ninguna semántica
+> cambiada):
+> - §2.2: el vocabulario de `extraction_method` añade **`structured_read`**
+>   (lectura determinista de una fuente estructurada: decode de récords
+>   binarios, consulta de una tabla SQLite). Los dos productores
+>   `system-alarm` —las notas `gdnl` de AMS y `alarms.db` del T8— lo declaran
+>   en vez de `null`, y §6 retira la decisión abierta correspondiente.
+> - §6: dos decisiones abiertas nuevas, ambas planteadas por el productor T8
+>   — el **GT de calidad de dato** (los fallos del equipo de medida) y la
+>   **precisión temporal** de `observed_at`.
+> - Los documentos que declaran `"0.1.1"` o `"0.1.0"` siguen siendo válidos:
+>   añadir un valor de vocabulario no obliga a nadie a reemitir.
 >
 > **Cambios en 0.1.1** (2026-07-27, retrocompatible con 0.1.0 — ningún campo
 > nuevo obligatorio, ningún cambio de semántica):
@@ -65,7 +79,7 @@ por informe — para que la procedencia sea única y verificable (hash del PDF).
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `$schema_version` | string | semver del esquema DiagGT (`"0.1.1"`; los documentos que declaran `"0.1.0"` siguen siendo válidos — 0.1.1 no añade obligaciones) |
+| `$schema_version` | string | semver del esquema DiagGT (`"0.1.2"`; los documentos que declaran `"0.1.1"` o `"0.1.0"` siguen siendo válidos — ninguna de las dos revisiones añade obligaciones) |
 | `kind` | string | literal `"diagnosis_ground_truth"` |
 | `provenance` | object | ver §2.2 |
 | `machines_stopped` | list[string] | máquinas declaradas paradas en el documento |
@@ -93,7 +107,16 @@ que solo cubre la procedencia del *dato*, con la procedencia de la
 | `analysts`, `reviewers` | list[string] | autoría del análisis |
 | `extractor` | string | herramienta y versión (patrón `SourceInfo.extractor`) |
 | `extracted_at` | datetime ISO | momento de la extracción |
-| `extraction_method` | string | `"pdf_text_parse"` \| `"manual"` \| `"llm"`; `null` cuando ninguno aplica — un decode binario (las alarmas `gdnl` de AMS) no tiene valor propio todavía, ver §6 |
+| `extraction_method` | string | `"pdf_text_parse"` \| `"manual"` \| `"llm"` \| `"structured_read"`; `null` cuando ninguno aplica |
+
+`extraction_method` describe **cómo se llegó del documento fuente al DiagGT**,
+no la calidad del juicio (esa la califica `label_quality` por finding).
+`structured_read` (desde 0.1.2) es la lectura **determinista de una fuente
+estructurada** —el decode de un récord binario o la consulta de una tabla—
+sin interpretación de texto libre: releer la misma fuente da el mismo
+documento. Lo declaran los dos productores `origin="system-alarm"`: las notas
+`gdnl` de AMS (`ams_extract.export.diag_gt`) y `alarms.db` del T8
+(`t8_extract.ground_truth`).
 
 ### 2.3 `observation` — una interpretación
 
@@ -357,10 +380,26 @@ previos): para cada (normalized_tag, observed_at, modality) gana el registro
   (¿ventana de acierto?, ¿multi-etiqueta parcial?) es análogo a
   `EvaluationPolicy` de BenchmarkCase y queda para cuando exista el primer
   consumidor.
-- **`extraction_method` para orígenes binarios**: el vocabulario cubre PDF,
-  manual y LLM; las alarmas que se leen de un binario (`gdnl` de AMS,
-  `alarms.db` del T8) declaran `null` a la espera de un `"binary_decode"`,
-  que sería un cambio menor del contrato.
+- **GT de calidad de dato**: `alarms.db` del T8 trae 15.114 eventos que no son
+  juicios sobre la máquina sino sobre el **equipo de medida** (sensor fuera de
+  rango o de límites, tensión de bias, error de cálculo de un parámetro,
+  adquisición sin tacómetro). Son excelente ground truth de *cuándo un canal
+  no es fiable* —una ventana de dato sospechoso— pero DiagGT v0.1.x modela el
+  estado de la **máquina**, no el del instrumento: no hay `status`, ni
+  `modality`, ni `fault_group` que les corresponda, y meterlos forzaría a
+  mentir en los tres. Quedan sin emitir a propósito (`t8_extract.ground_truth`
+  los cuenta y los declara en el resumen). Si algún día hacen falta, el
+  candidato es un **formato hermano** con su propio `kind` —misma procedencia,
+  otro sujeto— antes que un `origin` más dentro de DiagGT.
+- **Precisión temporal**: `observed_at` es una **fecha** y una alarma es un
+  **instante**. Hoy el instante completo no se pierde —viaja en el
+  `observation_id` (`…:2026-04-20T07:31:12Z:L2`) y en el verbatim de
+  `analysis_text`— pero un consumidor que agrupe por `observed_at` pierde la
+  resolución y no puede ordenar dos eventos del mismo día. Subir la precisión
+  del campo (cambiar el tipo, o añadir un `observed_at_us` opcional al lado)
+  es un cambio de esquema y por tanto decisión de una versión futura: los
+  informes de analista, que son el otro productor, sí son genuinamente
+  diarios y no ganan nada con ello.
 - **Eventos de mantenimiento**: las intervenciones se infieren del texto
   («tras su intervención…»). Un `record_kind="intervention"` sería la
   extensión natural cuando haya fuente estructurada (CMMS).

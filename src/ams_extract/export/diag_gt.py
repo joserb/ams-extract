@@ -57,7 +57,7 @@ from ams_extract.tree import walk_alarm_note, walk_hierarchy
 
 _log = structlog.get_logger(__name__)
 
-DIAGGT_SCHEMA_VERSION = "0.1.1"
+DIAGGT_SCHEMA_VERSION = "0.1.2"
 DIAGGT_KIND = "diagnosis_ground_truth"
 DIAGGT_FILE_SUFFIX = ".diaggt.json"
 GROUND_TRUTH_DIR = "ground-truth"
@@ -70,6 +70,8 @@ DOCUMENT_ID_PREFIX = "ams-gdnl"
 PROVIDER = "AMS Machinery Manager (Emerson)"
 MODALITY = "vibration"
 ORIGIN = "system-alarm"
+EXTRACTION_METHOD = "structured_read"
+"""Decode of a binary record, no free-text interpretation (spec §2.2, 0.1.2)."""
 
 STATUS_BY_LEVEL = {"C": ("ALERT", 2), "D": ("DANGER", 3)}
 """AMS alarm level → (DiagGT ``status``, VibFrame ``alarm``)."""
@@ -366,7 +368,7 @@ def build_alarm_ground_truth(
             "reviewers": [],
             "extractor": _extractor_name(),
             "extracted_at": now.astimezone(UTC).isoformat().replace("+00:00", "Z"),
-            "extraction_method": None,
+            "extraction_method": EXTRACTION_METHOD,
         },
         "machines_stopped": [],
         "machines_not_measured": [],
