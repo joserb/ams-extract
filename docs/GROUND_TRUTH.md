@@ -1,6 +1,6 @@
 # DiagGT — Formato de intercambio de ground truth de diagnóstico externo
 
-**Versión de esquema: 0.1.3** · Estado: propuesta · Ámbito: ecosistema VibFrame
+**Versión de esquema: 0.1.4** · Estado: propuesta · Ámbito: ecosistema VibFrame
 (vibsynth-contracts, vibsynth-diagnostics, vibsynth-metrics, ams-extract,
 t8-extract, t8-mapper)
 
@@ -12,6 +12,31 @@ t8-extract, t8-mapper)
 > el texto citado por `docs/VIBFRAME.md` de contracts. Ante una discrepancia
 > entre este documento y los modelos, gana el modelo — y la discrepancia es un
 > bug de esta spec.
+>
+> **Cambios en 0.1.4** (2026-07-28, retrocompatible con toda la serie 0.1.x —
+> ningún campo nuevo, ningún campo nuevo obligatorio, ninguna semántica
+> cambiada; sólo reglas del extractor, como en 0.1.1 con GT050 y en 0.1.3 con
+> GT900):
+> - §3.3: **GT020–GT024**, las familias de vocabulario que la auditoría de
+>   lectura completa de los informes Bunge encontró recurrentes y sin regla
+>   (distorsión armónica del variador, excentricidad, excitación asíncrona en
+>   alta frecuencia, falta de rigidez / holgura estructural y el vocabulario
+>   de inspección visual). Bajan el `unmapped` del extractor de informes del
+>   10,4 % al 2,3 %.
+> - §3.3: se fija además qué es un **texto de estado** y no de fallo (la
+>   familia «… en buen estado», «fuera de servicio») y que la comprobación es
+>   **por cláusula**, no sobre el texto entero: un «-Falta de rigidez.
+>   -Rodamientos en buen estado.» nombra un fallo.
+> - §6: se corrige la asunción sobre la **matriz de estados coloreada** — las
+>   celdas no son `rects` con color de relleno sino **imágenes**; y entra una
+>   decisión abierta nueva, el **índice de figuras** por observación.
+> - Ninguno de los dos toca el esquema: las reglas GTxxx viven en el extractor
+>   y `mapping_rule` es una cadena libre del namespace GT. Los documentos que
+>   declaran cualquier `"0.1.x"` anterior siguen siendo válidos.
+> - Los modelos de `vibsynth-contracts` **no cambian** con esta revisión;
+>   queda pendiente allí subir la constante `DIAGGT_SCHEMA_VERSION` de
+>   `"0.1.3"` a `"0.1.4"` y la cita de la spec en el docstring del módulo —
+>   edición de documentación, no de contrato.
 >
 > **Cambios en 0.1.3** (2026-07-28, retrocompatible con 0.1.2, 0.1.1 y 0.1.0 —
 > ningún campo nuevo, ningún campo nuevo obligatorio, ninguna semántica
@@ -102,7 +127,7 @@ por informe — para que la procedencia sea única y verificable (hash del PDF).
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `$schema_version` | string | semver del esquema DiagGT (`"0.1.3"`; los documentos que declaran `"0.1.2"`, `"0.1.1"` o `"0.1.0"` siguen siendo válidos — ninguna de las tres revisiones añade obligaciones) |
+| `$schema_version` | string | semver del esquema DiagGT (`"0.1.4"`; los documentos que declaran cualquier `"0.1.x"` anterior siguen siendo válidos — ninguna revisión de la serie añade obligaciones) |
 | `kind` | string | literal `"diagnosis_ground_truth"` |
 | `provenance` | object | ver §2.2 |
 | `machines_stopped` | list[string] | máquinas declaradas paradas en el documento |
@@ -318,7 +343,7 @@ Correspondencia con `FaultMode` (16 modos de vibsynth-contracts):
 `BELT` = {BELT_FAULT}; `STRUCTURE` ⊃ {RESONANCE} (+ debilidad estructural
 mapeada a LOOSENESS approximate).
 
-### 3.3 Reglas de mapeo GTxxx (v0.1)
+### 3.3 Reglas de mapeo GTxxx (prosa de analista)
 
 Las reglas viven en el extractor y se versionan como las IRxxx del t8-mapper:
 cambiar la lógica de una regla obliga a nuevo id o sufijo de versión.
@@ -341,6 +366,39 @@ cambiar la lógica de una regla obliga a nuevo id o sufijo de versión.
 | GT017 | álabe/rodete/VPF/impulsor | BROKEN_BLADE | FLOW | weak |
 | GT018 | rozamiento | — | OTHER | group |
 | GT019 | anclaje/bancada/pernos | LOOSENESS | STRUCTURE | approximate |
+
+**GT020–GT024** (desde 0.1.4) cubren las familias que la auditoría de lectura
+completa de los informes Bunge (2026-07-28 §3.8) encontró **repetidas** en el
+`unmapped` — no casos raros, sino vocabulario habitual del analista sin regla:
+
+| Regla | Patrón (es) | fault_mode | grupo | calidad |
+|---|---|---|---|---|
+| GT020 | distorsión armónica / variador de frecuencia / calidad de la energía | — | ELECTRICAL | group |
+| GT021 | excentricidad | ELECTRICAL_ROTOR | ELECTRICAL | approximate |
+| GT022 | excitación asíncrona / armónicos asíncronos / traza asíncrona | — | BEARING | group |
+| GT023 | falta de rigidez / holgura estructural / pata coja | LOOSENESS | STRUCTURE | approximate |
+| GT024 | ruido mecánico / ruido de origen eléctrico / ruido ultrasónico / cabeceo / fuga de… | — | OTHER | group |
+
+GT022 se emite como `group` y no como `weak`: el origen no nombra ningún
+`FaultMode` concreto —una excitación asíncrona en alta frecuencia es un
+*precursor* de rodamiento o engrane, no el fallo— y el modelo normativo exige
+`fault_mode` a toda calidad que no sea `group`/`unmapped` (§2.5). GT023 cruza
+la agrupación a propósito, como GT005 y GT019.
+
+#### Textos de estado, no de fallo
+
+Un diagnóstico sano, de parada, de no-medida o de fuera de servicio produce
+`findings=[]` (§2.5). El vocabulario de «sano» de los informes no es sólo
+«máquina en buen estado»: el analista escribe también «equipo», «conjunto»,
+«motor», «reductor» o «rodamientos … en buen estado», y v0.1 emitía por ellos
+un `unmapped` espurio.
+
+La comprobación es **por cláusula** —el analista redacta el diagnóstico como
+una lista separada por punto o por guion de viñeta—, no sobre el texto entero:
+sólo si *todas* las cláusulas son de estado el diagnóstico es de estado. Un
+«-Falta de rigidez / Resonancia… -Rodamientos en buen estado.» nombra un fallo
+y una parte sana, y lo que manda es el fallo. Buscar la frase sana en el texto
+completo (v0.1) tiraba los findings de las demás cláusulas.
 
 ### 3.4 Reglas de banda de alarma GT050-GT059 (origen `system-alarm`)
 
@@ -490,9 +548,33 @@ previos): para cada (normalized_tag, observed_at, modality) gana el registro
   el texto; un futuro `component_ref` podría enlazar con nodos de
   `MachineDefinition`.
 - **Matriz de estados coloreada**: la sección "Resumen Estado de Máquinas"
-  del informe codifica 12 meses de estado por color de celda (sin texto). Es
-  redundante con los diagnósticos previos, pero extraerla (color de rects del
-  PDF) daría cadencia mensual completa por máquina.
+  del informe (17 páginas) codifica 12 inspecciones de estado por color de
+  celda, sin texto. Extraerla daría **cadencia mensual completa de toda la
+  planta**: son ~343 filas de máquina por informe contra las 138 que tienen
+  ficha, es decir **209 máquinas que el DiagGT no conoce en absoluto**, y para
+  ellas es la única fuente. Para las que sí tienen ficha es redundante con los
+  diagnósticos previos (§3.3 del extractor de informes).
+  **Corrección de 0.1.4**: hasta 0.1.3 esta spec decía que extraerla era leer
+  el «color de rects del PDF». **No lo es**: las celdas se emiten como
+  **imágenes** (`page.images`, ~2.000 por informe); los únicos `rects` con
+  color de relleno son el gris del zebrado de fila. Sigue siendo una
+  extracción determinista, pero la operación es leer el píxel de cada imagen y
+  casar el color con el vocabulario `status` de §3.1, no inspeccionar
+  atributos de relleno vectoriales. Antes de emitirla hay que decidir si el
+  consolidado admite filas **sin texto** (`diagnosis_text=null`,
+  `findings=[]`) y resolver el crosswalk de los ~209 TAGs nuevos.
+- **Índice de figuras**: cada ficha de máquina lleva sus gráficos con pie
+  («Tendencia de los valores globales…», «Espectros PeakVue…»), que el
+  maquetador intercala con la prosa y que v0.1 dejaba pegados dentro de
+  `analysis_text`. Separarlos es determinista (catálogo cerrado de arranques)
+  y da además una **lista de la evidencia gráfica por máquina**, útil para
+  saber qué miró el analista. El extractor de informes ya la emite como
+  `figures: list[str]` en la observación primaria: es un campo **fuera del
+  esquema**, que los lectores DiagGT ignoran por la regla de §7, y por eso no
+  está en §2.3 ni en los modelos de `vibsynth-contracts`. Formalizarlo —o
+  decidir que la evidencia gráfica no es asunto de DiagGT— es una decisión de
+  una versión futura, porque añadir un campo al modelo normativo sí es un
+  cambio de esquema.
 - **Política de evaluación**: cómo puntuar un `DiagnosisResult` contra DiagGT
   (¿ventana de acierto?, ¿multi-etiqueta parcial?) es análogo a
   `EvaluationPolicy` de BenchmarkCase y queda para cuando exista el primer
