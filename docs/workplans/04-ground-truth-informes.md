@@ -7,18 +7,18 @@ updated: 2026-07-28
 # Plan: ground truth de diagnóstico externo (DiagGT) desde los informes Preditec
 
 **Fecha**: 2026-07-28 · **Estado**: **COMPLETADO**. Formato DiagGT
-especificado (v0.1.2) con modelos normativos en `vibsynth-contracts`
+especificado (v0.1.4) con modelos normativos en `vibsynth-contracts`
 (ADR-0016) y validador `vibframe-validate` con goldens por origen; los 6
-informes BUNGE 2026 extraídos y verificados (2.321 observaciones del
-analista); crosswalk contra `bunge_cartagena_ams` resuelto (273/283 tags,
-95,7 % de observaciones; 10 restantes descartados por decisión); overlay
-DiagGT en el visor `vibframe-viewer`; y las dos fuentes `system-alarm`
-emitidas: `gdnl` de AMS (973 obs, ADR-0018, validación 991/991 contra
-`pdla`) y `alarms.db` del T8 (91 obs en 3 datasets, workplan 05 de
-t8-extract). `bunge_cartagena_ams` re-exportado con ADR-0017 y en PASS
-permanente de `vibframe-validate` (347 máquinas, 7 documentos DiagGT,
-3.294 observaciones, 0 errores). Flecos supervivientes al final del
-documento.
+informes BUNGE 2026 extraídos y verificados (**6.669 observaciones del
+analista** tras el fix de geometría de columnas de la auditoría, Hecho §10-§12);
+crosswalk contra `bunge_cartagena_ams` resuelto (273/283 tags, 95,9 % de
+observaciones; 10 restantes descartados por decisión); overlay DiagGT en el
+visor `vibframe-viewer`; y las dos fuentes `system-alarm` emitidas: `gdnl` de
+AMS (973 obs, ADR-0018, validación 991/991 contra `pdla`) y `alarms.db` del T8
+(91 obs en 3 datasets, workplan 05 de t8-extract). `bunge_cartagena_ams`
+re-exportado con ADR-0017 y en PASS permanente de `vibframe-validate` (347
+máquinas, 7 documentos DiagGT, **7.642 observaciones**, 0 errores). Flecos
+supervivientes al final del documento.
 
 ## Contexto
 
@@ -284,13 +284,173 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
      consolidado propio. `extraction_method` queda `null`: el vocabulario
      no contempla un decode binario (propuesto `"binary_decode"`).
 
-## Limitaciones conocidas (v0.1)
+10. **Auditoría de cobertura por lectura completa** (2026-07-28) —
+    `../Informes Bunge Cartagena 2026/ground-truth/audit-lectura-completa-mayo-2026.md`.
+    Lectura íntegra de las 167 páginas del informe de Mayo (el mayor y el de
+    más anomalías estructurales), con los contadores calculados sobre los 6.
+    Veredicto: el extractor determinista **no** tenía un problema de
+    comprensión de texto libre sino de **geometría de columnas**. La sospecha
+    de partida (texto ad-hoc valioso fuera del formato de ficha) se confirma
+    sólo en parte —hay **un único** estudio especial en 921 páginas, el bloque
+    «ACTUALIZACIÓN» de `TC.1523A2` en Abril pp. 134-136—, y la pérdida grande
+    resultó estar *dentro* de las fichas: **el 87 % de los diagnósticos
+    retrospectivos** (4.348 de 4.999). Lo bueno queda confirmado: detección de
+    fichas 826/826, `provenance` completo, paradas/no-medidas correctas y
+    reparto por modalidad correcto.
 
-- Los pies de figura («Tendencia de…», «Espectros…») quedan al final de
-  `analysis_text` (la maquetación no los distingue tipográficamente).
-- La matriz coloreada "Resumen Estado de Máquinas" (≈12 meses de estado por
-  color de celda, sin texto) no se extrae; daría cadencia mensual completa
-  por máquina. Requiere leer color de rects del PDF.
+11. **Extractor v0.2.0 — el fix determinista de la auditoría** (2026-07-28,
+    prioridad 1 de §5.1 de la auditoría; sigue siendo
+    `extraction_method="pdf_text_parse"`, sin pasada LLM):
+    - **(a) Previos de las cuatro fuentes.** `parse_machine_page` sólo miraba
+      `right["DIAGNÓSTICOS PREVIOS:"]`, pero el maquetador coloca el bloque en
+      la **izquierda** siempre que la ficha es simple (la derecha queda para
+      los gráficos), que es el caso del ~80 % de las máquinas. Ahora se unen
+      izquierda/derecha × sección/`_pre` y se deduplica por (fecha,
+      modalidad), ganando el texto más largo ante un reflujo partido.
+    - **(b) Páginas de continuación.** Si una página no es ficha pero casa
+      `PREV_DIAG_RE`, sus entradas se arrastran a la **última ficha vista**:
+      6 páginas en el corpus (Enero p73, Marzo p64, Abril p72 y p136, Mayo p88
+      y p94), 39 entradas, atribución inequívoca. La auditoría dice «5
+      páginas» en el texto de §3.3 pero enumera 6 en la misma frase; son 6.
+      Abril p136 es a la vez continuación de `TC.1523A2` **y** cola del
+      estudio ad-hoc, con la p135 (que no lleva anclas) en medio.
+    - **(c) Pie de página en `column_text`.** La columna derecha no tenía cota
+      inferior, así que el número de página caía dentro de la última sección y
+      se pegaba al último diagnóstico previo: **57 textos** saneados
+      (`"Máquina parada 77"`, `"Cabeceo de la máquina. 74"`). Se pasa la misma
+      banda `45 < top < height − 40` que ya usaba la detección de título, en
+      las dos columnas. El recorte `y_min=100` de la derecha baja a 45: el
+      bloque de previos arranca a veces por encima de 100 y su cabecera se
+      perdía (§3.2, 46 fichas / 242 entradas).
+    - **(d) `global_status_label` con vocabulario cerrado** y banda **anclada
+      al `Área:`** en vez de al `top` absoluto. La ventana fija recogía la
+      línea de RPM o el título; y en la primera ficha de cada área, que baja
+      ~45 pt por el epígrafe «2 Análisis», se perdía además el estado por
+      modalidad (`TC.1523A2` de Abril pasaba de DANGER a UNKNOWN en inspección
+      visual). De **20 valores distintos a 7**: 276 observaciones con la
+      etiqueta arreglada y 127 `status_source_label` corregidos.
+    - **(e) Pies de figura fuera del texto.** Catálogo cerrado de arranques
+      (`Tendencia…`, `Espectros?…`, `Evolución…`, `Firmas…`, `Formas de
+      onda…`, `Comparación…`) más la regla de continuación «la línea siguiente
+      arranca en minúscula» —los pies parten a mitad de sintagma y la prosa
+      reabre con mayúscula—. 346 pies separados de `analysis_text`, que además
+      queda **continuo** cuando el análisis seguía después del pie. Se emiten
+      como `figures: list[str]`, campo **fuera del esquema** que los lectores
+      DiagGT ignoran (spec §7): formalizarlo exigiría tocar los modelos de
+      contracts y queda anotado en la spec §6, no hecho.
+    - **(f) Reglas GT020–GT024 y vocabulario de «sano».** `unmapped` del
+      **10,4 % al 2,3 %** (73 → 29 findings). GT022 se emite `group` y no
+      `weak` como proponía la auditoría: el modelo normativo exige
+      `fault_mode` a toda calidad que no sea `group`/`unmapped`, y una
+      excitación asíncrona no nombra ningún modo concreto. Además el
+      cortocircuito de «texto sano» pasa a evaluarse **por cláusula**: con
+      `search` sobre el texto entero, ampliar `HEALTHY_RE` a «equipo /
+      rodamientos en buen estado» tiraba los fallos de un
+      «-Falta de rigidez / Resonancia… -Rodamientos en buen estado.» (24
+      observaciones detectadas en la comparación antes/después).
+    - **Invariante de anclas** dentro del extractor: por ficha, las anclas
+      `-DD/MM/AAAA: (Modalidad)` del cuerpo de la página tienen que ser
+      exactamente las que suman las cuatro fuentes. **826/826 fichas, 4.960 =
+      4.960**; el extractor aborta si alguna no cuadra. Es el test que fija la
+      geometría: si una futura maquetación vuelve a esconder texto, salta.
+    - **Desempate del consolidado**: el dedupe de retrospectivos ordenaba por
+      `document_id`, que lleva la fecha en DDMMAA y **no ordena
+      cronológicamente** (`…-250526` < `…-260226`). Pasa a `inspection_date`
+      ISO, que es lo que la spec §5 pide («gana el del documento más
+      reciente»).
+
+12. **Cifras de la re-extracción** (2026-07-28) — antes → después:
+    - `*.diaggt.json`: 2.321 → **6.669 observaciones** (1.670 primarias
+      inalteradas + 651 → **4.999 retrospectivas**, el 100 % de las anclas del
+      PDF).
+    - Consolidado: 1.881 → **3.379 filas** (+1.498 únicas, **+80 %**), **0
+      filas perdidas**, 283 `normalized_tag` (los mismos).
+    - De las 1.498 nuevas, **112 con texto de fallo real** (el resto son
+      etiquetas negativas: 901 sanas, 479 paradas, 6 no medidas), de las que
+      **102 mapean a grupo** — STRUCTURE 45, LOOSENESS 20, BEARING 19,
+      LUBRICATION 15, ELECTRICAL 14, IMBALANCE 13, OTHER 12, MISALIGNMENT 6,
+      FLOW 2 — y 10 quedan `unmapped`.
+    - `findings`: 702 → 1.286; `unmapped` 73 (10,4 %) → **29 (2,3 %)**.
+    - Rango temporal **2025-04-22 → 2026-06-25, sin cambio**: la profundidad
+      es lo que crece (2025-04-22 pasa de 12 a 114 filas; 2025-07-25 de 14 a
+      221). La auditoría anuncia «8 fechas nuevas, histórico hasta
+      2025-04-22», pero eso es cierto **contra las observaciones primarias**
+      (que arrancan en 2026-01-26), no contra el consolidado de v0.1, que ya
+      llegaba a 2025-04-22 con los 651 retrospectivos que sí leía. **No hay
+      fechas nuevas**: son las mismas 14.
+    - Verificación: **fidelidad muestral 150/150** (25 retrospectivos
+      aleatorios por informe, semilla fija) contra el texto de la columna
+      extraído por `page.crop().extract_text()` —el motor de layout propio de
+      pdfplumber, vía independiente de `words_to_lines`—, con el script
+      reproducible `ground-truth/verify_previous.py`.
+    - Crosswalk re-ejecutado: 283 tags → 273 resueltos (96,5 %), **3.239 de
+      3.379 filas (95,9 %)**, 273 de 347 máquinas del dataset, **0
+      discrepancias de área**. Contrato de columnas del consolidado
+      **idéntico** (mismos nombres, mismo orden, mismos dtypes) — el visor lo
+      lee sin cambios.
+    - `vibframe-validate --strict` sobre `bunge_cartagena_ams`: **PASS**, 347
+      máquinas, 7 documentos DiagGT, 7.642 observaciones, 0 errores, 0 avisos.
+
+13. **Spec DiagGT v0.1.4** (2026-07-28) — [`../GROUND_TRUTH.md`](../GROUND_TRUTH.md),
+    retrocompatible, sin tocar el esquema (mismo patrón que GT050 en 0.1.1 y
+    GT900 en 0.1.3: las reglas GTxxx viven en el extractor y `mapping_rule` es
+    una cadena libre del namespace GT):
+    - §3.3: tabla **GT020–GT024**, la nota de por qué GT022 es `group` y no
+      `weak`, y un apartado nuevo sobre **textos de estado y no de fallo** con
+      la regla de comprobación por cláusula.
+    - §6: se corrige la asunción errónea sobre la **matriz coloreada** —las
+      celdas son **imágenes** (`page.images`, ~2.000 por informe), no `rects`
+      con color de relleno; los únicos `rects` coloreados son el zebrado gris
+      de fila— y se dimensiona lo que aporta (209 máquinas sin ficha). Entra
+      la decisión abierta del **índice de figuras**.
+    - Pendiente en `vibsynth-contracts` (fuera del alcance de esta sesión):
+      subir `DIAGGT_SCHEMA_VERSION` a `"0.1.4"` y la cita de la spec en el
+      docstring de `diagnosis/external.py`. Es documentación, no contrato: los
+      modelos no cambian y los documentos siguen declarando `"0.1.0"`.
+
+## Limitaciones conocidas (v0.2)
+
+- **La matriz coloreada "Resumen Estado de Máquinas"** sigue sin extraerse.
+  Es el fleco grande: 17 páginas por informe, ~343 filas de máquina contra
+  las 138 con ficha, es decir **209 máquinas de planta que el DiagGT no
+  conoce**, y ~2.000 celdas pintadas por informe. Para las 138 con ficha es
+  redundante con los previos ya recuperados; **el valor está en las otras
+  209**. Corregida en la spec la asunción de v0.1: las celdas son
+  **imágenes**, no `rects` con color de relleno, así que la extracción es
+  leer el píxel de cada `page.images` y casarlo por coordenada (fila, columna
+  de fecha). Antes hay que decidir si el consolidado admite filas sin texto y
+  resolver el crosswalk de 209 TAGs nuevos. Paso separado y posterior, como
+  recomienda la auditoría §5.1(g).
+- **`ANÁLISIS` desbordado a la columna derecha** (auditoría §3.5): cuando la
+  cola del análisis no cabe, salta al hueco de la derecha y cae en
+  `right["_pre"]`, donde hoy sólo se minan anclas de previos. Son ~7 párrafos
+  en los 6 informes, siempre en las mismas 2 máquinas de layout más denso
+  (`CF.9110S1` y `TC.1523A2`), pero de alto valor unitario: en Enero/Febrero/
+  Marzo el `ANÁLISIS` de Ultrasonidos de `TC.1523A2` se pierde entero
+  (`analysis_text = null`) y es el precursor, cuatro meses antes, del fallo
+  que desencadena el estudio ad-hoc de Abril.
+- **Estudio ad-hoc «ACTUALIZACIÓN»** (Abril pp. 134-136): 1 caso en 921
+  páginas, sin encabezado predecible y con el texto duplicado entre columnas
+  por el reflujo. La ficha de la p134 sí se extrae y su diagnóstico ya
+  dispara GT014; lo que se pierde es la **evidencia cuantitativa** (la
+  cinemática del reductor, los tres GMF y la frecuencia observada de 13 Hz).
+  Vía LLM o manual, no regla.
+- **Evidencia e intervenciones que sólo viven en `ANÁLISIS`/`RECOMENDACIÓN`**
+  (auditoría §3.7): `map_findings` se aplica sólo a `diagnosis_text`. Sobre
+  las 224 observaciones con análisis hay 69 intervenciones fechadas, 66
+  medidas numéricas (mm/s, Hz) y 45 peticiones/contexto de cliente que no
+  aparecen en el diagnóstico. Es el caso donde un LLM aporta de verdad
+  (prioridad 2 de la auditoría, §5.2), y exige decidir antes el esquema
+  (`record_kind="intervention"` ya está apuntado en la spec §6; la evidencia
+  numérica no tiene hueco todavía).
+- **`unmapped` residual**: 29 findings (2,3 %). Casi todos son honestos —
+  peticiones de información coladas como diagnóstico («Informar a Preditec si
+  se ha intervenido», 12) y estados de planta («Linea 1 de refinería
+  parada», 5)—. El único candidato claro a regla nueva es «bandas laterales
+  … fallo de barras sueltas» (4), que es `ELECTRICAL_ROTOR` de libro y pide
+  un GT025; se deja fuera por no salirse del alcance GT020–GT024 del encargo.
+- `figures` es un campo **fuera del esquema** (spec §7 manda ignorarlo).
+  Formalizarlo exige tocar los modelos de `vibsynth-contracts`.
 - Sin severidad numérica: los informes dan categorías; el mapeo a [0,1] se
   deja como política del consumidor (ver spec §6).
 
@@ -323,8 +483,22 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
    anotaciones). Spec consolidada en **v0.1.2** (2026-07-28):
    `extraction_method="structured_read"` adoptado por ambos productores y
    documentos regenerados.
+5. ~~Auditar la cobertura del extractor por lectura completa de un informe~~ —
+   **hecho 2026-07-28** (Hecho §10) y **fix determinista ejecutado**
+   (Hecho §11-§13, extractor v0.2.0, spec v0.1.4). Pendiente derivado: subir
+   `DIAGGT_SCHEMA_VERSION` a `"0.1.4"` en `vibsynth-contracts` (documentación,
+   no contrato). La **matriz de estados coloreada** queda como paso aparte y
+   posterior, con la asunción de la spec ya corregida (celdas = imágenes).
 
 ## Flecos que sobreviven al plan (fuera de su alcance)
+
+- Matriz coloreada «Resumen Estado de Máquinas»: ~209 máquinas de planta sin
+  ficha y ~2.000 celdas por informe, legibles por el píxel de `page.images`
+  (ver «Limitaciones conocidas (v0.2)»).
+- Pasada LLM quirúrgica de la auditoría §5.2: el bloque ad-hoc de Abril, la
+  evidencia numérica e intervenciones de `analysis_text` y el re-mapeo de los
+  29 `unmapped` residuales.
+- `ANÁLISIS` desbordado a la columna derecha (~7 párrafos, 2 máquinas).
 
 - Ley de la severidad `gdsc.0x1A` en zona D y las 18 alarmas con unidad
   inconsistente (FORMAT §5.9).
