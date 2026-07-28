@@ -1,7 +1,8 @@
 # DiagGT — Formato de intercambio de ground truth de diagnóstico externo
 
-**Versión de esquema: 0.1.2** · Estado: propuesta · Ámbito: ecosistema VibFrame
-(vibsynth-contracts, vibsynth-diagnostics, ams-extract, t8-extract, t8-mapper)
+**Versión de esquema: 0.1.3** · Estado: propuesta · Ámbito: ecosistema VibFrame
+(vibsynth-contracts, vibsynth-diagnostics, vibsynth-metrics, ams-extract,
+t8-extract, t8-mapper)
 
 > **Hogar del contrato**: los **modelos normativos** de DiagGT viven en
 > `vibsynth-contracts` (`vibsynth_contracts.diagnosis.external`, Pydantic v2),
@@ -11,6 +12,22 @@
 > el texto citado por `docs/VIBFRAME.md` de contracts. Ante una discrepancia
 > entre este documento y los modelos, gana el modelo — y la discrepancia es un
 > bug de esta spec.
+>
+> **Cambios en 0.1.3** (2026-07-28, retrocompatible con 0.1.2, 0.1.1 y 0.1.0 —
+> ningún campo nuevo, ningún campo nuevo obligatorio, ninguna semántica
+> cambiada):
+> - §2.2: el vocabulario de `origin` añade **`synthetic-truth`** — el juicio
+>   derivado de la *verdad de construcción* de un dataset sintético. Es el
+>   único origen no falible del vocabulario, y §2.2 documenta el matiz
+>   epistemológico y lo que implica en los demás campos.
+> - §3.5: familia de reglas **GT900–GT919**, el namespace del extractor
+>   sintético; hoy la ocupa una sola regla, GT900, la identidad.
+> - §4: dónde consolida `synthetic-truth` (en `observations.parquet`, porque
+>   nunca convive con informes de analista) y §6 recoge las dos políticas que
+>   su primer productor —`vibsynth_metrics.diag_gt_export`— ha tenido que
+>   declarar: cadencia de observación y severidad→`status`.
+> - Los documentos que declaran `"0.1.2"`, `"0.1.1"` o `"0.1.0"` siguen siendo
+>   válidos: añadir un valor de vocabulario no obliga a nadie a reemitir.
 >
 > **Cambios en 0.1.2** (2026-07-28, retrocompatible con 0.1.1 y 0.1.0 —
 > ningún campo nuevo, ningún campo nuevo obligatorio, ninguna semántica
@@ -52,9 +69,15 @@ etiqueta de campo, histórico de mantenimiento):
   sintética*: sus campos obligatorios (`seed`, `profile`,
   `operating_conditions.rpm_factor`) no tienen sentido para un informe real.
   Es además el único hueco de GT en VibFrame (`MachineDoc.ground_truth`) y es
-  por caso/máquina, no por instante.
+  por caso/máquina, no por instante. (Desde 0.1.3 hay un puente en la otra
+  dirección: el origen `synthetic-truth` de §2.2 publica el *contenido* de esa
+  inyección como observaciones DiagGT fechadas —sin sustituir el campo, que
+  sigue siendo el que hace reproducible la generación.)
 - `ground_truth.csv` de fleet_demo es un esquema ad hoc por dataset (una
   columna `severity_<modo>` por modo activo), sin versionado ni procedencia.
+  Desde 0.1.3 es, además, la *fuente* del origen `synthetic-truth`: sigue
+  existiendo tal cual para el análisis en pandas, y DiagGT es su proyección
+  versionada y con procedencia.
 - `BenchmarkCase` (peak-finder v3) etiqueta *picos espectrales*, no estados de
   máquina.
 
@@ -79,7 +102,7 @@ por informe — para que la procedencia sea única y verificable (hash del PDF).
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `$schema_version` | string | semver del esquema DiagGT (`"0.1.2"`; los documentos que declaran `"0.1.1"` o `"0.1.0"` siguen siendo válidos — ninguna de las dos revisiones añade obligaciones) |
+| `$schema_version` | string | semver del esquema DiagGT (`"0.1.3"`; los documentos que declaran `"0.1.2"`, `"0.1.1"` o `"0.1.0"` siguen siendo válidos — ninguna de las tres revisiones añade obligaciones) |
 | `kind` | string | literal `"diagnosis_ground_truth"` |
 | `provenance` | object | ver §2.2 |
 | `machines_stopped` | list[string] | máquinas declaradas paradas en el documento |
@@ -94,7 +117,7 @@ que solo cubre la procedencia del *dato*, con la procedencia de la
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `origin` | string | tipo de fuente: `"inspection-report"`, `"analyst-annotation"`, `"system-alarm"` (alarma del propio sistema: `gdnl` de AMS, `alarms.db` del T8 — juicio automático por umbral, no de analista); otros futuros: `"cmms"`, `"work-order"` |
+| `origin` | string | tipo de fuente: `"inspection-report"`, `"analyst-annotation"`, `"system-alarm"` (alarma del propio sistema: `gdnl` de AMS, `alarms.db` del T8 — juicio automático por umbral, no de analista), `"synthetic-truth"` (verdad de construcción de un dataset sintético, ver abajo); otros futuros: `"cmms"`, `"work-order"` |
 | `provider` | string | organización autora (p. ej. `"Preditec"`) |
 | `document_id` | string | referencia del documento (`"P25/81115-260126"`) |
 | `document_title` | string | título legible |
@@ -112,11 +135,49 @@ que solo cubre la procedencia del *dato*, con la procedencia de la
 `extraction_method` describe **cómo se llegó del documento fuente al DiagGT**,
 no la calidad del juicio (esa la califica `label_quality` por finding).
 `structured_read` (desde 0.1.2) es la lectura **determinista de una fuente
-estructurada** —el decode de un récord binario o la consulta de una tabla—
-sin interpretación de texto libre: releer la misma fuente da el mismo
-documento. Lo declaran los dos productores `origin="system-alarm"`: las notas
-`gdnl` de AMS (`ams_extract.export.diag_gt`) y `alarms.db` del T8
-(`t8_extract.ground_truth`).
+estructurada** —el decode de un récord binario, la consulta de una tabla— sin
+interpretación de texto libre: releer la misma fuente da el mismo documento.
+Lo declaran los dos productores `origin="system-alarm"` —las notas `gdnl` de
+AMS (`ams_extract.export.diag_gt`) y `alarms.db` del T8
+(`t8_extract.ground_truth`)— y también el productor `synthetic-truth`
+(`vibsynth_metrics.diag_gt_export`), que lee la tabla de verdad
+(`ground_truth.csv`) del dataset sintético y ancla su hash en
+`source_sha256`.
+
+#### `synthetic-truth` — el único origen no falible (desde 0.1.3)
+
+Un dataset generado sintéticamente conoce su verdad **por construcción**: sabe
+qué modos de fallo inyectó y con qué severidad, captura a captura. Publicar esa
+verdad como DiagGT permite que un dataset sintético lleve el mismo sidecar
+`ground-truth/` que uno de planta real y que el mismo consumidor —el visor, un
+evaluador de diagnóstico— los lea por la misma puerta. El productor actúa como
+un **«analista perfecto y omnisciente»**: no infiere el diagnóstico de la
+medida, lo deriva del plan de inyección, así que ni falla un fallo ni se
+inventa ninguno.
+
+Ese matiz no es decorativo — se lee en los campos del contrato:
+
+- `label_quality` es siempre `direct`. El modo canónico no se deduce de un
+  texto: se copia del `FaultMode` que se inyectó (regla GT900, §3.5). Nunca
+  aparecen `approximate`, `weak`, `group` ni `unmapped`.
+- El `status` no lleva incertidumbre: sale de la severidad [0,1] de la
+  inyección por una política de umbrales que el productor **declara** (§6).
+- `analysts` queda **vacío**, y a propósito: nadie firmó este juicio, se
+  derivó. La autoría entera está en `extractor`.
+
+Consecuencia práctica: un DiagGT `synthetic-truth` es la **referencia superior**
+contra la que evaluar un diagnóstico automático —el techo de acierto
+alcanzable—, no una opinión más que promediar con las otras. Un consumidor que
+pondere orígenes debería tratarlo aparte.
+
+Este origen **cruza a propósito** la frontera que §1 traza entre
+`MachineDoc.ground_truth` (verdad por construcción, por máquina, del dataset
+sintético) y DiagGT (juicio, por instante): toma el contenido de la primera y
+lo republica con la granularidad y la procedencia del segundo. Lo que no hace
+es sustituirla: `machine.json` sigue siendo el sitio del `FailureModeCase` con
+su `seed` y su `profile` —lo que hace reproducible la inyección—, los dos
+pueden convivir sin decirse nada, y la tabla de `docs/VIBFRAME.md` que los
+distingue sigue vigente para todo lo demás.
 
 ### 2.3 `observation` — una interpretación
 
@@ -304,6 +365,33 @@ Las bandas sin semántica de fallo (SUBSINCRONO, OVERALL VALUE, Mp Wave,
 Implementación de referencia: `ams_extract.export.diag_gt` (ADR-0018 de
 ams-extract), que emite las alarmas `gdnl` de una base AMS.
 
+### 3.5 Reglas del extractor sintético GT900-GT919 (origen `synthetic-truth`)
+
+Bloque reservado para el extractor de verdad sintética, disjunto de las reglas
+de prosa (§3.3) y de las de banda (§3.4). Hoy lo ocupa **una sola regla**,
+porque hay una sola operación de mapeo y es la identidad: el origen no dice
+«desequilibrio» en castellano, dice `IMBALANCE` — ya *es* el vocabulario
+canónico.
+
+| Regla | Patrón | fault_mode | grupo | calidad |
+|---|---|---|---|---|
+| GT900 | `FaultMode` inyectado | el mismo modo | el suyo (§3.2) | direct |
+
+No hay regla de «sano»: una máquina sin fallo inyectado produce
+`findings=[]`, como cualquier diagnóstico sano (§2.5). La diferencia con los
+demás orígenes es que aquí ese vacío **afirma** la salud en vez de sólo no
+afirmar nada, porque el productor es omnisciente: si no hay finding es que no
+se inyectó nada, no que el analista no lo viera.
+
+Tampoco hay `unmapped`: si la tabla de verdad nombrara un modo fuera del
+catálogo canónico, el extractor **falla** en vez de emitir. Es el mismo
+criterio de «no emitir lo no validado» aplicado a un origen que, por
+construcción, no puede tener texto ambiguo — un modo desconocido ahí es un bug
+del generador, no una imprecisión del origen.
+
+Implementación de referencia: `vibsynth_metrics.diag_gt_export`, que emite la
+verdad de construcción de los datasets demo de vibsynth.
+
 ## 4. Convenciones de fichero
 
 ```
@@ -324,6 +412,14 @@ Los documentos de distinto `origin` conviven en el mismo directorio (los
 consolidado**: cada familia proyecta al suyo (`observations.parquet` para los
 informes, `observations_system.parquet` para las alarmas del sistema), porque
 las reglas de deduplicación de §5 sólo tienen sentido dentro de una familia.
+
+`synthetic-truth` consolida en **`observations.parquet`**, la familia
+principal, y no en un fichero propio: es el juicio primario de un dataset
+sintético y no convive nunca con informes de analista (nadie inspecciona una
+máquina que no existe). Es además el fichero que lee el visor, que así pinta
+las bandas de estado de un dataset sintético igual que las de uno real. Si
+algún día un dataset llevara ambas familias, la regla de §5 seguiría
+mandando: separarlas.
 
 `ground-truth/` es **un único directorio**, no dos: §2.4 dice que la tabla de
 crosswalk se mantiene junto al dataset y este §4 la sitúa bajo
@@ -367,7 +463,28 @@ previos): para cada (normalized_tag, observed_at, modality) gana el registro
 - **Severidad numérica**: los informes dan categorías, no severidad [0,1].
   Se decidió NO inventar un mapeo `status→severity`; si diagnostics lo
   necesita, que lo declare como política propia (p. ej. WATCH=0.3, ALERT=0.6,
-  DANGER=0.9) y lo documente en su evaluación.
+  DANGER=0.9) y lo documente en su evaluación. Desde 0.1.3 hay un productor
+  que recorre el camino **inverso** —`synthetic-truth` parte de la severidad
+  de la inyección y tiene que llegar al `status`— y la spec le exige lo mismo:
+  declarar la política, no esconderla. La primera declarada, por
+  `vibsynth_metrics.diag_gt_export`, toma como cotas superiores las
+  severidades representativas que sugiere el párrafo anterior:
+  `0 → OK`, `≤ 0,30 → WATCH`, `≤ 0,60 → ALERT`, `> 0,60 → DANGER`, **sin
+  banda muerta** (cualquier severidad inyectada distinta de cero es al menos
+  WATCH, porque el fallo se conoce, no se mide). Sigue siendo política de
+  productor, no del esquema: otro emisor sintético puede declarar otra, y por
+  eso viaja escrita en `analysis_text` de cada observación.
+- **Cadencia de observación**: DiagGT no dice cada cuánto se observa —el
+  informe de analista lo hereda de su ruta— pero un productor que fabrica las
+  fechas sí tiene que decidirlo. `synthetic-truth` declara una **ruta
+  simulada**: la verdad se colapsa a día (`observed_at` es una fecha, §2.3)
+  quedándose con el peor estado del día, y se observa el primer día, el
+  último, todo día en que cambia el `status`, todo día en que cambia el
+  **conjunto de modos inyectados** (aunque el `status` no se mueva: un fallo
+  nuevo es noticia) y un suelo de N días entre observaciones. Los dos
+  disparadores de cambio son los que hacen que las bandas caigan exactamente
+  sobre las transiciones de la verdad; el suelo es lo que impide que una
+  máquina sana quede muda en vez de afirmada sana.
 - **Localización de componente**: «rodamientos de la bomba» localiza el
   fallo mejor que `machine_id` pero peor que un `point_id`. v0.1 lo deja en
   el texto; un futuro `component_ref` podría enlazar con nodos de
@@ -412,6 +529,11 @@ previos): para cada (normalized_tag, observed_at, modality) gana el registro
   la versión normativa del esquema; el CLI `vibframe-validate` de
   vibsynth-contracts los aplica a los `*.diaggt.json` que encuentre en
   `<dataset>/ground-truth/`.
+- **Productores conocidos**: `ams_extract.export.diag_gt` (`system-alarm`,
+  alarmas `gdnl` de AMS), `t8_extract.ground_truth` (`system-alarm`,
+  `alarms.db` del T8), los extractores de informes de Bunge
+  (`inspection-report`) y `vibsynth_metrics.diag_gt_export`
+  (`synthetic-truth`, verdad de construcción de los datasets sintéticos).
 - Lectores DiagGT deben ignorar campos desconocidos (regla VibFrame).
 - Añadir campo opcional o valor de vocabulario ⇒ sube versión menor;
   cambiar semántica de campo existente ⇒ versión mayor.
