@@ -1,20 +1,24 @@
 ---
-status: in-progress
+status: completed
 created: 2026-07-27
-updated: 2026-07-27
+updated: 2026-07-28
 ---
 
 # Plan: ground truth de diagnóstico externo (DiagGT) desde los informes Preditec
 
-**Fecha**: 2026-07-27 · **Estado**: formato **v0.1.1** especificado (Hecho §7),
-extracción de los 6 informes BUNGE 2026 completada y verificada, revisión de
-`t8-extract` hecha (compatible, ver Hecho §4), **crosswalk contra
-`bunge_cartagena_ams` resuelto** (Hecho §5: 273/283 tags, 95,7 % de las
-observaciones), `ground-truth/` registrado en `VIBFRAME.md` (Hecho §6) y
-**contrato DiagGT mudado a `vibsynth-contracts`** con validador y goldens
-(Hecho §8, ADR-0016) y **alarmas `gdnl` de AMS emitidas como DiagGT
-`origin="system-alarm"`** (Hecho §9, ADR-0018: 973 observaciones sobre 235
-máquinas). Pendiente: overlay del visor y el lado T8 (`alarms.db`).
+**Fecha**: 2026-07-28 · **Estado**: **COMPLETADO**. Formato DiagGT
+especificado (v0.1.2) con modelos normativos en `vibsynth-contracts`
+(ADR-0016) y validador `vibframe-validate` con goldens por origen; los 6
+informes BUNGE 2026 extraídos y verificados (2.321 observaciones del
+analista); crosswalk contra `bunge_cartagena_ams` resuelto (273/283 tags,
+95,7 % de observaciones; 10 restantes descartados por decisión); overlay
+DiagGT en el visor `vibframe-viewer`; y las dos fuentes `system-alarm`
+emitidas: `gdnl` de AMS (973 obs, ADR-0018, validación 991/991 contra
+`pdla`) y `alarms.db` del T8 (91 obs en 3 datasets, workplan 05 de
+t8-extract). `bunge_cartagena_ams` re-exportado con ADR-0017 y en PASS
+permanente de `vibframe-validate` (347 máquinas, 7 documentos DiagGT,
+3.294 observaciones, 0 errores). Flecos supervivientes al final del
+documento.
 
 ## Contexto
 
@@ -299,26 +303,34 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
    sigue siendo una entrada manual en `crosswalk.csv`. Descartada también,
    de momento, la evaluación contra abr–jun 2026: no hay `.rbm` más
    reciente que 2026-03-26 ni informes nuevos previstos.
-2. **Overlay en el visor** (opcional, tras la mudanza a repo
-   `vibframe-viewer`): endpoint `/api/diaggt/<key>` + bandas de estado en el
-   timeline (`setBands()`) y/o `layout.shapes` en las tendencias; badge de
-   status DiagGT en el panel. Todo aditivo, sin colisiones detectadas.
-3. ~~Regenerar la copia de cortesía~~ — hecho 2026-07-27 (sincronizada a
-   v0.1.1). ~~**Arreglar `waves.n_samples`**~~ — **hecho 2026-07-27**
-   (ADR-0017): `Waveform.n_samples` es ya la longitud del array emitido y el
-   bloque nominal de AMS viaja en `nominal_n_samples` → notas del
-   `proc_mode`. De paso queda cerrada la incógnita del padding (FORMAT §5.5:
-   `stored = 244 · ceil((nominal − 150) / 244)`, verificado en las 137.208
-   waveforms de BUNGE). Falta **re-exportar `bunge_cartagena_ams`** para que
-   el dataset publicado valide (~19 s con `--parallel 4`); y queda como tema
-   aparte, con gold propio, si el array emitido debe recortarse al payload
-   real en vez de publicar la cola de ceros.
-4. ~~Extracción de los récords `gdnl` del `.rbm`~~ — **hecho 2026-07-27**
-   (Hecho §9, ADR-0018): 973 observaciones `origin="system-alarm"` emitidas
-   y validadas 991/991 contra los umbrales `pdla`. Queda el **lado T8**:
-   `data/alarms.db` y `annotations/*.json` del backup, hoy sin extraer,
-   podrían emitirse igual (`system-alarm` para las alarmas,
-   `analyst-annotation` para las anotaciones) — trabajo en t8-extract.
-   Sub-pendientes menores heredados del decode: la ley de la severidad
-   `gdsc.0x1A` en la zona D (41-100) y las 18 alarmas con unidad
-   inconsistente, ambos en FORMAT §5.9.
+2. ~~Overlay en el visor~~ — **hecho 2026-07-27** en el repo
+   `vibframe-viewer` (workplan 02 de ese repo): endpoint `/api/diaggt/<key>`,
+   bandas de estado en el timeline (banda hasta la siguiente observación;
+   la última, 30 días y marcada abierta) y badge de status con el mismo
+   criterio de dominancia que las bandas. 57/57 tests con dataset real.
+3. ~~Regenerar la copia de cortesía~~ — hecho (hoy sincronizada a v0.1.2).
+   ~~Arreglar `waves.n_samples`~~ — **hecho 2026-07-27** (ADR-0017);
+   incógnita del padding cerrada (FORMAT §5.5:
+   `stored = 244 · ceil((nominal − 150) / 244)`).
+   ~~Re-exportar `bunge_cartagena_ams`~~ — **hecho 2026-07-27**: export con
+   el fix + `t8-mapper --write` + `ground-truth/`; `vibframe-validate` PASS
+   (347 máquinas, 7 docs DiagGT, 0 errores).
+4. ~~Extracción de los récords `gdnl`~~ — **hecho 2026-07-27** (Hecho §9,
+   ADR-0018): 973 observaciones `origin="system-alarm"`, validadas 991/991
+   contra los umbrales `pdla`. ~~Lado T8~~ — **hecho 2026-07-27** (workplan
+   05 de t8-extract): 91 observaciones `system-alarm` desde `alarms.db` en 3
+   datasets; las 195 `annotations/*.json` del workspace están vacías (0
+   anotaciones). Spec consolidada en **v0.1.2** (2026-07-28):
+   `extraction_method="structured_read"` adoptado por ambos productores y
+   documentos regenerados.
+
+## Flecos que sobreviven al plan (fuera de su alcance)
+
+- Ley de la severidad `gdsc.0x1A` en zona D y las 18 alarmas con unidad
+  inconsistente (FORMAT §5.9).
+- Recorte de la cola de ceros de la waveform al payload real — decisión
+  aparte con gold propio (ADR-0017).
+- Re-extraer los 28 datasets T8 multi-generación (workplan 04 de t8-extract)
+  y el colapso por `(metric_id, config_id)` en el visor.
+- CI de productores y procedimiento de cambio de formato (workplan 01 de
+  contracts).
