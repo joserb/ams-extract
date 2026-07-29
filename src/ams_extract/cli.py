@@ -533,6 +533,22 @@ def alarms(
         _console.print(f"  also wrote {path}")
 
 
+def _serve_vibframe_dataset(source: Path, *, host: str, port: int, no_browser: bool) -> int:
+    """Delegate an exported dataset to the ecosystem viewer (``vibframe-viewer``).
+
+    The viewer is a repo of its own (portable: stdlib + pyarrow), so every
+    VibFrame producer serves its datasets with the same browser. This wrapper
+    only translates the ``rbm serve`` options into its CLI; the serve loop,
+    the browser and Ctrl-C handling are the viewer's.
+    """
+    from vibframe_viewer.cli import main as viewer_main
+
+    argv = ["serve", str(source), "--host", host, "--port", str(port)]
+    if no_browser:
+        argv.append("--no-browser")
+    return viewer_main(argv)
+
+
 @app.command("serve")
 def serve(
     source: Annotated[
@@ -551,25 +567,24 @@ def serve(
 
     Two backends, picked automatically from ``SOURCE``:
 
+    * an **exported dataset directory** → delegates to the ecosystem viewer
+      (``vibframe-viewer serve``), common to every VibFrame producer: tree,
+      timeline, spectra, waves, trends and parameter matrix, plotted in the
+      browser. ``vibframe-viewer report`` writes the static report;
     * a **.rbm file** → renders straight from the database, walking the
       hierarchy on startup and rendering each plot on demand (no export
-      needed; machines/points/samples load lazily as you drill in);
-    * an **exported dataset directory** → reads the VibFrame tables and
-      renders each plot on demand from the local Parquet.
+      needed; machines/points/samples load lazily as you drill in). This
+      backend is ams-extract's own debugging tool: it needs no export.
 
     Either way the plots are built on the fly. Press Ctrl-C to stop.
     """
     import webbrowser
 
     if source.is_dir():
-        from ams_extract.export.viewer import ViewerError
-        from ams_extract.export.viewer import serve as build_server
-
-        try:
-            server = build_server(source, host=host, port=port)
-        except ViewerError as exc:
-            raise _abort(str(exc)) from exc
-    elif source.is_file():
+        raise typer.Exit(
+            code=_serve_vibframe_dataset(source, host=host, port=port, no_browser=no_browser)
+        )
+    if source.is_file():
         from ams_extract.export.live_viewer import LiveViewerError
         from ams_extract.export.live_viewer import serve as build_live_server
 

@@ -28,6 +28,7 @@ dependencies = [
     "pyarrow>=17.0",
     "structlog>=24.1",
     "matplotlib>=3.9",
+    "vibframe-viewer",
 ]
 
 [project.scripts]
@@ -43,6 +44,15 @@ dev = [
 ]
 
 [tool.uv.sources]
+# Los repos del ecosistema se resuelven por checkout vecino con paths
+# editables. Este repo vive en el lado Windows (junto a la VM y las bases
+# .rbm), así que "vecino" solo se cumple para los que están bajo
+# /mnt/c/Users/joser/work/ (vibsynth). `vibframe-viewer` vive en el lado WSL
+# (~/wslprojects/RESONINS/), donde son vecinos t8-extract y el visor: desde
+# aquí la ruta relativa cruzaría siete niveles hasta la raíz, así que se usa
+# la absoluta (mismo criterio que t8-extract, que apunta con ruta absoluta a
+# los repos del lado Windows).
+vibframe-viewer = { path = "/home/joserb/wslprojects/RESONINS/vibframe-viewer", editable = true }
 vibsynth-contracts = { path = "../../vibsynth/vibsynth-contracts", editable = true }
 
 [tool.hatch.build.targets.wheel]
