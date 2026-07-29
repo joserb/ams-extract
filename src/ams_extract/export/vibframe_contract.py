@@ -148,5 +148,15 @@ def pa_type(dtype: Dtype) -> pa.DataType:
 
 
 def schema(columns: tuple[ColumnSpec, ...]) -> pa.Schema:
-    """Build a PyArrow schema from VibFrame column specs."""
-    return pa.schema([(col.name, pa_type(col.dtype)) for col in columns])
+    """Build a PyArrow schema from VibFrame column specs.
+
+    Required columns are declared non-nullable: a missing value then fails at
+    write time here instead of surfacing later as a
+    ``columns.null-in-required`` error from ``vibframe-validate``. It is also
+    what t8-extract and vibsynth declare — the contract talks about the value,
+    not about how the field is declared, but aligning the three producers keeps
+    their parquet identical down to the schema.
+    """
+    return pa.schema(
+        [pa.field(col.name, pa_type(col.dtype), nullable=not col.required) for col in columns]
+    )
