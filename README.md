@@ -67,12 +67,16 @@ ground truth *about* the dataset, written next to it, never inside the
 `rbm serve` opens an interactive on-demand viewer and picks its backend from
 the argument:
 
-- a **`.rbm` file** → renders straight from the database. Startup only walks
-  the area → machine hierarchy (instant, even on a full database); machines,
-  points and samples load lazily as you drill in, and each plot is rendered on
-  the fly from the `.rbm`. No `export` needed.
-- an **exported dataset directory** → reads the VibFrame tables and renders
-  each plot on demand from the local Parquet.
+- an **exported dataset directory** → delegates to `vibframe-viewer`, the
+  ecosystem viewer shared by every VibFrame producer (installed as an editable
+  dependency): hierarchy tree, timeline, spectra, waves, trends and parameter
+  matrix plotted in the browser. `vibframe-viewer report
+  <dataset> -o report.html` writes the static report of the same data.
+- a **`.rbm` file** → renders straight from the database, this repo's own
+  debugging backend. Startup only walks the area → machine hierarchy (instant,
+  even on a full database); machines, points and samples load lazily as you
+  drill in, and each plot is rendered on the fly from the `.rbm`. No `export`
+  needed.
 
 Either way nothing is pre-rendered, and it binds to loopback only by default.
 

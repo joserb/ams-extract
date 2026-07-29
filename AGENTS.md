@@ -27,11 +27,20 @@ ams-extract/
 ├── samples/               # golds de AMS (parquet/png) usados en validación
 ├── src/ams_extract/
 │   ├── records/           # parsers de records (gicm, vdpm, pdcd, vdps, vddt, pdpa…)
-│   ├── export/            # export VibFrame, report HTML, viewer, plots
+│   ├── export/            # export VibFrame, report HTML, live_viewer, plots
 │   ├── tree.py            # walkers de jerarquía y muestras
-│   └── cli.py             # CLI `rbm` (info/tree/report/stats/extract/export/serve)
+│   └── cli.py             # CLI `rbm` (info/tree/report/stats/extract/export/
+│                          #   alarms/serve)
 └── tests/                 # pytest; integración usa RBM_TEST_FILE=<ruta .rbm>
 ```
+
+El visor de datasets no vive aquí: el visor del ecosistema es
+**`vibframe-viewer`** (repo propio, dependencia editable). `rbm serve
+<dataset>` es un wrapper fino de su CLI —
+`tests/test_viewer_delegation.py` protege esa frontera— y `rbm serve
+FILE.rbm` conserva el backend propio (`export/live_viewer.py`), que renderiza
+del `.rbm` sin exportar y es herramienta de depuración de este repo. El visor
+propio de datasets (`export/viewer.py`) se retiró el 2026-07-29 (workplan 05).
 
 ## Comandos
 
@@ -40,6 +49,9 @@ uv sync
 uv run rbm info FILE
 uv run rbm export FILE --out DIR --types fft,waveform,trend --parallel 4
 uv run rbm extract FILE --point NAME [--equipment SUBSTR] --type both --out DIR
+uv run rbm serve DIR            # dataset exportado → delega en vibframe-viewer
+uv run rbm serve FILE.rbm       # visor propio directo del .rbm (sin exportar)
+uv run vibframe-viewer report DIR -o report.html   # CLI del visor, ya instalado
 RBM_TEST_FILE="…/BUNGE CARTAGENA marzo 2.0.rbm" uv run pytest   # con integración
 uv run ruff check src tests && uv run pyright src               # antes de commit
 ```
@@ -50,6 +62,16 @@ uv run ruff check src tests && uv run pyright src               # antes de commi
   `hatchling`. El repo vive en el lado Windows
   (`/mnt/c/Users/joser/work/AMS 5.2-VMware/ams-extract`), junto a la VM y
   las bases `.rbm` (`../AMS databases/`).
+- **Checkout vecino**: la convención del ecosistema es clonar todos los repos
+  (`vibsynth`, `vibsynth-contracts`, `vibsynth-metrics-mapper`, `t8-extract`,
+  `ams-extract`, `vibframe-viewer`, `DataWaver`) bajo una misma carpeta y
+  consumirlos como editable installs con rutas relativas en
+  `[tool.uv.sources]`. Este repo rompe la vecindad por vivir junto a la VM:
+  `vibsynth-contracts` sí es vecino (`../../vibsynth/vibsynth-contracts`),
+  pero `vibframe-viewer` está en el lado WSL, así que se apunta con **ruta
+  absoluta** (`/home/joserb/wslprojects/RESONINS/vibframe-viewer`) — la
+  relativa cruzaría siete niveles hasta la raíz. Mismo criterio que t8-extract,
+  que apunta con absoluta a los repos del lado Windows.
 - **No emitir lo no validado**: cada escala/decode nuevo exige gold de AMS
   (captura o informe PLOTDATA) registrado en `VERIFICATION.md` y su ADR en
   `DECISIONS.md`. Lo que decodifica sin gold se salta con log.
@@ -84,8 +106,11 @@ VERIFICATION.md).
 - **vibsynth-contracts**: define el layout VibFrame que el export produce
   (contrato opcional en tests: `MachineDoc`).
 - **t8-extract**: productor hermano (backups T8).
-- **vibframe-viewer**: visor portable del ecosistema (repo propio, antes
-  subpaquete de t8-extract) — `vibframe-viewer serve <dataset>` sobre
-  cualquier dataset exportado.
+- **vibframe-viewer** (`/home/joserb/wslprojects/RESONINS/vibframe-viewer`):
+  visor portable del ecosistema (repo propio, antes subpaquete de t8-extract)
+  — `vibframe-viewer serve <dataset>` sobre cualquier dataset VibFrame, sea
+  de ams-extract, t8-extract, vibsynth o DataWaver. Entra aquí como
+  dependencia editable y `rbm serve <dataset>` delega en él; el trabajo sobre
+  el visor se hace en su repo, no aquí.
 - **t8-metrics-mapper**: etiquetado canónico de las métricas exportadas
   (`t8-mapper vibframe <dataset> --write`).
