@@ -1,8 +1,9 @@
 """On-demand viewer served straight from a ``.rbm`` (``rbm serve FILE.rbm``).
 
-Unlike the dataset viewer (:mod:`ams_extract.export.viewer`, which serves an
-already exported Parquet dataset), this backend keeps a single read-only
-``RbmReader`` open over the database and renders everything lazily:
+Unlike the dataset viewer (``vibframe-viewer``, the ecosystem repo ``rbm
+serve`` delegates to when handed an exported dataset), this backend needs no
+export at all — it is this repo's own debugging tool over the raw database.
+It keeps a single read-only ``RbmReader`` open and renders everything lazily:
 
 * startup only walks the area → machine → point hierarchy (fast — no sample
   payloads), so the server is ready almost immediately even on a big database;
