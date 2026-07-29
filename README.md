@@ -134,6 +134,15 @@ uv run pyright src/
 Integration tests run against a real `.rbm` when `RBM_TEST_FILE` points to one;
 they are skipped otherwise.
 
+The export is checked against the shared VibFrame contract:
+`tests/test_vibframe_conformance.py` runs `vibframe-validate` (from
+`vibsynth-contracts`, a test-only dependency) over what `rbm export` writes and
+round-trips the goldens of every producer. To validate a dataset by hand:
+
+```bash
+uv run vibframe-validate dataset/ --strict
+```
+
 ## License
 
 MIT — see [LICENSE](LICENSE).

@@ -52,6 +52,7 @@ uv run rbm extract FILE --point NAME [--equipment SUBSTR] --type both --out DIR
 uv run rbm serve DIR            # dataset exportado → delega en vibframe-viewer
 uv run rbm serve FILE.rbm       # visor propio directo del .rbm (sin exportar)
 uv run vibframe-viewer report DIR -o report.html   # CLI del visor, ya instalado
+uv run vibframe-validate DIR --strict   # conformidad VibFrame (CLI de contracts)
 RBM_TEST_FILE="…/BUNGE CARTAGENA marzo 2.0.rbm" uv run pytest   # con integración
 uv run ruff check src tests && uv run pyright src               # antes de commit
 ```
@@ -72,6 +73,13 @@ uv run ruff check src tests && uv run pyright src               # antes de commi
   absoluta** (`/home/joserb/wslprojects/RESONINS/vibframe-viewer`) — la
   relativa cruzaría siete niveles hasta la raíz. Mismo criterio que t8-extract,
   que apunta con absoluta a los repos del lado Windows.
+- **Conformidad VibFrame**: el contrato que usa el runtime está vendorizado
+  (`export/vibframe_contract.py`, con el commit de origen anotado);
+  `vibsynth-contracts` es dependencia **solo de tests/CI** y nunca se importa
+  desde `src/`. `tests/test_vibframe_conformance.py` valida lo que escribe
+  `rbm export` con `vibframe-validate` (API y CLI) y hace round-trip de los
+  goldens de los tres orígenes. Las columnas requeridas de los cuatro parquet
+  se declaran **non-nullable**, como en t8-extract y vibsynth (workplan 06).
 - **No emitir lo no validado**: cada escala/decode nuevo exige gold de AMS
   (captura o informe PLOTDATA) registrado en `VERIFICATION.md` y su ADR en
   `DECISIONS.md`. Lo que decodifica sin gold se salta con log.
@@ -103,8 +111,10 @@ VERIFICATION.md).
 
 ## Relación con el ecosistema
 
-- **vibsynth-contracts**: define el layout VibFrame que el export produce
-  (contrato opcional en tests: `MachineDoc`).
+- **vibsynth-contracts**: define el layout VibFrame que el export produce.
+  Dependencia de tests/CI: aporta los modelos (`MachineDoc`, `DatasetInfo`),
+  el validador `vibframe-validate` y los goldens por origen (`ams-rbm` salió
+  de aquí).
 - **t8-extract**: productor hermano (backups T8).
 - **vibframe-viewer** (`/home/joserb/wslprojects/RESONINS/vibframe-viewer`):
   visor portable del ecosistema (repo propio, antes subpaquete de t8-extract)
