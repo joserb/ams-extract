@@ -111,15 +111,58 @@ serán `approximate` por construcción, como anotaba el 07.
 
 ## Flecos
 
-- **Re-export de `bunge_cartagena_ams` pendiente de decisión del usuario**:
-  el dataset real (`~/wslprojects/RESONINS/datasets/bunge_cartagena_ams`) se
-  exportó antes de esta emisión, así que sus `machine.json` no llevan los
-  campos. Nada se rompe —son opcionales y su ausencia se lee como «el origen
-  no lo declaró»—, pero el ML de la fase E no verá los rodamientos hasta que
-  se re-exporte. No se ha tocado en esta tarea.
+- ~~**Re-export de `bunge_cartagena_ams`**~~ — **hecho 2026-08-04** (ver
+  «Re-export y enriquecimiento del dataset real» más abajo).
 - El contrato con los campos nuevos está **en local, sin push**, en el
   checkout de `vibsynth-contracts`. Hasta que aterrice allí, la conformidad
   de este repo sólo es verde contra ese checkout.
 - `definition_provenance` sigue sin escribirse desde aquí, por diseño. Si
   algún día este repo declarase también `location`/`direction` como evidencia
   firmada, tendría que hacerlo el enriquecedor, no el extractor.
+
+## Re-export y enriquecimiento del dataset real (2026-08-04)
+
+Operación sobre `~/wslprojects/RESONINS/datasets/bunge_cartagena_ams`, en
+este orden:
+
+```bash
+rbm export "…/AMS databases/BUNGE CARTAGENA marzo 2.0.rbm" \
+    --out ~/wslprojects/RESONINS/datasets/bunge_cartagena_ams \
+    --types fft,waveform,trend --parallel 4          # 34 s, 0 fallos
+t8-mapper vibframe <dataset> --write                 # etiquetado canónico
+vibsynth-machines enrich <dataset> --write           # frecuencias de fallo
+vibframe-validate <dataset> --strict                 # PASS
+```
+
+347 máquinas (311 con muestras), 137 270 FFT + 137 208 waveform + 1 571 433
+trend. El export ahora emite los campos del punto: **1 520** puntos con
+`bearing_designations` y **5 203** con `nominal_speed_rpm` (todos), más
+`location` en 5 108 (98,2 %) y `direction` en 4 220 (81,1 %). Los golds del
+workplan se confirman sobre el dataset real: AG-100 `MOTOR LOA HORIZONTAL` →
+`["6204", "6208"]` a 1 455 RPM.
+
+`vibsynth-machines enrich` (workplan 10 del monorepo `vibsynth`) resolvió por
+catálogo **2 784 entradas** `fault_frequencies_order` en **696 puntos de 73
+máquinas**, todas firmadas `source="enriched"`, `quality="direct"`. La segunda
+pasada no cambió un byte de los 347 `machine.json`: idempotente. Quedan **56
+designaciones sin resolver** (las más frecuentes: `23248`, `6316`, `6317`,
+`23120`, `6314`, `6312`, `6411`, `6216`, `6213`, `6319`), material para
+ampliar catálogo o entrar por `--input`.
+
+Dos cosas que el re-export se llevó por delante y hubo que rehacer:
+
+- **El etiquetado canónico**, como manda ADR-0011: `t8-mapper vibframe
+  --write` devolvió la cobertura exacta de antes (23 590 de 24 684 métricas,
+  95,6 %). Es post-proceso, no paso del export: re-exportar siempre lo exige.
+- **`dataset.json:path`** (`["Bunge Cartagena"]`, el nivel de agrupación por
+  encima del dataset). `rbm export` nunca ha escrito ese campo —lo puso a
+  mano quien curó el dataset— así que el re-export lo perdió y se restauró a
+  mano. Si se quiere que sobreviva solo, tiene que emitirlo el export.
+
+Y un **bug de conformidad corregido en el camino** (`f1d7b91`): `rbm export`
+limpiaba `--out` con un `rmtree` a secas, y VIBFRAME.md prohíbe borrar
+`ground-truth/` y `analysis/` al re-exportar sobre un dataset existente —
+habría destruido los siete documentos DiagGT y la capa `diaggt-contrast` de
+BUNGE. Ahora la limpieza va entrada a entrada y respeta los dos sidecars;
+`test_export_keeps_curated_sidecars` lo fija. Verificado sobre el dataset
+real: `diff -r` contra la copia de seguridad, idénticos byte a byte.
