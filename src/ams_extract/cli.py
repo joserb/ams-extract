@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import json
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 from rich.console import Console
@@ -531,6 +532,95 @@ def alarms(
     )
     for path in written[1:]:
         _console.print(f"  also wrote {path}")
+
+
+@app.command("informes")
+def informes(
+    pdf_dir: Annotated[
+        Path, typer.Argument(help="Directory holding the inspection report PDFs.")
+    ],
+    out: Annotated[
+        Path,
+        typer.Option(
+            "--out",
+            help="Directory for the DiagGT documents, normally <informes>/ground-truth.",
+        ),
+    ] = Path("ground-truth"),
+) -> None:
+    """Extract the analyst's diagnoses from inspection report PDFs as DiagGT.
+
+    Writes one ``<report>.diaggt.json`` per PDF plus the flat consolidations
+    (spec §5) with ``origin="inspection-report"``. Needs the ``informes``
+    extra (``uv sync --extra informes``), which brings ``pdfplumber``.
+
+    Aborts if the anchor invariant breaks — the count of dated
+    ``DIAGNÓSTICOS PREVIOS`` entries found in the page body must match the
+    union of the four column sources, or the layout is eating text again.
+    """
+    if not pdf_dir.is_dir():
+        raise _abort(f"not a directory: {pdf_dir}")
+    pdfs = sorted(pdf_dir.glob("*.pdf"))
+    if not pdfs:
+        raise _abort(f"no *.pdf in {pdf_dir}")
+
+    try:
+        from ams_extract.informes.parse import ExtractionReport, build_document
+    except ImportError as exc:  # pragma: no cover - depends on the extra
+        raise _abort(
+            "the informes extractor needs pdfplumber: install the 'informes' extra "
+            "(uv sync --extra informes)"
+        ) from exc
+
+    from ams_extract.informes.consolidate import (
+        observation_rows,
+        read_crosswalk,
+        write_observations,
+    )
+
+    out.mkdir(parents=True, exist_ok=True)
+    report = ExtractionReport()
+    documents: list[dict[str, Any]] = []
+    for pdf_path in pdfs:
+        _console.print(f"reading {pdf_path.name} ...")
+        document = build_document(pdf_path, report)
+        documents.append(document)
+        json_path = out / f"{pdf_path.stem}.diaggt.json"
+        json_path.write_text(
+            json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        primary = sum(1 for o in document["observations"] if o["record_kind"] == "primary")
+        _console.print(
+            f"  wrote {json_path.name}: {primary} primary + "
+            f"{len(document['observations']) - primary} retrospective observations"
+        )
+
+    _console.print(
+        f"anchor invariant: {report.fichas} machine pages, {report.anchors_page} anchors "
+        f"in page, {report.anchors_sources} in the union of sources -> "
+        + ("[green]OK[/green]" if report.anchors_ok else "[red]FAILED[/red]")
+    )
+    for mismatch in report.anchor_mismatch:
+        _console.print(f"  [red]{mismatch}[/red]")
+    if not report.anchors_ok:
+        raise _abort("anchor invariant broken: review the page geometry")
+    for continuation in report.continuations:
+        _console.print(
+            f"  continuation {continuation[0]} p{continuation[1]} -> "
+            f"{continuation[2]} (+{continuation[3]} entries)"
+        )
+
+    crosswalk = read_crosswalk(out)
+    rows = observation_rows(documents, crosswalk)
+    written = write_observations(rows, out)
+    resolved = sum(1 for row in rows if row["dataset_machine_id"])
+    _console.print(
+        f"consolidated {len(rows)} observations -> {', '.join(p.name for p in written)}"
+        + (
+            f"  ({resolved} with dataset_machine_id from {len(crosswalk)} crosswalk entries)"
+            if crosswalk
+            else "  (no crosswalk.csv: dataset_machine_id left null)"
+        )
+    )
 
 
 def _serve_vibframe_dataset(source: Path, *, host: str, port: int, no_browser: bool) -> int:

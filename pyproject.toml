@@ -31,6 +31,12 @@ dependencies = [
     "vibframe-viewer",
 ]
 
+[project.optional-dependencies]
+# Extractor de ground truth desde informes PDF (`rbm informes`, workplan 09).
+# Extra y no dependencia dura: quien sólo lee .rbm no necesita un parser de
+# PDF, y el import vive dentro del comando que lo usa.
+informes = ["pdfplumber>=0.11"]
+
 [project.scripts]
 rbm = "ams_extract.cli:app"
 rbm-dev = "ams_extract.cli_dev:app"

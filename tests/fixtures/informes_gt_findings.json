@@ -1,0 +1,4261 @@
+{
+ "extractor": "informes-gt-extract 0.2.0",
+ "source": "Informes Bunge Cartagena 2026, 6 documentos, emision 2026-07-28",
+ "cases": [
+  {
+   "diagnosis_text": "-Debilidad estructural (seguimiento). -Posible suciedad y/o desgaste en la válvula",
+   "observations": 7,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural / Desequilibrio. -Desalineación.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural / falta de rigidez en la dirección vertical. -Posible fenómeno de resonancia que amplifique las vibraciones en el eje vertical.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "resonancia",
+     "fault_mode": "RESONANCE",
+     "fault_group": "STRUCTURE",
+     "label_quality": "direct",
+     "mapping_rule": "GT006"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural / falta de rigidez. -Posible fenómeno de resonancia que amplifique las vibraciones en el eje vertical.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "resonancia",
+     "fault_mode": "RESONANCE",
+     "fault_group": "STRUCTURE",
+     "label_quality": "direct",
+     "mapping_rule": "GT006"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural de la bomba. - Desalineación del conjunto.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural de la bomba. -Desalineación del conjunto.",
+   "observations": 6,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del conjunto y desequilibrio del bowl. -Holguras rotacionales en rodamientos del eje de entrada de la centrífuga.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del conjunto. -Desequilibrio en la centrífuga.",
+   "observations": 16,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del conjunto. -Holguras rotacionales en rodamientos del motor.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del conjunto. -Lubricación inadecuada en rodamientos de la bomba. -Cavitación.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "cavitaci",
+     "fault_mode": "CAVITATION",
+     "fault_group": "FLOW",
+     "label_quality": "direct",
+     "mapping_rule": "GT015"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del conjunto. / Desequilibrio.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "distorsión armónica",
+     "fault_mode": null,
+     "fault_group": "ELECTRICAL",
+     "label_quality": "group",
+     "mapping_rule": "GT020"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Holguras rotacionales en rodamientos del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Holguras rotacionales en rodamientos eje de entrada de la centrífuga, puntos C1 y C2.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Holguras rotacionales en rodamientos eje de entrada de la centrífuga, puntos C1 y C2. Menor amplitud.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Lubricación ineficiente en rodamientos del molino.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Lubricación ineficiente en rodamientos del molino. - Holguras rotacionales en rodamientos del molino.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Lubricación ineficiente en rodamientos del molino. -Holguras rotacionales en rodamientos del molino.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Lubricación mejorable en rodamientos de la bomba.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. / Desequilibrio.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. ALERTA. - Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "distorsión armónica",
+     "fault_mode": null,
+     "fault_group": "ELECTRICAL",
+     "label_quality": "group",
+     "mapping_rule": "GT020"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. ALERTA. -Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "distorsión armónica",
+     "fault_mode": null,
+     "fault_group": "ELECTRICAL",
+     "label_quality": "group",
+     "mapping_rule": "GT020"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. PELIGRO. - Lubricación ineficiente en rodamientos del molino.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. PELIGRO. - Posible aparición de deterioro en el rodamiento del ventilador, lado acoplado.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "deterioro en el rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. PELIGRO. - Posible aparición de deterioro en el rodamiento del ventilador, lado acoplado. Sin evolución negativa por el momento.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "deterioro en el rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. PELIGRO. -Lubricación ineficiente en rodamientos del molino.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. PELIGRO. -Posible aparición de deterioro en el rodamiento del ventilador, lado acoplado.",
+   "observations": 9,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "deterioro en el rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural, PELIGRO. -Lubricación ineficiente en rodamientos del molino. -Holguras rotacionales en rodamientos del molino.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación -Holguras rotacionales en la bomba.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación y/o problema del acoplamiento.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación y/o problema del acoplamiento. - Deterioro en rodamientos de la bomba.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación y/o problema del acoplamiento. -Deterioro en rodamientos de la bomba.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación. -Debilidad estructural.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación. -Debilidad estructural. - Lubricación mejorable en rodamientos de la bomba.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación. -Debilidad estructural. -Lubricación mejorable en rodamientos de la bomba.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación. -Holguras rotacionales en rodamiento de la bomba, lado acoplado.",
+   "observations": 6,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio del ventilador. - Debilidad estructural del motor",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio del ventilador. - Debilidad estructural del motor.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio del ventilador. -Debilidad estructural del motor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio del ventilador. ALERTA. -Debilidad estructural en el motor.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio del ventilador. ALERTA.-Debilidad estructural en el motor.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio y debilidad estructural. -Holguras rotacionales en rodamientos del ventilador. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio, por el momento en niveles dentro de histórico. -Lubricación inadecuada en rodamientos del ventilador, así como holguras rotacionales de caracter incipiente. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio. -Debilidad estructural del motor.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro del acoplamiento. - Debilidad estructural del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en el impulsor de la bomba amplificado por debilidad en la estructura. - Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "debilidad en",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "impulsor",
+     "fault_mode": "BROKEN_BLADE",
+     "fault_group": "FLOW",
+     "label_quality": "weak",
+     "mapping_rule": "GT017"
+    },
+    {
+     "matched_text": "distorsión armónica",
+     "fault_mode": null,
+     "fault_group": "ELECTRICAL",
+     "label_quality": "group",
+     "mapping_rule": "GT020"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en evolución en el rodamiento de la bomba, lado opuesto al acoplamiento. - Lubricación ineficiente en rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "deterioro en evolución en el rodamiento de la bomba, lado opuesto al acoplamiento. - lubricación ineficiente en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en evolución en el rodamiento de la bomba, lado opuesto al acoplamiento. -Lubricación ineficiente en rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "deterioro en evolución en el rodamiento de la bomba, lado opuesto al acoplamiento. -lubricación ineficiente en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en rodamientos de la bomba. - Cavitación.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    },
+    {
+     "matched_text": "cavitaci",
+     "fault_mode": "CAVITATION",
+     "fault_group": "FLOW",
+     "label_quality": "direct",
+     "mapping_rule": "GT015"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en rodamientos de la bomba. -Cavitación.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    },
+    {
+     "matched_text": "cavitaci",
+     "fault_mode": "CAVITATION",
+     "fault_group": "FLOW",
+     "label_quality": "direct",
+     "mapping_rule": "GT015"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en rodamientos del motor lado acoplado y del reductor.-Debilidad estructural",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Distorsión armónica proveniente del variador de frecuencia. -Excentricidad.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "distorsión armónica",
+     "fault_mode": null,
+     "fault_group": "ELECTRICAL",
+     "label_quality": "group",
+     "mapping_rule": "GT020"
+    },
+    {
+     "matched_text": "excentricidad",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT021"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Excentricidad. -Distorsión armónica del variador.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "distorsión armónica",
+     "fault_mode": null,
+     "fault_group": "ELECTRICAL",
+     "label_quality": "group",
+     "mapping_rule": "GT020"
+    },
+    {
+     "matched_text": "excentricidad",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT021"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Desequilibrio. - Rodamientos en buen estado.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "falta de rigidez",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Desequilibrio. -Lubricación inadecuada y holguras rotacionales en rodamiento del molino, lado acoplado.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "falta de rigidez",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Resonancia en dirección horizontal del motor. -Lubricación mejorable en rodamientos del molino.",
+   "observations": 9,
+   "findings": [
+    {
+     "matched_text": "resonancia",
+     "fault_mode": "RESONANCE",
+     "fault_group": "STRUCTURE",
+     "label_quality": "direct",
+     "mapping_rule": "GT006"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "falta de rigidez",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Resonancia en dirección horizontal del motor. -Rodamientos del equipo en buen estado.",
+   "observations": 22,
+   "findings": [
+    {
+     "matched_text": "resonancia",
+     "fault_mode": "RESONANCE",
+     "fault_group": "STRUCTURE",
+     "label_quality": "direct",
+     "mapping_rule": "GT006"
+    },
+    {
+     "matched_text": "falta de rigidez",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Resonancia en dirección vertical del motor. -Lubricación inadecuada en rodamientos del molino.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "resonancia",
+     "fault_mode": "RESONANCE",
+     "fault_group": "STRUCTURE",
+     "label_quality": "direct",
+     "mapping_rule": "GT006"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "falta de rigidez",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Resonancia en dirección vertical del motor. -Lubricación ineficiente en rodamientos del molino.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "resonancia",
+     "fault_mode": "RESONANCE",
+     "fault_group": "STRUCTURE",
+     "label_quality": "direct",
+     "mapping_rule": "GT006"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "falta de rigidez",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Frecuencias de naturaleza eléctrica en el lado acoplado del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Frecuencias de naturaleza eléctrica en el lado acoplado del motor. -Debilidad estructural del conjunto, que amplifica el desequilibrio del rotor del ventilador.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Frecuencias de origen eléctrico. -Deterioro incipiente en rodamientos del reductor eje de entrada.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "deterioro incipiente en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holgura estructural / Falta de rigidez en dirección horizontal del conjunto motor-bomba. ALERTA. -Desalineación del conjunto.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "holgura",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "approximate",
+     "mapping_rule": "GT004"
+    },
+    {
+     "matched_text": "holgura estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en evolución en rodamientos del ventilador. ALERTA. - Desequilibrio, por el momento en niveles dentro de histórico. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en evolución en rodamientos del ventilador. ALERTA. -Desequilibrio, por el momento en niveles dentro de histórico. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos del eje de entrada de la centrífuga. -Debilidad estructural del motor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos del eje de entrada de la centrífuga.-Debilidad estructural del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos del eje de entrada y salida punto C4 de la centrífuga. -Debilidad estructural de la centrífuga y desequilibrio del bowl.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos del motor. -Falta de rigidez / Desequilibrio.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "falta de rigidez",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos del ventilador.. -Desequilibrio y debilidad estructural. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos eje de entrada de la centrífuga, puntos C1 y C2. PELIGRO. -Debilidad estructural del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Informar a Preditec si se intervinieron los rodamientos de la bomba. -Posible deterioro en rodamientos de la bomba.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "rodamientos de la bomba. -posible deterior",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Lubricación ineficiente en rodamiento de la bomba, lado opuesto al acoplamiento. -Posible deterioro en el rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "rodamiento de la bomba, lado opuesto al acoplamiento. -posible deterior",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Lubricación mejorable en rodamientos del ventilador. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor. - Desequilibrio, por el momento en niveles dentro de histórico.",
+   "observations": 6,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Mejor estado de lubricación de los rodamientos de la bomba, pero se ha de monitorizar su estado. -Deterioro en el rodamiento de la bomba, lado opuesto al acoplamiento, de carácter incipiente.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "rodamientos de la bomba, pero se ha de monitorizar su estado. -deterior",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Posible deterioro del rodamiento del reductor, eje de entrada, lado opuesto al motor.-Deterioro de la etapa de salida del reductor- Vibración debida al cabeceo que sufre el equipo. Presenta debilidad estructural en el lado libre del motor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "deterioro del rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    },
+    {
+     "matched_text": "cabeceo",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Posible problema de caracter eléctrico en el motor. -Lubricación inadecuada en rodamiento del motor, lado acoplado.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Vibración aleatoria en apoyo de bomba lado opuesto al acoplamiento, debido a estas posible causas: cavitación, lubricación deficiente, deterioro. -Debilidad estructural del conjunto. -Holguras rotacionales en rodamientos del motor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "cavitaci",
+     "fault_mode": "CAVITATION",
+     "fault_group": "FLOW",
+     "label_quality": "direct",
+     "mapping_rule": "GT015"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Vibración debido a distorsión armónica proveniente de un variador de frecuencias. -Lubricación mejorable en los rodamientos del ventilador, así como holguras rotacionales.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "distorsión armónica",
+     "fault_mode": null,
+     "fault_group": "ELECTRICAL",
+     "label_quality": "group",
+     "mapping_rule": "GT020"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Aparición de deterioro en rodamiento del laminador, lado opuesto al acoplamiento.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Aparición de deterioro en rodamiento del motor, lado acoplado.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Cabeceo de la máquina.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "cabeceo",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Comentar a Preditec qué labores se han llevado a cabo.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Daño en rodamientos de la bomba.",
+   "observations": 7,
+   "findings": [
+    {
+     "matched_text": "daño en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad / Holgura estructural del conjunto.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holgura",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "approximate",
+     "mapping_rule": "GT004"
+    },
+    {
+     "matched_text": "holgura estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad en el estructura/ Falta de rigidez.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad en",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural / Desequilibrio, excentricidad en polea.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "excentricidad",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT021"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural / Desequilibrio.",
+   "observations": 8,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural / Desequilibrio. Estable. Se establece el buen estado.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural de la bomba.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto.",
+   "observations": 8,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto. / Desequilibrio.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto. ALERTA. Desalineación y/o deterioro del acoplamiento.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto. Desalineación y/o deterioro del acoplamiento.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto. En tendencia, se establece el buen estado.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto. Ligeras holguras rotacionales.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del motor",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del motor.",
+   "observations": 9,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del motor. Holgura rotacional en rodamientos del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holgura rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del motor. PELIGRO.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural en el motor, así como holguras rotacionales.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural en la bomba y desalineación.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural en motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural en motor. Leve holgura rotacional en rodamiento del motor lado acoplado",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "holgura rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural en protección del acople a bomba.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural muy notable, cabeceo del conjunto motor-reductor",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "cabeceo",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural, cabeceo del conjunto motor reductor",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "cabeceo",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural, cabeceo del conjunto motor reductor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "cabeceo",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural.",
+   "observations": 35,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural. PELIGRO.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deficiente lubricación en rodamiento lado polea.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desalineación del conjunto motor bomba.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desalineación del conjunto y posible deterioro del acople",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desalineación del conjunto.",
+   "observations": 12,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desalineación.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desbalanceo - Debilidad estructural del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desbalanceo en el rotor del ventilador posiblemente amplificado por debilidad en la estructura.Frecuencias de naturaleza eléctrica en el lado acoplado del motor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad en",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desbalanceo en el rotor del ventilador posiblemente amplificado por debilidad en la estructura.Frecuencias de naturaleza eléctrica en el lado acoplado del motor. Lubricación mejorable en rodamientos del ventilador. Huelgo leve.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "debilidad en",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Descenso de amplitudes en vibración y PeakVue. No se aprecian trazas de fallo. Informar a Preditec si se ha intervenido el equipo. Se establece su buen estado.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desequilibrio / Debilidad estructural.",
+   "observations": 6,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desequilibrio del ventilador.",
+   "observations": 6,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desequilibrio.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desequilibrio/debilidad estructural.",
+   "observations": 16,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro de la bancada.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "bancada",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT019"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro de los rodamientos de la bomba.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "deterioro de los rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro de rodamiento de la bomba lado opuesto al acoplamiento.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "deterioro de rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro del motor, existencia de roces en la zona de la campana y posible deterioro en dientes del engrane del eje intermedio 2 con el eje de salida.",
+   "observations": 6,
+   "findings": [
+    {
+     "matched_text": "engran",
+     "fault_mode": "GEAR_WEAR",
+     "fault_group": "GEAR",
+     "label_quality": "approximate",
+     "mapping_rule": "GT014"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro del rodamiento del motor lado libre.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "deterioro del rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro en acople y rodamientos del motor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "deterioro en acople y rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro en el impulsor de la bomba amplificado por debilidad en la estructura. Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "debilidad en",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    },
+    {
+     "matched_text": "impulsor",
+     "fault_mode": "BROKEN_BLADE",
+     "fault_group": "FLOW",
+     "label_quality": "weak",
+     "mapping_rule": "GT017"
+    },
+    {
+     "matched_text": "distorsión armónica",
+     "fault_mode": null,
+     "fault_group": "ELECTRICAL",
+     "label_quality": "group",
+     "mapping_rule": "GT020"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro en evolución en el rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "deterioro en evolución en el rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro en evolución en rodamiento del motor lado libre.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "deterioro en evolución en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro en los rodamientos de la bomba, con especial relevancia en el del lado opuesto al acoplamiento.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "deterioro en los rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro en rodamiento del motor, lado acoplado.",
+   "observations": 12,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro incipiente en rodamiento del motor, lado libre.",
+   "observations": 8,
+   "findings": [
+    {
+     "matched_text": "deterioro incipiente en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 7,
+   "findings": [
+    {
+     "matched_text": "distorsión armónica",
+     "fault_mode": null,
+     "fault_group": "ELECTRICAL",
+     "label_quality": "group",
+     "mapping_rule": "GT020"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "El equipo (conjunto motor reductor) cabecea con su estructura de emplazamiento.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "cabecea",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Equipo en buen estado",
+   "observations": 1,
+   "findings": []
+  },
+  {
+   "diagnosis_text": "Equipo en buen estado.",
+   "observations": 17,
+   "findings": []
+  },
+  {
+   "diagnosis_text": "Equipo en buen estado. Ligeras holguras rotacionales en rodamientos de la bomba.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Excitación a la 1X RPM amplificada por fallo estructural por falta de rigidez en el conjunto motor reductor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "falta de rigidez",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Excitación asíncrona en alta frecuencia en la campana y disminucion en el reductor eje de entrada, punto R1.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "excitación asíncrona",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT022"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Excitación asíncrona en alta frecuencia en la campana y estabilidad en el reductor eje de entrada, punto R1.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "excitación asíncrona",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT022"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Excitación asíncrona en alta frecuencia en la campana y reductor eje de entrada, punto R1.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "excitación asíncrona",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT022"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Excitación asíncrona en alta frecuencia en la campana.",
+   "observations": 8,
+   "findings": [
+    {
+     "matched_text": "excitación asíncrona",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT022"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Excitación asíncrona en alta frecuencia en punto R1 del reductor con tendencia descendente, pasa a seguimiento",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "excitación asíncrona",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT022"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Excitación asíncrona en alta frecuencia en punto R1 del reductor con tendencia descendente, pasa a seguimiento.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "excitación asíncrona",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT022"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Excitación asíncrona en alta frecuencia en punto R1 del reductor.",
+   "observations": 12,
+   "findings": [
+    {
+     "matched_text": "excitación asíncrona",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT022"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Excitación eléctrica en rodamientos del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Existencia de bandas laterales que podrían estar relacionadas con un fallo de barras sueltas o rotas.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Falta de rigidez / Resonancia en dirección horizontal del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "resonancia",
+     "fault_mode": "RESONANCE",
+     "fault_group": "STRUCTURE",
+     "label_quality": "direct",
+     "mapping_rule": "GT006"
+    },
+    {
+     "matched_text": "falta de rigidez",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Falta de rigidez / Resonancia en dirección vertical del motor.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "resonancia",
+     "fault_mode": "RESONANCE",
+     "fault_group": "STRUCTURE",
+     "label_quality": "direct",
+     "mapping_rule": "GT006"
+    },
+    {
+     "matched_text": "falta de rigidez",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Frecuencias de carácter eléctrico en los rodamientos del motor.",
+   "observations": 6,
+   "findings": [
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Frecuencias eléctricas procedentes de la señal eléctrica / Deterioro en rodamientos del motor (baja amplitud).",
+   "observations": 8,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    },
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Fuera de servicio",
+   "observations": 10,
+   "findings": []
+  },
+  {
+   "diagnosis_text": "Fuga de agua bastante importante",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "fuga de",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Fuga de agua.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "fuga de",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holgura estructural / Desequilibrio.",
+   "observations": 12,
+   "findings": [
+    {
+     "matched_text": "desequilibri",
+     "fault_mode": "IMBALANCE",
+     "fault_group": "IMBALANCE",
+     "label_quality": "direct",
+     "mapping_rule": "GT001"
+    },
+    {
+     "matched_text": "holgura",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "approximate",
+     "mapping_rule": "GT004"
+    },
+    {
+     "matched_text": "holgura estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holgura estructural / Falta de rigidez.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "holgura",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "approximate",
+     "mapping_rule": "GT004"
+    },
+    {
+     "matched_text": "holgura estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holgura estructural / Falta rigidez.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holgura",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "approximate",
+     "mapping_rule": "GT004"
+    },
+    {
+     "matched_text": "holgura estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT023"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionale sen ambos rodamientos de la bomba y motor lado acoplado Desalineación del conjunto motor bomba, así como debilidad estructural del conjunto.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    },
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "debilidad estructural",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "STRUCTURE",
+     "label_quality": "approximate",
+     "mapping_rule": "GT005"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales del conjunto.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en la bomba.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en los rodamientos de la bomba.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en los rodamientos de la bomba. Se observa en ambos rodamientos de la bomba frecuencias posiblemente asociadas al rodete.",
+   "observations": 11,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "rodete",
+     "fault_mode": "BROKEN_BLADE",
+     "fault_group": "FLOW",
+     "label_quality": "weak",
+     "mapping_rule": "GT017"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en motor y con especial relevancia en sus rodamientos.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en rodamiento del motor lado acoplado.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en rodamiento del motor lado libre.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en rodamientos de la bomba.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en rodamientos del eje de entrada de la centrífuga. Ineficiente lubricación en rodamiento del punto 4 de la centrífuga.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en rodamientos del eje de salida de la centrífuga.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en rodamientos del motor, con mayor relevancia en el del lado libre.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en rodamientos del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en rodamientos del reductor, con mayor amplitud en eje de entrada.",
+   "observations": 12,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales y/o desgaste en el eje que gira en torno a 13 Hz.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Informar a Preditec si se ha intervenido el rodamiento del motor, lado acoplado.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Informar a Preditec si se ha intervenido.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Informar a Preditec si se han intervenido dichos rodamientos de la bomba.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Informar a Preditec si se han intervenido los rodamientos de la bomba.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Linea 1 de refinería parada",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada en rodamiento de la bomba, lado opuesto al acoplamiento, así como posible traza de fallo incipiente en el mismo.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada en rodamiento del laminador, lado acoplado.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada en rodamiento del molino lado acoplado.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada en rodamiento del motor, lado opuesto al acoplamiento.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada en rodamientos de la bomba.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada en rodamientos del laminador.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada en rodamientos del molino y motor, lado acoplado.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada y holguras rotacionales en rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada y posible deterioro en evolución en rodamiento del laminador, lado opuesto al acoplamiento.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "deterioro en evolución en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente en rodamiento del molino lado acoplado.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente en rodamiento del motor, lado acoplado y rodamiento del laminador, lado acoplado. Posible deterioro en rodamiento del motor, lado acoplado.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "rodamiento del motor, lado acoplado y rodamiento del laminador, lado acoplado. posible deterior",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente en rodamiento del motor, lado acoplado.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente en rodamientos del conjunto. Posible deterioro en rodamiento del motor, lado acoplado, en evolución.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "rodamientos del conjunto. posible deterior",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente en rodamientos del laminador.",
+   "observations": 10,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente en rodamientos del molino. Holguras rotacionales en rodamientos del molino.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente y posible deterioro en evolución en rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "deterioro en evolución en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable Rodamiento del laminador L2.Aumento en vibración del laminador por condición operativa (carga)",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamiento L1P del laminador.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamiento L2 del laminador.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamiento de la bomba, lado opuesto al acoplamiento, así como posible deterioro incipiente en el mismo.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "rodamiento de la bomba, lado opuesto al acoplamiento, así como posible deterior",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamientos de la bomba, y holguras rotacionales en los mismos.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamientos del conjunto.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamientos del eje de entrada de la centrífuga, puntos C1 y C2, así como traza asíncrona de baja amplitud.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "traza asíncrona",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT022"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamientos del laminador.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamientos del molino.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Maquina en buen estado.",
+   "observations": 1,
+   "findings": []
+  },
+  {
+   "diagnosis_text": "Mejor estado de lubricación. Holguras rotacionales en rodamientos del eje de entrada de la centrífuga.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Mejorable estado de lubricación de los rodamientos de la centrífuga, eje de salida.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Mejorable estado de lubricación. Holguras rotacionales en rodamientos del eje de entrada de la centrífuga.",
+   "observations": 7,
+   "findings": [
+    {
+     "matched_text": "holguras rotacional",
+     "fault_mode": "LOOSENESS",
+     "fault_group": "LOOSENESS",
+     "label_quality": "direct",
+     "mapping_rule": "GT003"
+    },
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Mejorable lubricación en rodamiento lado polea.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Mejorable lubricación en rodamiento motor lado acoplado, así como posible deterioro del mismo.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    },
+    {
+     "matched_text": "rodamiento motor lado acoplado, así como posible deterior",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Motor sustituido. Se ha medido solo campana y reductor. Tras la intervención del motor se vuelven a registrar niveles aptos de operación en campana y reductor. No se aprecian trazas de fallo. Se establece el buen estado del equipo y se vigilará su evolución.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Máquina en buen estado",
+   "observations": 3772,
+   "findings": []
+  },
+  {
+   "diagnosis_text": "Máquina no medida",
+   "observations": 135,
+   "findings": []
+  },
+  {
+   "diagnosis_text": "Máquina parada",
+   "observations": 1904,
+   "findings": []
+  },
+  {
+   "diagnosis_text": "Posible aparición de deterioro de rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "deterioro de rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible aparición de deterioro en rodamiento del eje de salida del reductor, lado opuesto al motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro en evolución en rodamiento de la bomba, lado acoplado.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "deterioro en evolución en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro en evolución en rodamientos del motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "deterioro en evolución en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro en rodamiento del motor lado acoplado.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro en rodamiento del motor lado libre.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro en rodamiento del motor, lado libre.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro en rodamientos del motor.",
+   "observations": 7,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro en rodamientos del motor. Sin evolución en el último mes.",
+   "observations": 7,
+   "findings": [
+    {
+     "matched_text": "deterioro en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro incipiente del rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "deterioro incipiente del rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro incipiente en rodamiento motor lado acoplado",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "deterioro incipiente en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro incipiente en rodamientos del motor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "deterioro incipiente en rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible problema de caracter eléctrico en el motor.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Revisar protección ventilador motor.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Rodamientos en buen estado.",
+   "observations": 4,
+   "findings": []
+  },
+  {
+   "diagnosis_text": "Ruido de origen eléctrico.",
+   "observations": 5,
+   "findings": [
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    },
+    {
+     "matched_text": "ruido de origen eléctric",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido eléctrico en el motor.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "eléctric",
+     "fault_mode": "ELECTRICAL_ROTOR",
+     "fault_group": "ELECTRICAL",
+     "label_quality": "approximate",
+     "mapping_rule": "GT013"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido en el acople.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": null,
+     "fault_mode": null,
+     "fault_group": "UNMAPPED",
+     "label_quality": "unmapped",
+     "mapping_rule": null
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido mecanico en el motor",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "ruido mecanic",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido mecanico en la campana de acople",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "ruido mecanic",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido mecánico alto en motor y campana.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "ruido mecánic",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido mecánico alto.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "ruido mecánic",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido mecánico en el rodamiento del motor lado libre.",
+   "observations": 3,
+   "findings": [
+    {
+     "matched_text": "ruido mecánic",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido mecánico en rodamiento del laminador, lado opuesto al acoplamiento.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "ruido mecánic",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido mecánico notable procedente del motor.",
+   "observations": 1,
+   "findings": [
+    {
+     "matched_text": "ruido mecánic",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruidos mecánicos en el motor.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "ruidos mecánic",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Se aprecia buen estado de lubricación de los rodamientos del conjunto. Se establece su buen estado y se vigilará su evolución.",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "lubricaci",
+     "fault_mode": "BEARING_LUBRICATION",
+     "fault_group": "LUBRICATION",
+     "label_quality": "direct",
+     "mapping_rule": "GT011"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Se aprecia ruido mecánico alto en motor.",
+   "observations": 4,
+   "findings": [
+    {
+     "matched_text": "ruido mecánic",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Vibración debido a distorsión armónica proveniente de un variador de frecuencias.",
+   "observations": 11,
+   "findings": [
+    {
+     "matched_text": "distorsión armónica",
+     "fault_mode": null,
+     "fault_group": "ELECTRICAL",
+     "label_quality": "group",
+     "mapping_rule": "GT020"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "desalineación del conjunto",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "desalineac",
+     "fault_mode": null,
+     "fault_group": "MISALIGNMENT",
+     "label_quality": "group",
+     "mapping_rule": "GT002"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "deterioro incipiente del rodamiento lado libre del motor",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "deterioro incipiente del rodamiento",
+     "fault_mode": null,
+     "fault_group": "BEARING",
+     "label_quality": "group",
+     "mapping_rule": "GT012"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "ruido mecánico en todo el equipo",
+   "observations": 2,
+   "findings": [
+    {
+     "matched_text": "ruido mecánic",
+     "fault_mode": null,
+     "fault_group": "OTHER",
+     "label_quality": "group",
+     "mapping_rule": "GT024"
+    }
+   ]
+  },
+  {
+   "diagnosis_text": null,
+   "observations": 2,
+   "findings": []
+  }
+ ]
+}
