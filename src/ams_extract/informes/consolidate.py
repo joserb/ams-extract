@@ -206,7 +206,9 @@ def _csv_value(value: Any) -> Any:
 def write_csv(rows: list[dict[str, Any]], path: Path, columns: tuple[str, ...]) -> None:
     """Escribe ``rows`` como CSV con ``columns`` de cabecera."""
     with path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.writer(handle)
+        # LF, no el CRLF del dialecto excel: el consolidado se lee en Linux y
+        # es el salto de línea con el que nació.
+        writer = csv.writer(handle, lineterminator="\n")
         writer.writerow(columns)
         for row in rows:
             writer.writerow([_csv_value(row[name]) for name in columns])
