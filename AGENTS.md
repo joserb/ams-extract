@@ -70,7 +70,7 @@ uv run ruff check src tests && uv run pyright src               # antes de commi
   `[tool.uv.sources]`. Este repo rompe la vecindad por vivir junto a la VM:
   `vibsynth-contracts` sí es vecino (`../../vibsynth/vibsynth-contracts`),
   pero `vibframe-viewer` está en el lado WSL, así que se apunta con **ruta
-  absoluta** (`/home/joserb/wslprojects/RESONINS/vibframe-viewer`) — la
+  absoluta** (`/home/joserb/wslprojects/vibframe-viewer`) — la
   relativa cruzaría siete niveles hasta la raíz. Mismo criterio que t8-extract,
   que apunta con absoluta a los repos del lado Windows.
 - **Conformidad VibFrame**: el contrato que usa el runtime está vendorizado
@@ -116,7 +116,7 @@ VERIFICATION.md).
   el validador `vibframe-validate` y los goldens por origen (`ams-rbm` salió
   de aquí).
 - **t8-extract**: productor hermano (backups T8).
-- **vibframe-viewer** (`/home/joserb/wslprojects/RESONINS/vibframe-viewer`):
+- **vibframe-viewer** (`/home/joserb/wslprojects/vibframe-viewer`):
   visor portable del ecosistema (repo propio, antes subpaquete de t8-extract)
   — `vibframe-viewer serve <dataset>` sobre cualquier dataset VibFrame, sea
   de ams-extract, t8-extract, vibsynth o DataWaver. Entra aquí como

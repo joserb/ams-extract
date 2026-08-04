@@ -32,7 +32,7 @@ requires-dist = [
     { name = "rich", specifier = ">=13.7" },
     { name = "structlog", specifier = ">=24.1" },
     { name = "typer", specifier = ">=0.12" },
-    { name = "vibframe-viewer", editable = "/home/joserb/wslprojects/RESONINS/vibframe-viewer" },
+    { name = "vibframe-viewer", editable = "/home/joserb/wslprojects/vibframe-viewer" },
 ]
 
 [package.metadata.requires-dev]
@@ -716,7 +716,7 @@ wheels = [
 [[package]]
 name = "vibframe-viewer"
 version = "0.1.0"
-source = { editable = "/home/joserb/wslprojects/RESONINS/vibframe-viewer" }
+source = { editable = "/home/joserb/wslprojects/vibframe-viewer" }
 dependencies = [
     { name = "pyarrow" },
 ]
