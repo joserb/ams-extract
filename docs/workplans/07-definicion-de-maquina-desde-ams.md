@@ -12,6 +12,13 @@ punto; `vdpm.0x07E` (designación de rodamiento) y `vdpm.0x164` (RPM nominal)
 quedan decodificados y probados, pero **no emitidos**: el contrato no tiene
 hueco para ellos hasta las fases A/B del marco.
 
+> **Continúa en el workplan 08** (mismo día, 2026-08-04): el contrato abrió
+> el hueco (`PointDoc.bearing_designations` / `nominal_speed_rpm`, workplan
+> 04 de `vibsynth-contracts`) y la emisión se hizo en
+> [`08-emision-de-la-definicion-de-punto.md`](08-emision-de-la-definicion-de-punto.md).
+> El decode y sus golds, abajo, no cambian; el «por qué no se emite todavía»
+> es el estado en que cerró este plan.
+
 Ejecuta la **fase C** del plan marco *Marco de definiciones de máquina en
 VibFrame para ML*
 (`/mnt/c/Users/joser/work/vibsynth/docs/work-plans/08-marco-definiciones-maquina-ml.md`),

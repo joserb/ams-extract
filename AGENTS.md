@@ -83,6 +83,13 @@ uv run ruff check src tests && uv run pyright src               # antes de commi
 - **No emitir lo no validado**: cada escala/decode nuevo exige gold de AMS
   (captura o informe PLOTDATA) registrado en `VERIFICATION.md` y su ADR en
   `DECISIONS.md`. Lo que decodifica sin gold se salta con log.
+- **Definición de máquina**: lo único que AMS declara del eje de un punto son
+  las designaciones de rodamiento (`vdpm.0x07E`) y la RPM nominal
+  (`vdpm.0x164`); van al `machine.json` **verbatim**
+  (`PointDoc.bearing_designations` / `nominal_speed_rpm`, workplans 07 y 08),
+  sin normalizar ni proyectar a frecuencias de fallo — eso es del enriquecedor
+  del ecosistema. Este repo no escribe `definition` ni
+  `definition_provenance`: declara, no resuelve.
 - Unidades de display: velocidad mm/s (×25.4 desde in/s), aceleración G's.
   El etiquetado canónico es post-proceso con `t8-mapper vibframe --write`
   (ADR-0011), no un paso del export.
