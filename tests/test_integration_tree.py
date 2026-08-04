@@ -174,3 +174,30 @@ def test_real_file_depuradora_includes_expected_machines(real_rbm: Path) -> None
         "Tornillo deshidr TRD.10100",
     ):
         assert expected in names, f"missing equipment in DEPURADORA: {expected!r}"
+
+
+def test_real_file_points_carry_the_shaft_config_they_declare(real_rbm: Path) -> None:
+    # The walker fills Point.bearing_designations / nominal_speed_rpm from
+    # vdpm.0x07E / 0x164 (FORMAT §3.2), which is what the export emits.
+    with RbmReader(real_rbm) as reader:
+        areas = walk_hierarchy(reader)
+    by_machine = {eq.long_name: eq for a in areas for eq in a.equipment}
+
+    ag100 = {p.long_name: p for p in by_machine["MECLADOR AGITADOR AG-100"].points}
+    # Per point, not per machine: the LA side of the same motor differs.
+    assert ag100["MOTOR LOA HORIZONTAL"].bearing_designations == ("6204", "6208")
+    assert ag100["MOTOR LA VERTICAL"].bearing_designations == ("6205", "6208")
+    # The gearbox points of the same machine declare no bearing at all.
+    assert ag100["Reductor LA Horiz"].bearing_designations == ()
+    assert all(p.nominal_speed_rpm == 1455.0 for p in ag100.values())
+
+    pm9101 = {p.long_name: p for p in by_machine["Bomba Centrifuga PM-9101-A"].points}
+    # ADR-0013's gold: AMS shows "RPM = 2900,0 (48,33 Hz)" for this M1H.
+    assert pm9101["MOTOR LOA HORIZONTAL"].nominal_speed_rpm == 2900.0
+    assert pm9101["MOTOR LOA HORIZONTAL"].bearing_designations == ()
+
+    # Coverage over the whole database, as decoded in workplan 07.
+    points = [p for a in areas for eq in a.equipment for p in eq.points]
+    assert len(points) == BUNGE_TOTAL_POINTS
+    assert sum(1 for p in points if p.bearing_designations) == 1520
+    assert all(p.nominal_speed_rpm is not None for p in points)

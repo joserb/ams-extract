@@ -237,6 +237,14 @@ def _build_point_doc(point: Point) -> dict[str, Any]:
     off the point name — the only place the analyst wrote them (see
     :mod:`ams_extract.point_naming`); names that declare neither stay ``None``.
     ``sensor`` and ``speed_source`` have no counterpart in the ``.rbm`` at all.
+
+    ``bearing_designations`` and ``nominal_speed_rpm`` are what the point's
+    ``vdpm`` record declares about its shaft (FORMAT §3.2), emitted
+    **verbatim**: the designations keep the analyst's free text (``6204``,
+    ``SKF 6308``, ``22218 EKC3``) because normalizing them against a catalogue
+    is the enricher's job, and the speed goes out in RPM as stored. A point
+    that declares no bearing gets an empty list; one without a usable speed
+    gets ``null``, never ``0``.
     """
     placement = parse_point_name(point.long_name)
     return {
@@ -246,6 +254,8 @@ def _build_point_doc(point: Point) -> dict[str, Any]:
         "direction": placement.direction,
         "sensor": None,
         "speed_source": None,
+        "bearing_designations": list(point.bearing_designations),
+        "nominal_speed_rpm": point.nominal_speed_rpm,
     }
 
 

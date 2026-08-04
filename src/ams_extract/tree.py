@@ -73,6 +73,8 @@ from ams_extract.records.pdpa import (
 from ams_extract.records.point import (
     PointChainError,
     parse_gipm_point_records,
+    parse_vdpm_bearings,
+    parse_vdpm_nominal_rpm,
     parse_vdpm_pdcd_pointer,
     parse_vdpm_point,
 )
@@ -220,6 +222,10 @@ def _walk_points_for_equipment(
     for vdpm in vdpm_records:
         try:
             point = parse_vdpm_point(reader, vdpm)
+            # What the analyst declared about the shaft this point sits on
+            # (FORMAT §3.2): raw material for the enricher, carried verbatim.
+            bearings = parse_vdpm_bearings(reader, vdpm)
+            nominal_rpm = parse_vdpm_nominal_rpm(reader, vdpm)
         except (PointChainError, IndexError) as exc:
             _log.warning(
                 "vdpm_parse_failed",
@@ -233,6 +239,8 @@ def _walk_points_for_equipment(
                 record_num=point.record_num,
                 long_name=point.long_name,
                 short_code=point_sanitizer.sanitize(point.long_name),
+                bearing_designations=bearings,
+                nominal_speed_rpm=nominal_rpm,
             )
         )
     return tuple(points)

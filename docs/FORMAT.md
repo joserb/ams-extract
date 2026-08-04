@@ -204,9 +204,14 @@ devuelve `list[Area]` con `equipment` y `points` poblados.
 
 **Rodamientos y RPM nominal** (decodificados el 2026-08-04, workplan 07;
 `records/point.py`: `parse_vdpm_bearings` / `parse_vdpm_nominal_rpm`). Son
-configuración del punto, no medida: se leen y se prueban, pero **no se
-emiten todavía** al dataset porque el contrato VibFrame aún no tiene hueco
-para ellos (fases A/B del marco de definiciones de máquina).
+configuración del punto, no medida. El walker los deja en
+`Point.bearing_designations` / `Point.nominal_speed_rpm`, y `rbm export` los
+emite **tal cual** en `PointDoc.bearing_designations` (lista vacía si el punto
+no declara ninguno) y `PointDoc.nominal_speed_rpm` (`null`, nunca `0`, si no
+hay velocidad) desde que el contrato les abrió hueco (workplan 08; hueco
+definido en el workplan 04 de vibsynth-contracts). Normalizar la designación
+contra un catálogo y proyectarla a frecuencias de fallo sigue siendo del
+enriquecedor, no de este extractor.
 
 - `0x07E` es **por punto**, no por máquina: el motor de AG-100 declara
   `6204`/`6208` en su punto LOA y `6205`/`6208` en el LA, y el de DT-0070

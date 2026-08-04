@@ -31,11 +31,20 @@ class Point:
         long_name: Human-readable name as stored in the ``vdpm`` record
             (cp1252 decoded, trailing space/NUL stripped).
         short_code: Sanitized, filesystem-safe identifier for this point.
+        bearing_designations: Bearing designations the analyst configured for
+            this point (``vdpm.0x07E``), verbatim and in slot order — free
+            text such as ``6204``, ``SKF 6308`` or ``22218 EKC3``. Empty for
+            the 71% of BUNGE points that declare none (FORMAT §3.2).
+        nominal_speed_rpm: Configured (nominal) speed of the shaft this point
+            sits on, in RPM (``vdpm.0x164``), already propagated through the
+            gearbox by AMS itself. ``None`` when the field is non-positive.
     """
 
     record_num: int
     long_name: str
     short_code: str
+    bearing_designations: tuple[str, ...] = ()
+    nominal_speed_rpm: float | None = None
 
 
 @dataclass(frozen=True, slots=True)

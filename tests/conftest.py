@@ -73,7 +73,16 @@ _TS = datetime(2020, 2, 19, 10, 2, 50, tzinfo=UTC)
 
 
 def _sample_point() -> Point:
-    return Point(record_num=10, long_name="MOTOR LA HORIZONTAL", short_code="MOTOR_LA_H")
+    # Shaft config the way an AMS point declares it (vdpm.0x07E / 0x164): the
+    # two designations and the 1 455 RPM of the AG-100 pilot, so every dataset
+    # built from this fixture carries what the machine doc now emits.
+    return Point(
+        record_num=10,
+        long_name="MOTOR LA HORIZONTAL",
+        short_code="MOTOR_LA_H",
+        bearing_designations=("6204", "6208"),
+        nominal_speed_rpm=1_455.0,
+    )
 
 
 def _sample_spectrum(point: Point) -> Spectrum:

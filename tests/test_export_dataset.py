@@ -96,6 +96,51 @@ class TestExportDataset:
         # The rest of the PointDoc has no counterpart in the .rbm.
         assert all(p["sensor"] is None and p["speed_source"] is None for p in machine_doc["points"])
 
+    def test_point_docs_carry_the_shaft_config_the_rbm_declares(self) -> None:
+        # vdpm.0x07E / 0x164 go out verbatim: the free text the analyst typed
+        # and the speed as stored, in RPM. Normalizing designations against a
+        # catalogue belongs to the enricher, not to this extractor.
+        points = (
+            Point(
+                record_num=1,
+                long_name="MOTOR LOA HORIZONTAL",
+                short_code="M1H",
+                bearing_designations=("6204", "6208"),
+                nominal_speed_rpm=1_455.0,
+            ),
+            Point(
+                record_num=2,
+                long_name="Reductor Lado Libre Peakvue",
+                short_code="R1P",
+                bearing_designations=("SKF 6308", "22218 EKC3", "RED"),
+                nominal_speed_rpm=9.6,
+            ),
+            Point(record_num=3, long_name="Campana Peakvue", short_code="C1P"),
+        )
+        equipment = Equipment(record_num=4, long_name="BOMBA", short_code="PUMP", points=points)
+
+        machine_doc = _build_machine_doc(
+            source_path="fixture.rbm",
+            extracted_at=datetime(2020, 1, 1, tzinfo=UTC),
+            area_long="AREA",
+            equipment=equipment,
+            proc_modes=[],
+        )
+
+        docs = machine_doc["points"]
+        assert [p["bearing_designations"] for p in docs] == [
+            ["6204", "6208"],  # slot order preserved
+            ["SKF 6308", "22218 EKC3", "RED"],  # maker, suffix and non-designation, untouched
+            [],  # a point that declares none emits an empty list, not null
+        ]
+        assert [p["nominal_speed_rpm"] for p in docs] == [1_455.0, 9.6, None]
+        # Unknown speed is null, never 0: a zero would read as a stopped shaft.
+        assert docs[2]["nominal_speed_rpm"] is None
+        # AMS declares the fields; it does not resolve them into a definition,
+        # so the machine carries no definition and no provenance for one.
+        assert machine_doc["machine"]["definition"] is None
+        assert "definition_provenance" not in machine_doc["machine"]
+
     def test_wave_row_n_samples_matches_the_emitted_array(self) -> None:
         # VibFrame derives the time axis from t + i / sample_rate_hz, so
         # n_samples must be len(data); the AMS nominal block (512 for these
@@ -146,7 +191,13 @@ class TestExportDataset:
 
     def test_machine_doc_validates_against_optional_vibframe_contract(self) -> None:
         contracts = pytest.importorskip("vibsynth_contracts.dataset")
-        point = Point(record_num=1, long_name="MOTOR", short_code="MOTOR")
+        point = Point(
+            record_num=1,
+            long_name="MOTOR",
+            short_code="MOTOR",
+            bearing_designations=("SKF 6308",),
+            nominal_speed_rpm=1_455.0,
+        )
         equipment = Equipment(record_num=2, long_name="BOMBA", short_code="PUMP", points=(point,))
         document = _build_machine_doc(
             source_path="fixture.rbm",
@@ -156,7 +207,12 @@ class TestExportDataset:
             proc_modes=[],
         )
 
-        contracts.MachineDoc.model_validate(document)
+        doc = contracts.MachineDoc.model_validate(document)
+
+        # The contract keeps the shaft config as declared (PointDoc fields of
+        # vibsynth-contracts workplan 04): nothing is normalized on the way in.
+        assert doc.points[0].bearing_designations == ["SKF 6308"]
+        assert doc.points[0].nominal_speed_rpm == 1_455.0
 
     def test_writes_dataset_doc_and_report(self, synthetic_rbm: Path, tmp_path: Path) -> None:
         out = tmp_path / "dataset"

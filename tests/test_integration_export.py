@@ -77,6 +77,29 @@ def test_export_m1h_samples_present_in_asset_tables(real_rbm: Path, tmp_path: Pa
     assert len(m1h_fft[0]["data"]) == 1600
 
 
+def test_export_machine_doc_carries_the_shaft_config(real_rbm: Path, tmp_path: Path) -> None:
+    out = tmp_path / "dataset"
+    _export_depuradora(real_rbm, out)
+
+    machine_dir = _find_machine_dir(out, "AG-100")
+    doc = json.loads((machine_dir / "machine.json").read_text(encoding="utf-8"))
+    points = {p["name"]: p for p in doc["points"]}
+
+    # The designations FORMAT §5.8 records for the pilot point, verbatim and
+    # in slot order; its LA sibling differs in the first slot (per point, not
+    # per machine), and the gearbox points declare none.
+    assert points["MOTOR LOA HORIZONTAL"]["bearing_designations"] == ["6204", "6208"]
+    assert points["MOTOR LA VERTICAL"]["bearing_designations"] == ["6205", "6208"]
+    assert points["Reductor LA Horiz"]["bearing_designations"] == []
+    # vdpm.0x164 in RPM, as stored: the 1 455 of FORMAT §5, on every point of
+    # this single-shaft machine.
+    assert all(p["nominal_speed_rpm"] == 1455.0 for p in doc["points"])
+    # ams-extract declares what the .rbm holds; it resolves no definition, so
+    # it writes neither a definition nor a provenance for one.
+    assert doc["machine"]["definition"] is None
+    assert "definition_provenance" not in doc["machine"]
+
+
 def test_export_parallel_matches_serial(real_rbm: Path, tmp_path: Path) -> None:
     serial = tmp_path / "serial"
     parallel = tmp_path / "parallel"
