@@ -24,6 +24,15 @@ SPECTRA_FILE = "spectra.parquet"
 WAVES_FILE = "waves.parquet"
 MACHINE_PARTITION_PREFIX = "machine="
 
+# Optional sidecar directories of a VibFrame dataset, neither of them written
+# by a producer: ``ground-truth/`` carries externally issued diagnostic labels
+# (DiagGT, ``vibsynth_contracts.diagnosis.external.GROUND_TRUTH_DIR``) and
+# ``analysis/`` carries computed analysis layers
+# (``vibsynth_contracts.analysis.layers.ANALYSIS_DIR``). The spec forbids
+# deleting them when re-exporting over an existing dataset directory.
+GROUND_TRUTH_DIR = "ground-truth"
+ANALYSIS_DIR = "analysis"
+
 Dtype = Literal[
     "int8",
     "int32",

@@ -34,7 +34,9 @@ from rich.progress import (
 from ams_extract.export.html_report import write_inventory_html
 from ams_extract.export.json_tree import build_tree_document
 from ams_extract.export.vibframe_contract import (
+    ANALYSIS_DIR,
     DATASET_FILE,
+    GROUND_TRUTH_DIR,
     MACHINE_DOC_FILE,
     MACHINE_PARTITION_PREFIX,
     METRICS_COLUMNS,
@@ -70,6 +72,7 @@ FFT = "fft"
 WAVEFORM = "waveform"
 TREND = "trend"
 VALID_TYPES = frozenset({FFT, WAVEFORM, TREND})
+PRESERVED_SIDECAR_DIRS = frozenset({GROUND_TRUTH_DIR, ANALYSIS_DIR})
 CONFIG_ID = ""
 TREND_METRIC_NAME_VELOCITY = "overall_velocity_rms"
 TREND_METRIC_NAME_ACCELERATION = "overall_acceleration_rms"
@@ -744,11 +747,25 @@ def _assert_safe_output_dir(out: Path) -> None:
 
 
 def _prepare_output_dir(out: Path) -> None:
+    """Clear ``out`` for a fresh export, keeping the curated sidecars.
+
+    VibFrame reserves ``ground-truth/`` (external diagnostic labels) and
+    ``analysis/`` (computed layers) for content the producer neither writes
+    nor can regenerate, and forbids deleting them when re-exporting over an
+    existing dataset directory. Everything else this export owns and rewrites.
+    """
     _assert_safe_output_dir(out)
     if out.exists():
         if not out.is_dir():
             raise ValueError(f"output path exists and is not a directory: {out}")
-        shutil.rmtree(out)
+        for entry in out.iterdir():
+            if entry.name in PRESERVED_SIDECAR_DIRS and entry.is_dir():
+                _log.info("export_preserves_sidecar", directory=entry.name)
+                continue
+            if entry.is_dir() and not entry.is_symlink():
+                shutil.rmtree(entry)
+            else:
+                entry.unlink()
     out.mkdir(parents=True, exist_ok=True)
 
 

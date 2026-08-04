@@ -459,6 +459,29 @@ class TestRbmExportCommand:
         assert (out / "dataset.json").exists()
         assert not stale.exists()
 
+    def test_export_keeps_curated_sidecars(self, synthetic_rbm: Path, tmp_path: Path) -> None:
+        """VibFrame forbids deleting ``ground-truth/`` and ``analysis/``."""
+        out = tmp_path / "dataset"
+        (out / "ground-truth").mkdir(parents=True)
+        (out / "analysis" / "diaggt-contrast").mkdir(parents=True)
+        labels = out / "ground-truth" / "informe.diaggt.json"
+        labels.write_text('{"observations": []}', encoding="utf-8")
+        layer = out / "analysis" / "diaggt-contrast" / "layer.json"
+        layer.write_text('{"layer_id": "diaggt-contrast"}', encoding="utf-8")
+        stale = out / "machine=GONE"
+        stale.mkdir()
+        (stale / "machine.json").write_text("{}", encoding="utf-8")
+
+        result = runner.invoke(
+            rbm_app,
+            ["export", str(synthetic_rbm), "--out", str(out), "--types", "fft"],
+        )
+        assert result.exit_code == 0, result.output
+        assert (out / "dataset.json").exists()
+        assert labels.read_text(encoding="utf-8") == '{"observations": []}'
+        assert layer.read_text(encoding="utf-8") == '{"layer_id": "diaggt-contrast"}'
+        assert not stale.exists()
+
     def test_unknown_type_exits_nonzero(self, synthetic_rbm: Path, tmp_path: Path) -> None:
         result = runner.invoke(
             rbm_app,
