@@ -24,6 +24,7 @@ ams-extract/
 │   ├── DECISIONS.md       # ADRs numerados (ADR-0001…)
 │   ├── VERIFICATION.md    # protocolo y registro de validación contra AMS
 │   └── workplans/         # planes de implementación (ver «Work plans»)
+├── overlays/              # juicios de peso sobre un GT emitido (ver overlays/README.md)
 ├── samples/               # golds de AMS (parquet/png) usados en validación
 ├── scripts/               # herramientas sueltas (crosswalk GT, verificación, …)
 ├── src/ams_extract/
@@ -32,7 +33,7 @@ ams-extract/
 │   ├── informes/          # GT de diagnóstico desde informes PDF (extra `informes`)
 │   ├── tree.py            # walkers de jerarquía y muestras
 │   └── cli.py             # CLI `rbm` (info/tree/report/stats/extract/export/
-│                          #   alarms/informes/serve)
+│                          #   alarms/informes/informes-weights/serve)
 └── tests/                 # pytest; integración usa RBM_TEST_FILE=<ruta .rbm>
 ```
 
@@ -51,6 +52,14 @@ inspección — extractor adoptado en el paquete el 2026-08-04, workplan 09). La
 copias del extractor que siguen junto a los informes y dentro del dataset
 `bunge_cartagena_ams` son artefactos desplegados, no código vivo.
 
+El GT del analista tiene **dos generaciones** (workplan 10): la determinista
+(`informes-gt-extract`, reparto `1/n` por cláusula, archivada en
+`<informes>/ground-truth/deterministic-0.3.0/`) y la contextual
+(`informes-gt-weights-llm`, `extraction_method="llm"`, desplegada en el dataset
+y en `<informes>/ground-truth/`). La segunda sale de la primera aplicándole un
+overlay de juicio de `overlays/`; los documentos, la geometría y el
+`source_sha256` del PDF son los mismos, sólo cambia el reparto de `weight`.
+
 ## Comandos
 
 ```bash
@@ -59,6 +68,7 @@ uv run rbm info FILE
 uv run rbm export FILE --out DIR --types fft,waveform,trend --parallel 4
 uv run rbm extract FILE --point NAME [--equipment SUBSTR] --type both --out DIR
 uv run rbm informes PDFDIR --out PDFDIR/ground-truth   # GT desde informes PDF
+uv run rbm informes-weights GTDIR --overlay overlays/…json  # pesos contextuales
 uv run rbm serve DIR            # dataset exportado → delega en vibframe-viewer
 uv run rbm serve FILE.rbm       # visor propio directo del .rbm (sin exportar)
 uv run vibframe-viewer report DIR -o report.html   # CLI del visor, ya instalado

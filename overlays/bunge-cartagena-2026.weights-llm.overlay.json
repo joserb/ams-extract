@@ -1,0 +1,2237 @@
+{
+ "$overlay_version": "0.1.0",
+ "kind": "diaggt_weight_overlay",
+ "target": {
+  "origin": "inspection-report",
+  "provider": "Preditec",
+  "client": "BUNGE",
+  "plant": "CARTAGENA",
+  "base_extractor": "informes-gt-extract 0.3.0",
+  "schema_version": "0.1.5"
+ },
+ "extractor": "informes-gt-weights-llm 0.1.0",
+ "extraction_method": "llm",
+ "scale": {
+  "3": "conclusión principal: el análisis se centra ahí, o de ahí sale el estado",
+  "2": "hallazgo relevante: segunda afirmación real, co-principal",
+  "1.5": "co-principal repartido: una conclusión escrita como dos alternativas",
+  "1": "mención secundaria: se afirma, pero el análisis no la sostiene",
+  "0.5": "mención lateral: matizada (posible, leve, dentro de histórico)",
+  "0.25": "residuo sin juicio: cláusula administrativa o de estado caída en unmapped"
+ },
+ "judgements": [
+  {
+   "diagnosis_text": "-Falta de rigidez / Resonancia en dirección horizontal del motor. -Rodamientos del equipo en buen estado.",
+   "observations": 22,
+   "rationale": "«falta de rigidez / resonancia» es una conclusión escrita como dos alternativas sobre la misma direccionalidad: empatan.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:RESONANCE",
+     "score": 1.5
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del conjunto. -Desequilibrio en la centrífuga.",
+   "observations": 16,
+   "rationale": "el análisis concluye vibración transmitida «amplificada por el propio diseño del equipo (motor en voladizo)»: manda lo estructural.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desequilibrio/debilidad estructural.",
+   "observations": 16,
+   "rationale": "«ligero grado de desequilibrio» frente a «el problema radique fundamentalmente en una debilidad estructural».",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holgura estructural / Desequilibrio.",
+   "observations": 12,
+   "rationale": "el 1xRPM es el patrón observado; la pérdida de rigidez es hipótesis («no se descarta»). GT004 y GT023 leen la misma frase.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 1
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en los rodamientos de la bomba. Se observa en ambos rodamientos de la bomba frecuencias posiblemente asociadas al rodete.",
+   "observations": 11,
+   "rationale": "el estado y la recomendación (cambio de rodamientos) cuelgan de las holguras; el rodete es «posiblemente asociadas» y calidad weak.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "FLOW:BROKEN_BLADE",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. PELIGRO. -Posible aparición de deterioro en el rodamiento del ventilador, lado acoplado.",
+   "observations": 9,
+   "rationale": "la debilidad estructural lleva el PELIGRO; el rodamiento es «posible aparición».",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Resonancia en dirección horizontal del motor. -Lubricación mejorable en rodamientos del molino.",
+   "observations": 9,
+   "rationale": "el análisis y el estado giran sobre la debilidad estructural; la lubricación es la nota final de mantenimiento.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:RESONANCE",
+     "score": 1.5
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 1
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural / Desequilibrio.",
+   "observations": 8,
+   "rationale": "«indicativo de desequilibrio. No obstante, dada la diferencia de amplitud […] puede radicar en una debilidad estructural».",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Frecuencias eléctricas procedentes de la señal eléctrica / Deterioro en rodamientos del motor (baja amplitud).",
+   "observations": 8,
+   "rationale": "el análisis se inclina por el origen eléctrico («reforzaría el carácter eléctrico»); el rodamiento es la alternativa y «(baja amplitud)».",
+   "findings": [
+    {
+     "finding": "BEARING:-",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural (seguimiento). -Posible suciedad y/o desgaste en la válvula",
+   "observations": 7,
+   "rationale": "la válvula es un fallo real (la recomendación manda revisarla) pero va matizado con «Posible».",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ],
+   "remap": [
+    {
+     "from": "UNMAPPED:-",
+     "to": {
+      "fault_group": "OTHER",
+      "fault_mode": null,
+      "label_quality": "group",
+      "matched_text": "suciedad y/o desgaste en la válvula"
+     },
+     "why": "«Posible suciedad y/o desgaste en la válvula»: fallo identificado sin FaultMode canónico."
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Mejorable estado de lubricación. Holguras rotacionales en rodamientos del eje de entrada de la centrífuga.",
+   "observations": 7,
+   "rationale": "la lubricación se afirma sin matiz; las holguras van con «por el momento no de amplitud demasiado elevada».",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Posible deterioro en rodamientos del motor. Sin evolución en el último mes.",
+   "observations": 7,
+   "rationale": "«Sin evolución en el último mes» es una cláusula de tendencia, no un juicio de fallo.",
+   "findings": [
+    {
+     "finding": "BEARING:-",
+     "score": 3
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 0.25
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural de la bomba. -Desalineación del conjunto.",
+   "observations": 6,
+   "rationale": "en esta bomba el análisis atribuye a debilidad estructural la primera acción y el 2xRPM entra como «también».",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación. -Holguras rotacionales en rodamiento de la bomba, lado acoplado.",
+   "observations": 6,
+   "rationale": "la desalineación es la causa y las holguras su consecuencia («estos esfuerzos están provocando»); la recomendación abre con alineación.",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 3
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Lubricación mejorable en rodamientos del ventilador. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor. - Desequilibrio, por el momento en niveles dentro de histórico.",
+   "observations": 6,
+   "rationale": "«Desequilibrio, por el momento en niveles dentro de histórico»: el propio analista lo saca del cuadro.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 1
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desequilibrio / Debilidad estructural.",
+   "observations": 6,
+   "rationale": "«síntoma de desequilibrio, amplificado por debilidad estructural» y la primera acción correctiva es rigidizar.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural / falta de rigidez en la dirección vertical. -Posible fenómeno de resonancia que amplifique las vibraciones en el eje vertical.",
+   "observations": 5,
+   "rationale": "la direccionalidad se atribuye a debilidad estructural; la resonancia es «Posible fenómeno».",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:RESONANCE",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio del ventilador. ALERTA. -Debilidad estructural en el motor.",
+   "observations": 5,
+   "rationale": "el desequilibrio del ventilador encabeza y lleva la ALERTA; la debilidad es «cierto grado» y en otro componente.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio del ventilador. ALERTA.-Debilidad estructural en el motor.",
+   "observations": 5,
+   "rationale": "mismo texto que el anterior sin el espacio: mismo juicio.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Distorsión armónica proveniente del variador de frecuencia. -Excentricidad.",
+   "observations": 5,
+   "rationale": "las dos están sostenidas por ensayo (2xFL del variador y excentricidad en el MCA): empatan.",
+   "findings": [
+    {
+     "finding": "ELECTRICAL:-",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Frecuencias de naturaleza eléctrica en el lado acoplado del motor. -Debilidad estructural del conjunto, que amplifica el desequilibrio del rotor del ventilador.",
+   "observations": 5,
+   "rationale": "el análisis rebaja el par estructura/desequilibrio («no se aprecia tanta direccionalidad ni elevada amplitud») y deja lo eléctrico como el hallazgo vivo.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 1
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Linea 1 de refinería parada",
+   "observations": 5,
+   "rationale": "«Línea 1 de refinería parada» es un estado de planta, no un fallo: se queda unmapped.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido de origen eléctrico.",
+   "observations": 5,
+   "rationale": "una sola afirmación leída por dos reglas: la eléctrica es la sustantiva, GT024 sólo recoge «ruido».",
+   "findings": [
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 3
+    },
+    {
+     "finding": "OTHER:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Holguras rotacionales en rodamientos eje de entrada de la centrífuga, puntos C1 y C2.",
+   "observations": 4,
+   "rationale": "el aumento que dispara la ALERTA está en los rodamientos de la centrífuga; el motor aporta la direccionalidad.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Holguras rotacionales en rodamientos eje de entrada de la centrífuga, puntos C1 y C2. Menor amplitud.",
+   "observations": 4,
+   "rationale": "mismo reparto, y «Menor amplitud» es una cláusula de tendencia sin juicio.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 0.25
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. PELIGRO. - Posible aparición de deterioro en el rodamiento del ventilador, lado acoplado.",
+   "observations": 4,
+   "rationale": "la debilidad estructural lleva el PELIGRO; el rodamiento es «posible aparición».",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural, PELIGRO. -Lubricación ineficiente en rodamientos del molino. -Holguras rotacionales en rodamientos del molino.",
+   "observations": 4,
+   "rationale": "la debilidad estructural fija el PELIGRO y causa las holguras («estas elevadas amplitudes están produciendo»); la lubricación entra con «Además».",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación. -Debilidad estructural.",
+   "observations": 4,
+   "rationale": "en esta bomba el análisis sostiene las dos por separado (2xRPM y direccionalidad del 1xRPM).",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio, por el momento en niveles dentro de histórico. -Lubricación inadecuada en rodamientos del ventilador, así como holguras rotacionales de caracter incipiente. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor.",
+   "observations": 4,
+   "rationale": "el desequilibrio va «dentro de histórico»; lo vivo es el PeakVue (lubricación + holguras) y lo eléctrico queda en monitorización.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 1
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Comentar a Preditec qué labores se han llevado a cabo.",
+   "observations": 4,
+   "rationale": "petición administrativa al cliente, no un diagnóstico: se queda unmapped.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Existencia de bandas laterales que podrían estar relacionadas con un fallo de barras sueltas o rotas.",
+   "observations": 4,
+   "rationale": "barras sueltas o rotas es el fallo eléctrico de rotor por antonomasia.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ],
+   "remap": [
+    {
+     "from": "UNMAPPED:-",
+     "to": {
+      "fault_group": "ELECTRICAL",
+      "fault_mode": "ELECTRICAL_ROTOR",
+      "label_quality": "approximate",
+      "matched_text": "barras sueltas o rotas"
+     },
+     "why": "«bandas laterales […] fallo de barras sueltas o rotas»: barras de rotor = ELECTRICAL_ROTOR."
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Falta de rigidez / Resonancia en dirección vertical del motor.",
+   "observations": 4,
+   "rationale": "par de alternativas de una misma conclusión estructural.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:RESONANCE",
+     "score": 1.5
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holgura estructural / Falta de rigidez.",
+   "observations": 4,
+   "rationale": "«Holgura estructural / Falta de rigidez» es una frase leída por dos reglas.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 1.5
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente en rodamientos del molino. Holguras rotacionales en rodamientos del molino.",
+   "observations": 4,
+   "rationale": "«se observa patrón de lubricación deficiente y holguras rotacionales»: las dos con el mismo respaldo.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Mejor estado de lubricación. Holguras rotacionales en rodamientos del eje de entrada de la centrífuga.",
+   "observations": 4,
+   "rationale": "«Mejor estado de lubricación» es una mejora, no un fallo: el hallazgo vivo son las holguras.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural / Desequilibrio. -Desalineación.",
+   "observations": 3,
+   "rationale": "en esta bomba el análisis concluye desalineación («predominancia del 2xRPM»); el desequilibrio es el patrón descartado.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 1
+    },
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del conjunto. -Lubricación inadecuada en rodamientos de la bomba. -Cavitación.",
+   "observations": 3,
+   "rationale": "«se observa un problema de índole estructural» abre y manda la primera acción; lubricación y cavitación son dos lecturas de la misma hierba espectral.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    },
+    {
+     "finding": "FLOW:CAVITATION",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Holguras rotacionales en rodamientos del motor.",
+   "observations": 3,
+   "rationale": "dos hallazgos en paralelo sin análisis que decida.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio del ventilador. - Debilidad estructural del motor",
+   "observations": 3,
+   "rationale": "el desequilibrio del ventilador es la excitación nombrada y lo que persigue el equilibrado; la debilidad está en el motor.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro del acoplamiento. - Debilidad estructural del motor.",
+   "observations": 3,
+   "rationale": "dos cláusulas en paralelo sin análisis que decida.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 2
+    }
+   ],
+   "remap": [
+    {
+     "from": "UNMAPPED:-",
+     "to": {
+      "fault_group": "OTHER",
+      "fault_mode": null,
+      "label_quality": "group",
+      "matched_text": "Deterioro del acoplamiento"
+     },
+     "why": "«Deterioro del acoplamiento»: fallo identificado sin FaultMode canónico en el catálogo."
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en rodamientos de la bomba. -Cavitación.",
+   "observations": 3,
+   "rationale": "«puede que realmente nos estemos encontrando con un deterioro severo en rodamientos»; la cavitación entra con «También se puede».",
+   "findings": [
+    {
+     "finding": "BEARING:-",
+     "score": 3
+    },
+    {
+     "finding": "FLOW:CAVITATION",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Excentricidad. -Distorsión armónica del variador.",
+   "observations": 3,
+   "rationale": "el análisis dedica casi todo a la excentricidad y la corrobora con ensayo eléctrico; el rizado del variador es el punto 2.",
+   "findings": [
+    {
+     "finding": "ELECTRICAL:-",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Resonancia en dirección vertical del motor. -Lubricación ineficiente en rodamientos del molino.",
+   "observations": 3,
+   "rationale": "el motor está «dentro del histórico» y la recomendación sólo pide revisar la lubricación del molino.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:RESONANCE",
+     "score": 1
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Frecuencias de origen eléctrico. -Deterioro incipiente en rodamientos del reductor eje de entrada.",
+   "observations": 3,
+   "rationale": "dos hallazgos en paralelo; «incipiente» matiza el rodamiento pero el analista lo mantiene.",
+   "findings": [
+    {
+     "finding": "BEARING:-",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos del eje de entrada de la centrífuga.-Debilidad estructural del motor.",
+   "observations": 3,
+   "rationale": "el aumento vive en los rodamientos de la centrífuga; el motor aporta la direccionalidad.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos del eje de entrada y salida punto C4 de la centrífuga. -Debilidad estructural de la centrífuga y desequilibrio del bowl.",
+   "observations": 3,
+   "rationale": "«El origen de la vibración es el desequilibrio del bowl, amplificado por debilidad estructural», y las holguras llevan la primera acción.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos del motor. -Falta de rigidez / Desequilibrio.",
+   "observations": 3,
+   "rationale": "«La amplitud está aumentando, razón por la que se establece el estado de ALERTA» se refiere a las holguras del motor; el desequilibrio es el patrón redirigido a lo estructural.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 1
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos eje de entrada de la centrífuga, puntos C1 y C2. PELIGRO. -Debilidad estructural del motor.",
+   "observations": 3,
+   "rationale": "el marcador PELIGRO va pegado a las holguras de la centrífuga.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad / Holgura estructural del conjunto.",
+   "observations": 3,
+   "rationale": "«Debilidad / Holgura estructural» es una frase leída por dos reglas.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 1.5
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural / Desequilibrio, excentricidad en polea.",
+   "observations": 3,
+   "rationale": "la excentricidad es «en polea», mecánica: GT021 la lleva a ELECTRICAL_ROTOR y esa lectura no merece un tercio.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto. Desalineación y/o deterioro del acoplamiento.",
+   "observations": 3,
+   "rationale": "«se determina que existe cierto grado de debilidad estructural»; el acoplamiento/alineación es lo que «puede indicar» un armónico.",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del motor. Holgura rotacional en rodamientos del motor.",
+   "observations": 3,
+   "rationale": "dos hallazgos en paralelo sin análisis que decida.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desbalanceo - Debilidad estructural del motor.",
+   "observations": 3,
+   "rationale": "«Desbalanceo» y «Debilidad estructural» se enuncian en paralelo y sin análisis que decida.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 2
+    }
+   ],
+   "remap": [
+    {
+     "from": "UNMAPPED:-",
+     "to": {
+      "fault_group": "IMBALANCE",
+      "fault_mode": "IMBALANCE",
+      "label_quality": "approximate",
+      "matched_text": "Desbalanceo"
+     },
+     "why": "«Desbalanceo» es el sinónimo del analista para desequilibrio; GT001 sólo casa «desequilibri»."
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Falta de rigidez / Resonancia en dirección horizontal del motor.",
+   "observations": 3,
+   "rationale": "par de alternativas de una misma conclusión estructural.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:RESONANCE",
+     "score": 1.5
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holgura estructural / Falta rigidez.",
+   "observations": 3,
+   "rationale": "«Holgura estructural / Falta rigidez» es una frase leída por dos reglas.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 1.5
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionales en rodamientos del eje de entrada de la centrífuga. Ineficiente lubricación en rodamiento del punto 4 de la centrífuga.",
+   "observations": 3,
+   "rationale": "dos hallazgos concretos y localizados, sin matiz que los separe.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente en rodamientos del conjunto. Posible deterioro en rodamiento del motor, lado acoplado, en evolución.",
+   "observations": 3,
+   "rationale": "el empeoramiento de la hierba espectral abre el análisis; el deterioro entra con «Además» y «puede indicar».",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamientos del eje de entrada de la centrífuga, puntos C1 y C2, así como traza asíncrona de baja amplitud.",
+   "observations": 3,
+   "rationale": "la traza asíncrona abre el análisis y la lubricación lo cierra; la recomendación sólo habla de lubricación. Empatan.",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural de la bomba. - Desalineación del conjunto.",
+   "observations": 2,
+   "rationale": "«la direccionalidad […] parece indicar que hay un problema de debilidad estructural, por lo que se recomienda como primera acción»; el 2xRPM entra con «también».",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del conjunto y desequilibrio del bowl. -Holguras rotacionales en rodamientos del eje de entrada de la centrífuga.",
+   "observations": 2,
+   "rationale": "«El origen de la vibración es el desequilibrio del bowl, amplificado por debilidad estructural»; las holguras son el segundo hallazgo del PeakVue.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del conjunto. -Holguras rotacionales en rodamientos del motor.",
+   "observations": 2,
+   "rationale": "dos hallazgos en paralelo sin análisis que decida.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del conjunto. / Desequilibrio.",
+   "observations": 2,
+   "rationale": "par estructura/desequilibrio sobre el mismo conjunto: manda la lectura estructural.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 2,
+   "rationale": "el análisis dedica el cuerpo a la debilidad estructural y fija con ella el SEGUIMIENTO; los 100 Hz cierran.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "ELECTRICAL:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Lubricación ineficiente en rodamientos del molino. - Holguras rotacionales en rodamientos del molino.",
+   "observations": 2,
+   "rationale": "las tres con el mismo respaldo en el análisis (direccionalidad en el motor, lubricación y holguras en el PeakVue del molino).",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. ALERTA. -Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 2,
+   "rationale": "mismo texto con el marcador ALERTA sobre la cláusula estructural.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "ELECTRICAL:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación -Holguras rotacionales en la bomba.",
+   "observations": 2,
+   "rationale": "desalineación y holguras, ambas sostenidas por el patrón espectral.",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación y/o problema del acoplamiento. - Deterioro en rodamientos de la bomba.",
+   "observations": 2,
+   "rationale": "el 2xRPM y los armónicos asíncronos aparecen con el mismo respaldo y la recomendación cubre ambos.",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación. -Debilidad estructural. - Lubricación mejorable en rodamientos de la bomba.",
+   "observations": 2,
+   "rationale": "las tres sostenidas («por un lado […] por otro lado […]»), con la lubricación como tercera y la recomendación abriendo con lo estructural.",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio del ventilador. - Debilidad estructural del motor.",
+   "observations": 2,
+   "rationale": "el desequilibrio del ventilador es la excitación nombrada; la debilidad está en el motor.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio. -Debilidad estructural del motor.",
+   "observations": 2,
+   "rationale": "dos cláusulas en paralelo sin análisis que decida.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en el impulsor de la bomba amplificado por debilidad en la estructura. - Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 2,
+   "rationale": "el deterioro del impulsor encabeza; la debilidad lo amplifica y la distorsión armónica es la segunda cláusula.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    },
+    {
+     "finding": "FLOW:BROKEN_BLADE",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:-",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en evolución en el rodamiento de la bomba, lado opuesto al acoplamiento. - Lubricación ineficiente en rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 2,
+   "rationale": "«Deterioro en evolución» encabeza y es lo que se planifica sustituir; la lubricación lo acompaña.",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Desequilibrio. -Lubricación inadecuada y holguras rotacionales en rodamiento del molino, lado acoplado.",
+   "observations": 2,
+   "rationale": "en este molino el desequilibrio es el patrón que el análisis redirige a debilidad estructural; lubricación y holguras del rodamiento son hallazgos propios.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 1
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Resonancia en dirección vertical del motor. -Lubricación inadecuada en rodamientos del molino.",
+   "observations": 2,
+   "rationale": "sin análisis que decida: el par estructural es una conclusión y la lubricación otra.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:RESONANCE",
+     "score": 1
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en evolución en rodamientos del ventilador. ALERTA. - Desequilibrio, por el momento en niveles dentro de histórico. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor.",
+   "observations": 2,
+   "rationale": "«Holguras rotacionales en evolución. ALERTA» manda; el desequilibrio va «dentro de histórico».",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 1
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos del ventilador.. -Desequilibrio y debilidad estructural. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor.",
+   "observations": 2,
+   "rationale": "el aumento lo lleva el ventilador (desequilibrio) y el PeakVue las holguras; la direccionalidad es «cierta» y lo eléctrico queda en monitorización.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Mejor estado de lubricación de los rodamientos de la bomba, pero se ha de monitorizar su estado. -Deterioro en el rodamiento de la bomba, lado opuesto al acoplamiento, de carácter incipiente.",
+   "observations": 2,
+   "rationale": "«Mejor estado de lubricación» es una mejora; el hallazgo vivo es el deterioro del rodamiento.",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 1
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural / Desequilibrio. Estable. Se establece el buen estado.",
+   "observations": 2,
+   "rationale": "«Estable» y «Se establece el buen estado» son dos cláusulas sin juicio que el 1/n premiaba con dos tercios de la masa.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 0.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto. / Desequilibrio.",
+   "observations": 2,
+   "rationale": "par estructura/desequilibrio sobre el mismo conjunto: manda la lectura estructural.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto. ALERTA. Desalineación y/o deterioro del acoplamiento.",
+   "observations": 2,
+   "rationale": "«se determina que existe un problema de debilidad estructural» y lleva la ALERTA; el acoplamiento es lo que «puede indicar» un armónico.",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto. En tendencia, se establece el buen estado.",
+   "observations": 2,
+   "rationale": "«En tendencia, se establece el buen estado» es una cláusula de estado, no un juicio de fallo.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 0.25
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural en el motor, así como holguras rotacionales.",
+   "observations": 2,
+   "rationale": "dos hallazgos en paralelo sin análisis que decida.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desbalanceo en el rotor del ventilador posiblemente amplificado por debilidad en la estructura.Frecuencias de naturaleza eléctrica en el lado acoplado del motor. Lubricación mejorable en rodamientos del ventilador. Huelgo leve.",
+   "observations": 2,
+   "rationale": "el desbalanceo amplificado por la estructura encabeza; «Huelgo leve» va matizado.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 1.5
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 1.5
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ],
+   "remap": [
+    {
+     "from": "UNMAPPED:-",
+     "to": {
+      "fault_group": "LOOSENESS",
+      "fault_mode": "LOOSENESS",
+      "label_quality": "approximate",
+      "matched_text": "Huelgo leve"
+     },
+     "why": "«Huelgo leve»: huelgo es el sinónimo de holgura que GT003/GT004 no casan."
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Descenso de amplitudes en vibración y PeakVue. No se aprecian trazas de fallo. Informar a Preditec si se ha intervenido el equipo. Se establece su buen estado.",
+   "observations": 2,
+   "rationale": "texto de buen estado y petición administrativa: ninguna cláusula afirma un fallo.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Informar a Preditec si se ha intervenido el rodamiento del motor, lado acoplado.",
+   "observations": 2,
+   "rationale": "petición administrativa al cliente, no un diagnóstico.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Informar a Preditec si se ha intervenido.",
+   "observations": 2,
+   "rationale": "petición administrativa al cliente, no un diagnóstico.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Informar a Preditec si se han intervenido dichos rodamientos de la bomba.",
+   "observations": 2,
+   "rationale": "petición administrativa al cliente, no un diagnóstico.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Informar a Preditec si se han intervenido los rodamientos de la bomba.",
+   "observations": 2,
+   "rationale": "petición administrativa al cliente, no un diagnóstico.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada y holguras rotacionales en rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 2,
+   "rationale": "la lubricación es el cambio medido y «podría opacar» las holguras, que quedan en segundo plano.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamiento de la bomba, lado opuesto al acoplamiento, así como posible deterioro incipiente en el mismo.",
+   "observations": 2,
+   "rationale": "el empeoramiento de lubricación es el cambio medido; el deterioro es «posible» e «incipiente» y la recomendación ni lo menciona.",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Mejorable lubricación en rodamiento motor lado acoplado, así como posible deterioro del mismo.",
+   "observations": 2,
+   "rationale": "la lubricación se afirma; el deterioro es «posible» y va colgado de ella.",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Motor sustituido. Se ha medido solo campana y reductor. Tras la intervención del motor se vuelven a registrar niveles aptos de operación en campana y reductor. No se aprecian trazas de fallo. Se establece el buen estado del equipo y se vigilará su evolución.",
+   "observations": 2,
+   "rationale": "parte de intervención y buen estado: ninguna cláusula afirma un fallo.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Revisar protección ventilador motor.",
+   "observations": 2,
+   "rationale": "acción de inspección visual sobre la protección del ventilador: no hay modo de fallo que mapear.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Ruido en el acople.",
+   "observations": 2,
+   "rationale": "ruido reportado en el acoplamiento: familia de GT024 pero sin regla que lo case.",
+   "findings": [
+    {
+     "finding": "UNMAPPED:-",
+     "score": 1
+    }
+   ],
+   "remap": [
+    {
+     "from": "UNMAPPED:-",
+     "to": {
+      "fault_group": "OTHER",
+      "fault_mode": null,
+      "label_quality": "group",
+      "matched_text": "Ruido en el acople"
+     },
+     "why": "«Ruido en el acople»: mismo grupo OTHER que los ruidos mecánicos de GT024, sin FaultMode."
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Se aprecia buen estado de lubricación de los rodamientos del conjunto. Se establece su buen estado y se vigilará su evolución.",
+   "observations": 2,
+   "rationale": "el texto afirma BUEN estado de lubricación: GT011 lo lee al revés, así que la masa se va a lo que las reglas no cubren.",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 1
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural / falta de rigidez. -Posible fenómeno de resonancia que amplifique las vibraciones en el eje vertical.",
+   "observations": 1,
+   "rationale": "la direccionalidad se atribuye a debilidad estructural; la resonancia es «Posible fenómeno».",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:RESONANCE",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Lubricación ineficiente en rodamientos del molino.",
+   "observations": 1,
+   "rationale": "las dos con respaldo fuerte: 20 mm/s con direccionalidad en el motor y altas amplitudes PeakVue con vibración aleatoria en el molino.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Lubricación ineficiente en rodamientos del molino. -Holguras rotacionales en rodamientos del molino.",
+   "observations": 1,
+   "rationale": "las tres con el mismo respaldo en el análisis del molino.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. -Lubricación mejorable en rodamientos de la bomba.",
+   "observations": 1,
+   "rationale": "las dos sostenidas por su propio patrón (direccionalidad en el motor, vibración aleatoria en la bomba).",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. / Desequilibrio.",
+   "observations": 1,
+   "rationale": "par estructura/desequilibrio sobre el mismo conjunto: manda la lectura estructural.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. ALERTA. - Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 1,
+   "rationale": "mismo texto: el cuerpo del análisis es la debilidad estructural, que fija la ALERTA.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "ELECTRICAL:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. PELIGRO. - Lubricación ineficiente en rodamientos del molino.",
+   "observations": 1,
+   "rationale": "las dos con respaldo fuerte: 27 mm/s con direccionalidad en el motor y altas amplitudes PeakVue en el molino.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. PELIGRO. - Posible aparición de deterioro en el rodamiento del ventilador, lado acoplado. Sin evolución negativa por el momento.",
+   "observations": 1,
+   "rationale": "la debilidad estructural lleva el PELIGRO, el rodamiento es «posible aparición» y «Sin evolución negativa» no es un juicio.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 1
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 0.25
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Debilidad estructural del motor. PELIGRO. -Lubricación ineficiente en rodamientos del molino.",
+   "observations": 1,
+   "rationale": "mismo par con el marcador PELIGRO sobre la cláusula estructural, pero la lubricación del molino sigue siendo hallazgo propio.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación y/o problema del acoplamiento. -Deterioro en rodamientos de la bomba.",
+   "observations": 1,
+   "rationale": "el 2xRPM y los armónicos asíncronos con el mismo respaldo.",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desalineación. -Debilidad estructural. -Lubricación mejorable en rodamientos de la bomba.",
+   "observations": 1,
+   "rationale": "las tres sostenidas, con la lubricación como tercera y la recomendación abriendo con lo estructural.",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio del ventilador. -Debilidad estructural del motor.",
+   "observations": 1,
+   "rationale": "el desequilibrio del ventilador es la componente única excitada; la debilidad estructural amplifica desde el motor.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Desequilibrio y debilidad estructural. -Holguras rotacionales en rodamientos del ventilador. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor.",
+   "observations": 1,
+   "rationale": "el aumento lo lleva el ventilador (desequilibrio) y el PeakVue las holguras; la direccionalidad es «cierta» y lo eléctrico queda en monitorización.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en evolución en el rodamiento de la bomba, lado opuesto al acoplamiento. -Lubricación ineficiente en rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 1,
+   "rationale": "«Deterioro en evolución» encabeza y es lo que se planifica sustituir; la lubricación lo acompaña.",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en rodamientos de la bomba. - Cavitación.",
+   "observations": 1,
+   "rationale": "«puede que realmente nos estemos encontrando con un deterioro severo en rodamientos»; la cavitación entra con «También se puede».",
+   "findings": [
+    {
+     "finding": "BEARING:-",
+     "score": 3
+    },
+    {
+     "finding": "FLOW:CAVITATION",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Deterioro en rodamientos del motor lado acoplado y del reductor.-Debilidad estructural",
+   "observations": 1,
+   "rationale": "el deterioro de rodamientos encabeza y es lo concreto; la debilidad estructural cierra sin localizar.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Falta de rigidez / Desequilibrio. - Rodamientos en buen estado.",
+   "observations": 1,
+   "rationale": "en este molino la direccionalidad redirige el desequilibrio a falta de rigidez; la segunda cláusula es de estado sano.",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holgura estructural / Falta de rigidez en dirección horizontal del conjunto motor-bomba. ALERTA. -Desalineación del conjunto.",
+   "observations": 1,
+   "rationale": "«se concluye que es un problema de índole estructural» y lleva la ALERTA; la desalineación es «a menor amplitud». El par GT004/GT023 es una frase leída dos veces.",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 1.5
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 1.5
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en evolución en rodamientos del ventilador. ALERTA. -Desequilibrio, por el momento en niveles dentro de histórico. -Frecuencias asociadas a la alimentación eléctrica y a la parte eléctrica del motor.",
+   "observations": 1,
+   "rationale": "«Holguras rotacionales en evolución. ALERTA» manda; el desequilibrio va «dentro de histórico».",
+   "findings": [
+    {
+     "finding": "IMBALANCE:IMBALANCE",
+     "score": 1
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Holguras rotacionales en rodamientos del eje de entrada de la centrífuga. -Debilidad estructural del motor.",
+   "observations": 1,
+   "rationale": "el aumento del PeakVue en la centrífuga abre el análisis y fija la ALERTA; el motor entra con «También mencionar».",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 3
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Informar a Preditec si se intervinieron los rodamientos de la bomba. -Posible deterioro en rodamientos de la bomba.",
+   "observations": 1,
+   "rationale": "la primera cláusula es una petición administrativa; el juicio es el deterioro de rodamientos.",
+   "findings": [
+    {
+     "finding": "BEARING:-",
+     "score": 3
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 0.25
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Lubricación ineficiente en rodamiento de la bomba, lado opuesto al acoplamiento. -Posible deterioro en el rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 1,
+   "rationale": "la lubricación encabeza y es el patrón claro; el deterioro es «posible» y «podría coincidir».",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Posible deterioro del rodamiento del reductor, eje de entrada, lado opuesto al motor.-Deterioro de la etapa de salida del reductor- Vibración debida al cabeceo que sufre el equipo. Presenta debilidad estructural en el lado libre del motor.",
+   "observations": 1,
+   "rationale": "cuatro afirmaciones enumeradas en plano, sin análisis que jerarquice.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 2
+    },
+    {
+     "finding": "OTHER:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Posible problema de caracter eléctrico en el motor. -Lubricación inadecuada en rodamiento del motor, lado acoplado.",
+   "observations": 1,
+   "rationale": "el análisis desarrolla el patrón eléctrico y pide MCSA; la lubricación entra con «Se ve también».",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Vibración aleatoria en apoyo de bomba lado opuesto al acoplamiento, debido a estas posible causas: cavitación, lubricación deficiente, deterioro. -Debilidad estructural del conjunto. -Holguras rotacionales en rodamientos del motor.",
+   "observations": 1,
+   "rationale": "la primera cláusula es un diagnóstico diferencial explícito a tres bandas: el reparto a medias que ya hacía el 1/n es la lectura correcta.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 1
+    },
+    {
+     "finding": "FLOW:CAVITATION",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "-Vibración debido a distorsión armónica proveniente de un variador de frecuencias. -Lubricación mejorable en los rodamientos del ventilador, así como holguras rotacionales.",
+   "observations": 1,
+   "rationale": "la distorsión del variador es una cláusula y lubricación + holguras la otra, ambas sostenidas.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 1
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 1
+    },
+    {
+     "finding": "ELECTRICAL:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural del conjunto. Ligeras holguras rotacionales.",
+   "observations": 1,
+   "rationale": "«Ligeras holguras rotacionales» va matizado frente a la debilidad estructural del conjunto.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 1
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural en la bomba y desalineación.",
+   "observations": 1,
+   "rationale": "«el problema radica en una debilidad estructural»; el 2xRPM entra con «También se aprecia».",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural en motor. Leve holgura rotacional en rodamiento del motor lado acoplado",
+   "observations": 1,
+   "rationale": "«Leve holgura rotacional» va matizado frente a la debilidad estructural del motor.",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 1
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 3
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural muy notable, cabeceo del conjunto motor-reductor",
+   "observations": 1,
+   "rationale": "debilidad estructural y cabeceo son dos nombres del mismo fenómeno en una sola cláusula.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "OTHER:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural, cabeceo del conjunto motor reductor",
+   "observations": 1,
+   "rationale": "debilidad estructural y cabeceo son dos nombres del mismo fenómeno en una sola cláusula.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "OTHER:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Debilidad estructural, cabeceo del conjunto motor reductor.",
+   "observations": 1,
+   "rationale": "debilidad estructural y cabeceo son dos nombres del mismo fenómeno en una sola cláusula.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "OTHER:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Desbalanceo en el rotor del ventilador posiblemente amplificado por debilidad en la estructura.Frecuencias de naturaleza eléctrica en el lado acoplado del motor.",
+   "observations": 1,
+   "rationale": "dos cláusulas en paralelo, cada una sobre un componente.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Deterioro en el impulsor de la bomba amplificado por debilidad en la estructura. Distorsión armónica en la calidad de la energía de alimentación.",
+   "observations": 1,
+   "rationale": "el deterioro del impulsor encabeza; la debilidad lo amplifica y la distorsión armónica es la segunda cláusula.",
+   "findings": [
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1.5
+    },
+    {
+     "finding": "FLOW:BROKEN_BLADE",
+     "score": 2
+    },
+    {
+     "finding": "ELECTRICAL:-",
+     "score": 1.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Holguras rotacionale sen ambos rodamientos de la bomba y motor lado acoplado Desalineación del conjunto motor bomba, así como debilidad estructural del conjunto.",
+   "observations": 1,
+   "rationale": "tres hallazgos enumerados en plano, sin análisis que jerarquice.",
+   "findings": [
+    {
+     "finding": "MISALIGNMENT:-",
+     "score": 2
+    },
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación inadecuada y posible deterioro en evolución en rodamiento del laminador, lado opuesto al acoplamiento.",
+   "observations": 1,
+   "rationale": "«no se aprecian trazas de fallo, pero el ruido ha subido […] por un posible problema de lubricación que opaca las trazas».",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 1
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente en rodamiento del motor, lado acoplado y rodamiento del laminador, lado acoplado. Posible deterioro en rodamiento del motor, lado acoplado.",
+   "observations": 1,
+   "rationale": "lubricación en un rodamiento y deterioro en otro, cada uno con su patrón y ambos en la recomendación.",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 2
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación ineficiente y posible deterioro en evolución en rodamiento de la bomba, lado opuesto al acoplamiento.",
+   "observations": 1,
+   "rationale": "el peor estado de lubricación es lo medido; el deterioro «podría indicar» y va con «Además».",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    },
+    {
+     "finding": "BEARING:-",
+     "score": 2
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable Rodamiento del laminador L2.Aumento en vibración del laminador por condición operativa (carga)",
+   "observations": 1,
+   "rationale": "«Aumento en vibración por condición operativa (carga)» es contexto de operación, no un fallo.",
+   "findings": [
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    },
+    {
+     "finding": "UNMAPPED:-",
+     "score": 0.5
+    }
+   ]
+  },
+  {
+   "diagnosis_text": "Lubricación mejorable en rodamientos de la bomba, y holguras rotacionales en los mismos.",
+   "observations": 1,
+   "rationale": "la lubricación es el cambio que abre el análisis; las holguras entran con «Se ven también».",
+   "findings": [
+    {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 2
+    },
+    {
+     "finding": "LUBRICATION:BEARING_LUBRICATION",
+     "score": 3
+    }
+   ]
+  }
+ ]
+}
