@@ -572,8 +572,10 @@ def informes(
         ) from exc
 
     from ams_extract.informes.consolidate import (
+        finding_rows,
         observation_rows,
         read_crosswalk,
+        write_findings,
         write_observations,
     )
 
@@ -612,13 +614,19 @@ def informes(
     crosswalk = read_crosswalk(out)
     rows = observation_rows(documents, crosswalk)
     written = write_observations(rows, out)
+    findings = finding_rows(rows)
+    written.append(write_findings(findings, out))
     resolved = sum(1 for row in rows if row["dataset_machine_id"])
+    weighted = sum(1 for row in rows if row["_findings"])
     _console.print(
-        f"consolidated {len(rows)} observations -> {', '.join(p.name for p in written)}"
+        f"consolidated {len(rows)} observations and {len(findings)} findings "
+        f"({weighted} observations carry at least one) -> "
+        f"{', '.join(p.name for p in written)}"
         + (
-            f"  ({resolved} with dataset_machine_id from {len(crosswalk)} crosswalk entries)"
+            f"\n  {resolved} rows with dataset_machine_id "
+            f"from {len(crosswalk)} crosswalk entries"
             if crosswalk
-            else "  (no crosswalk.csv: dataset_machine_id left null)"
+            else "\n  no crosswalk.csv: dataset_machine_id left null"
         )
     )
 

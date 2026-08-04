@@ -18,9 +18,12 @@ from typing import Any
 import pytest
 
 from ams_extract.informes.consolidate import (
+    FINDING_COLUMNS,
     OBSERVATION_COLUMNS,
+    finding_rows,
     observation_rows,
     read_crosswalk,
+    write_findings,
     write_observations,
 )
 from ams_extract.informes.rules import (
@@ -371,6 +374,61 @@ class TestConsolidation:
         assert header == ",".join(OBSERVATION_COLUMNS)
 
 
+class TestFindingsConsolidation:
+    def test_one_row_per_finding_with_its_weight_and_keys(self) -> None:
+        text = "-Desequilibrio del ventilador. -Debilidad estructural."
+        rows = observation_rows(
+            [_document([_observation(diagnosis_text=text, findings=map_findings(text))])],
+            {"AG100": "MECLADOR_AGITADOR_AG_100"},
+        )
+        findings = finding_rows(rows)
+        assert len(findings) == 2
+        assert set(findings[0]) == set(FINDING_COLUMNS)
+        assert [f["mapping_rule"] for f in findings] == ["GT001", "GT005"]
+        assert [f["weight"] for f in findings] == [0.5, 0.5]
+        assert all(f["observation_id"] == "P2581115260126:AG100:vibration" for f in findings)
+        assert all(f["dataset_machine_id"] == "MECLADOR_AGITADOR_AG_100" for f in findings)
+        assert all(f["source_text"] == text for f in findings)
+
+    def test_a_healthy_observation_contributes_no_row(self) -> None:
+        rows = observation_rows(
+            [_document([_observation(diagnosis_text="Máquina parada", findings=[])])]
+        )
+        assert finding_rows(rows) == []
+
+    def test_the_dedupe_of_the_observations_is_inherited(self) -> None:
+        # The same retrospective quoted by two monthly reports is one judgement,
+        # so its findings must not be counted twice.
+        text = "Desequilibrio del ventilador"
+        quoted = _observation(
+            record_kind="retrospective",
+            status="UNKNOWN",
+            alarm=None,
+            diagnosis_text=text,
+            findings=map_findings(text),
+            operating_context=None,
+        )
+        documents = [
+            _document([quoted], document_id="P25/81115-260126", inspection_date="2026-01-26"),
+            _document([quoted], document_id="P25/81115-250526", inspection_date="2026-05-25"),
+        ]
+        assert len(finding_rows(observation_rows(documents))) == 1
+
+    def test_writes_the_parquet_the_contract_models(self, tmp_path: Path) -> None:
+        import pyarrow.parquet as pq
+
+        text = "-Desequilibrio. -Suciedad en la válvula."
+        rows = observation_rows(
+            [_document([_observation(diagnosis_text=text, findings=map_findings(text))])]
+        )
+        path = write_findings(finding_rows(rows), tmp_path)
+        assert path.name == "findings.parquet"
+        table = pq.read_table(path)
+        assert tuple(table.column_names) == FINDING_COLUMNS
+        assert str(table.schema.field("weight").type) == "float"
+        assert table.column("fault_group").to_pylist() == ["IMBALANCE", "UNMAPPED"]
+
+
 class TestContractConformance:
     """The normative models of vibsynth-contracts are the schema (spec §7)."""
 
@@ -381,6 +439,11 @@ class TestContractConformance:
         model = external.DiagGTObservation.model_validate(observation)
         assert [f.weight for f in model.findings] == [0.5, 0.5]
         assert model.alarm == external.STATUS_ALARM["ALERT"]
+
+    def test_the_findings_table_is_the_one_the_contract_models(self) -> None:
+        external = pytest.importorskip("vibsynth_contracts.diagnosis.external")
+        assert tuple(c.name for c in external.FINDINGS_COLUMNS) == FINDING_COLUMNS
+        assert {c.name: c.dtype for c in external.FINDINGS_COLUMNS}["weight"] == "float32"
 
     def test_the_schema_version_is_the_one_the_models_declare(self) -> None:
         external = pytest.importorskip("vibsynth_contracts.diagnosis.external")

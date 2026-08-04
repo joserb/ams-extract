@@ -47,6 +47,32 @@ OBSERVATION_COLUMNS: tuple[str, ...] = (
 )
 """Columnas de ``observations.parquet`` (spec §5), en su orden."""
 
+FINDING_COLUMNS: tuple[str, ...] = (
+    "document_id",
+    "observation_id",
+    "dataset_machine_id",
+    "observed_at",
+    "modality",
+    "record_kind",
+    "fault_mode",
+    "fault_group",
+    "label_quality",
+    "mapping_rule",
+    "weight",
+    "source_text",
+)
+"""Columnas de ``findings.parquet``, réplica de ``FINDINGS_COLUMNS``.
+
+El contrato las modela (``vibsynth_contracts.diagnosis.external``, 0.1.5) y
+aquí se replican como el resto del layout, sin importarlo en runtime
+(ADR-0009). La tabla existe aparte de ``observations.parquet`` porque aplanar
+los findings dentro de la fila de su observación obliga a colapsarlos en una
+cadena, y ese colapso se lleva por delante la multiplicidad, el ``weight``, la
+``mapping_rule`` y el ``source_text``.
+"""
+
+FINDINGS_STEM = "findings"
+
 _INT_COLUMNS = frozenset({"alarm", "source_page"})
 _FLOAT_COLUMNS = frozenset({"rpm1", "power_kw"})
 
@@ -106,8 +132,10 @@ def _observation_row(
         "rpm1": (observation["operating_context"] or {}).get("rpm1"),
         "power_kw": (observation["operating_context"] or {}).get("power_kw"),
         "source_page": observation["source_page"],
-        # claves internas, no son columnas del consolidado
+        # claves internas: no son columnas del consolidado, pero sostienen la
+        # proyección a findings.parquet sobre el mismo conjunto deduplicado
         "_observation_id": observation["observation_id"],
+        "_findings": findings,
     }
 
 
@@ -142,6 +170,35 @@ def observation_rows(
     return sorted(best.values(), key=lambda row: tuple(row[name] for name in _DEDUPE_KEY))
 
 
+def finding_rows(observations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Una fila por finding de las observaciones **ya deduplicadas**.
+
+    Se deriva del consolidado de observaciones y no de los documentos en bruto
+    a propósito: un diagnóstico previo citado por los seis informes mensuales
+    contaría seis veces al agregar masa por modo de fallo.
+    """
+    rows: list[dict[str, Any]] = []
+    for observation in observations:
+        for finding in observation["_findings"]:
+            rows.append(
+                {
+                    "document_id": observation["document_id"],
+                    "observation_id": observation["_observation_id"],
+                    "dataset_machine_id": observation["dataset_machine_id"],
+                    "observed_at": observation["observed_at"],
+                    "modality": observation["modality"],
+                    "record_kind": observation["record_kind"],
+                    "fault_mode": finding["fault_mode"],
+                    "fault_group": finding["fault_group"],
+                    "label_quality": finding["label_quality"],
+                    "mapping_rule": finding["mapping_rule"],
+                    "weight": finding.get("weight"),
+                    "source_text": finding["source_text"],
+                }
+            )
+    return rows
+
+
 def _csv_value(value: Any) -> Any:
     return "" if value is None else value
 
@@ -165,7 +222,9 @@ def write_parquet(rows: list[dict[str, Any]], path: Path, columns: tuple[str, ..
             return pa.int8()
         if name in _INT_COLUMNS:
             return pa.int32()
-        if name in _FLOAT_COLUMNS or name == "weight":
+        if name == "weight":
+            return pa.float32()  # el tipo que declara el contrato
+        if name in _FLOAT_COLUMNS:
             return pa.float64()
         return pa.string()
 
@@ -185,3 +244,10 @@ def write_observations(rows: list[dict[str, Any]], gt_dir: Path) -> list[Path]:
     write_parquet(rows, parquet_path, OBSERVATION_COLUMNS)
     write_csv(rows, csv_path, OBSERVATION_COLUMNS)
     return [parquet_path, csv_path]
+
+
+def write_findings(rows: list[dict[str, Any]], gt_dir: Path) -> Path:
+    """Escribe ``findings.parquet``. Sin CSV: el contrato sólo nombra el parquet."""
+    path = gt_dir / f"{FINDINGS_STEM}.parquet"
+    write_parquet(rows, path, FINDING_COLUMNS)
+    return path
