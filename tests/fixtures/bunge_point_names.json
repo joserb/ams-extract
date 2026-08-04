@@ -1,0 +1,1399 @@
+{
+  "source": "BUNGE CARTAGENA marzo 2.0.rbm, exported dataset bunge_cartagena_ams",
+  "total_points": 5203,
+  "distinct_names": 232,
+  "names": [
+    {
+      "name": "1º Eje Rodam Sup  Peakv 1000Hz",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "1º Eje Rodam Sup  Peakv 2000Hz",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "1º eje Rodam Sup (HF) 2000Hz",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "1º eje Rodam Sup (HF) 6000Hz",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "2º Eje Lado Motor Vertical",
+      "points": 10,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "2º Eje Reductora Axial",
+      "points": 1,
+      "location": null,
+      "direction": "A"
+    },
+    {
+      "name": "2º Eje Rodam Sup Peakv 1000Hz",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "2º Eje Rodam Sup Peakv 2000Hz",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "2º Eje reductora (HF)",
+      "points": 2,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "2º Eje reductora (P)",
+      "points": 3,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "2º Eje reductora Axial",
+      "points": 2,
+      "location": null,
+      "direction": "A"
+    },
+    {
+      "name": "2º Eje reductora Horiz",
+      "points": 1,
+      "location": null,
+      "direction": "H"
+    },
+    {
+      "name": "2º Eje reductora Horizontal",
+      "points": 2,
+      "location": null,
+      "direction": "H"
+    },
+    {
+      "name": "2º Eje reductora Vertical",
+      "points": 3,
+      "location": null,
+      "direction": "V"
+    },
+    {
+      "name": "2º eje Rodam Sup (HF) 2000Hz",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "2º eje Rodam Sup (HF) 6000Hz",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "2º eje reductora (HF)",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "3r Eje Lado Motor Axial",
+      "points": 3,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "3r Eje Lado Motor Vert (P)",
+      "points": 3,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "3r Eje Lado Motor Vertical",
+      "points": 3,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "3º Eje Rodam Sup Peakv 1000Hz",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "3º eje Rodam Sup (HF) 2000Hz",
+      "points": 2,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "3º eje Rodam Sup (HF) 6000Hz",
+      "points": 2,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "4º Eje Rodam Sup Peakv 1000Hz",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "Agitaddor LA Horiz(P)",
+      "points": 1,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Agitaddor LOA Horiz(P)",
+      "points": 1,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Agitador LA (HF)",
+      "points": 3,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Agitador LA Axial",
+      "points": 3,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "Agitador LA Horiz",
+      "points": 3,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Agitador LA Horiz(P)",
+      "points": 2,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Agitador LA Vertical",
+      "points": 3,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Agitador LOA (HF)",
+      "points": 3,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Agitador LOA Horiz",
+      "points": 3,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Agitador LOA Horiz(P)",
+      "points": 2,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Agitador LOA Vertical",
+      "points": 3,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "BOMBA LA ALTA FRECUENCIA (HF)",
+      "points": 133,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "BOMBA LA AXIAL",
+      "points": 15,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "BOMBA LA HORIZONTAL",
+      "points": 136,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "BOMBA LA VERTICAL",
+      "points": 135,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "BOMBA LA VERTICAL PEAKVUE",
+      "points": 135,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "BOMBA LOA AXIAL",
+      "points": 63,
+      "location": "NDE",
+      "direction": "A"
+    },
+    {
+      "name": "BOMBA LOA HORIZONTAL",
+      "points": 129,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "BOMBA LOA VERTICAL",
+      "points": 127,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "BOMBA LOA VERTICAL PEAKVUE",
+      "points": 125,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Bomba LA (HF)",
+      "points": 1,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Bomba LA Axial",
+      "points": 1,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "Bomba LA Horiz",
+      "points": 1,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Bomba LA Horiz(P)",
+      "points": 1,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Bomba LA Vertical",
+      "points": 1,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "CENTRIFUGA LA AXIAL",
+      "points": 2,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "CENTRIFUGA LA HORIZONTAL",
+      "points": 12,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "CENTRIFUGA LA VERTICAL",
+      "points": 12,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "CENTRIFUGA LA VERTICAL (HF)",
+      "points": 12,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "CENTRIFUGA LA VERTICAL PEAKVUE",
+      "points": 12,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "CENTRIFUGA LCA VERTICAL (HF)",
+      "points": 10,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "CENTRIFUGA LOA HORIZONTAL",
+      "points": 12,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "CENTRIFUGA LOA VERTICAL",
+      "points": 12,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "CENTRIFUGA LOA VERTICAL PEAKVUE",
+      "points": 10,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "CONSUMO INTENSIDAD (A)",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "Campana Horizontal",
+      "points": 5,
+      "location": null,
+      "direction": "H"
+    },
+    {
+      "name": "Campana Peakvue",
+      "points": 5,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "Campana Vertical",
+      "points": 5,
+      "location": null,
+      "direction": "V"
+    },
+    {
+      "name": "Campana Vertical (HF)",
+      "points": 5,
+      "location": null,
+      "direction": "V"
+    },
+    {
+      "name": "Eje Entrad Lado Op Motor Axial",
+      "points": 10,
+      "location": "NDE",
+      "direction": "A"
+    },
+    {
+      "name": "Eje Entrad Lado Op Motor Vert",
+      "points": 10,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Eje Entrada (HF)",
+      "points": 3,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "Eje Entrada Axial",
+      "points": 2,
+      "location": null,
+      "direction": "A"
+    },
+    {
+      "name": "Eje Entrada Horizontal",
+      "points": 5,
+      "location": null,
+      "direction": "H"
+    },
+    {
+      "name": "Eje Entrada Lado Motor (HF)",
+      "points": 7,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Eje Entrada Lado Motor (P)",
+      "points": 11,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Eje Entrada Lado Motor Horiz",
+      "points": 11,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Eje Entrada Lado Motor Vert",
+      "points": 11,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Eje Entrada Lado Motor [HF]",
+      "points": 4,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Eje Entrada Lado Op Motor (P)",
+      "points": 10,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Eje Entrada Peakvue",
+      "points": 6,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "Eje Entrada Vertical",
+      "points": 6,
+      "location": null,
+      "direction": "V"
+    },
+    {
+      "name": "Eje Entrada(HF)",
+      "points": 3,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "Eje Entradaç Horizontal",
+      "points": 1,
+      "location": null,
+      "direction": "H"
+    },
+    {
+      "name": "Eje Intermed Lado Libre Vertical",
+      "points": 2,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Eje Intermedi Lado Libre Peakvue",
+      "points": 2,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Eje interm Lado Libre Horizontal",
+      "points": 2,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "LAMINADOR LA HORIZONTAL",
+      "points": 14,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "LAMINADOR LA VERTICAL",
+      "points": 14,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "LAMINADOR LA VERTICAL PEAKVUE",
+      "points": 14,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "LAMINADOR LOA HORIZONTAL",
+      "points": 14,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "LAMINADOR LOA VERTICAL",
+      "points": 14,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "LAMINADOR LOA VERTICAL PEAKVUE",
+      "points": 14,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "MOLINO LA AXIAL",
+      "points": 12,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "MOLINO LA HORIZONTAL",
+      "points": 12,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "MOLINO LA VERTICAL",
+      "points": 12,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "MOLINO LA VERTICAL PEAKVUE",
+      "points": 12,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "MOLINO LOA HORIZONTAL",
+      "points": 12,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "MOLINO LOA VERTICAL",
+      "points": 12,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "MOLINO LOA VERTICAL PEAKVUE",
+      "points": 12,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "MOTOR LA ALTA FRECUENCIA (HF)",
+      "points": 3,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "MOTOR LA AXIAL",
+      "points": 247,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "MOTOR LA HORIZONTAL",
+      "points": 219,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "MOTOR LA VERTICAL",
+      "points": 248,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "MOTOR LA VERTICAL (HF)",
+      "points": 5,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "MOTOR LA VERTICAL PEAKVUE",
+      "points": 248,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "MOTOR LOA ALTA FRECUENCIA (HF)",
+      "points": 268,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "MOTOR LOA ALTA RESOLUCION (HR)",
+      "points": 70,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "MOTOR LOA AXIAL",
+      "points": 5,
+      "location": "NDE",
+      "direction": "A"
+    },
+    {
+      "name": "MOTOR LOA HORIZONTAL",
+      "points": 248,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "MOTOR LOA HORIZONTAL (HR)",
+      "points": 10,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "MOTOR LOA VERTICAL",
+      "points": 248,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "MOTOR LOA VERTICAL (HF)",
+      "points": 58,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "MOTOR LOA VERTICAL PEAKVUE",
+      "points": 248,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "MOTOR LOA Vertical (HF)",
+      "points": 14,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Motor Lado Acople Axial",
+      "points": 95,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "Motor Lado Acople Horizontal",
+      "points": 95,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Motor Lado Acople Peakvue",
+      "points": 81,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Motor Lado Acople Vert Peakvue",
+      "points": 14,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Motor Lado Acople Vertical",
+      "points": 95,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Motor Lado Libre Horizontal",
+      "points": 95,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Motor Lado Libre Horizontal (HR)",
+      "points": 1,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Motor Lado Libre Peakvue",
+      "points": 81,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Motor Lado Libre Vert Peakvue",
+      "points": 14,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Motor Lado Libre Vertical",
+      "points": 95,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor (HF)",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje 2 Rodam Inf Horiz",
+      "points": 1,
+      "location": null,
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Entr Vert (HF)",
+      "points": 1,
+      "location": null,
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Entr Vert (Varilla)",
+      "points": 1,
+      "location": null,
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Entrada Axial",
+      "points": 1,
+      "location": null,
+      "direction": "A"
+    },
+    {
+      "name": "Reductor Eje Entrada Horiz",
+      "points": 1,
+      "location": null,
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Entrada LA (HF)",
+      "points": 38,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje Entrada LA Axial",
+      "points": 36,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "Reductor Eje Entrada LA Horiz",
+      "points": 38,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Entrada LA Horiz(P)",
+      "points": 2,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Entrada LA Peakvue",
+      "points": 36,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje Entrada LA Vert",
+      "points": 20,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Entrada LA Vertical",
+      "points": 16,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Entrada LOA  Peakv",
+      "points": 3,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje Entrada LOA Horiz",
+      "points": 15,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Entrada LOA Peakvue",
+      "points": 13,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje Entrada LOA Vert",
+      "points": 7,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Entrada Peakvue",
+      "points": 1,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje Interm 1 LA Vert",
+      "points": 2,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Interm LA Horiz",
+      "points": 2,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Interm LA Horizonta",
+      "points": 1,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Interm LA Peakvue",
+      "points": 3,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje Interm LA Vertical",
+      "points": 2,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Interm LOA Axial",
+      "points": 5,
+      "location": "NDE",
+      "direction": "A"
+    },
+    {
+      "name": "Reductor Eje Interm LOA Horiz",
+      "points": 2,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Interm LOA Horizont",
+      "points": 1,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Interm LOA Peakvue",
+      "points": 5,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje Interm LOA Vertical",
+      "points": 2,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Salida LA Horiz",
+      "points": 1,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Salida LA Peakvue",
+      "points": 1,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje Salida LA Verti (P)",
+      "points": 2,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Salida LA Vertical",
+      "points": 13,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Salida LOA  Peakv",
+      "points": 19,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje Salida LOA Axial",
+      "points": 1,
+      "location": "NDE",
+      "direction": "A"
+    },
+    {
+      "name": "Reductor Eje Salida LOA Horiz",
+      "points": 19,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Salida LOA Horizont",
+      "points": 13,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Eje Salida LOA Peakvue",
+      "points": 13,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Eje Salida LOA Vert",
+      "points": 19,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Eje Salida LOA Vertical",
+      "points": 14,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Entrada (HF)",
+      "points": 2,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "Reductor Entrada Axial",
+      "points": 2,
+      "location": null,
+      "direction": "A"
+    },
+    {
+      "name": "Reductor Entrada Horiz",
+      "points": 2,
+      "location": null,
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Entrada Peakvue",
+      "points": 2,
+      "location": null,
+      "direction": null
+    },
+    {
+      "name": "Reductor Entrada Vertical",
+      "points": 2,
+      "location": null,
+      "direction": "V"
+    },
+    {
+      "name": "Reductor LA (HF)",
+      "points": 26,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor LA Axial",
+      "points": 24,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "Reductor LA Horiz",
+      "points": 28,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor LA Horiz (P)",
+      "points": 7,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor LA Horiz(P)",
+      "points": 18,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor LA Vertical",
+      "points": 26,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor LA Vertical (HF)",
+      "points": 1,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor LA Vertical (P)",
+      "points": 3,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor LCA Horiz",
+      "points": 3,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor LCA Horiz (P)",
+      "points": 10,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor LCA Horiz(P)",
+      "points": 3,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor LCA Vertical",
+      "points": 5,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor LCA Vertical (P)",
+      "points": 2,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor LOA Axial",
+      "points": 2,
+      "location": "NDE",
+      "direction": "A"
+    },
+    {
+      "name": "Reductor LOA Horiz",
+      "points": 8,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor LOA Vert",
+      "points": 2,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor LOA Vertical",
+      "points": 2,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor LOA Vertical (P)",
+      "points": 2,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Lado Acople (HF)",
+      "points": 4,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Lado Acople Axial",
+      "points": 19,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "Reductor Lado Acople Horizontal",
+      "points": 17,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Lado Acople Peakvue",
+      "points": 19,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Lado Acople Vertical",
+      "points": 19,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Lado Acople [HF]",
+      "points": 13,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Lado Libre Horizontal",
+      "points": 17,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Lado Libre Peakvue",
+      "points": 17,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Lado Libre Vertical",
+      "points": 17,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Lado Motor (HF)",
+      "points": 4,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Lado Motor Axial",
+      "points": 12,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "Reductor Lado Motor Horizontal",
+      "points": 15,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Reductor Lado Motor Peakvue",
+      "points": 18,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Lado Motor Vertical",
+      "points": 18,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Lado Motor [HF]",
+      "points": 13,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Reductor Vertical",
+      "points": 1,
+      "location": null,
+      "direction": "V"
+    },
+    {
+      "name": "Reductor Vertical (P)",
+      "points": 1,
+      "location": null,
+      "direction": "V"
+    },
+    {
+      "name": "Rodillo Reenvio Lado Motor (P)",
+      "points": 2,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Rodillo Reenvio Lado Op Mot (P)",
+      "points": 2,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Rodillo Traccion Lad Op Mot (P)",
+      "points": 1,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "Rodillo Traccion Lado Motor (P)",
+      "points": 3,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Rodillo Traccion Lado Op Mot (P)",
+      "points": 2,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "SOPLANTE LA ALTA FRECUENCIA (HF)",
+      "points": 5,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "SOPLANTE LA HORIZONTAL",
+      "points": 5,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "SOPLANTE LA VERTICAL",
+      "points": 5,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "SOPLANTE LA VERTICAL PEAKVUE",
+      "points": 5,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "SOPLANTE LOA HORIZONTAL",
+      "points": 5,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "SOPLANTE LOA VERTICAL",
+      "points": 5,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "SOPLANTE LOA VERTICAL PEAKVUE",
+      "points": 1,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "TAMBOR LA AXIAL",
+      "points": 1,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "TAMBOR LA HORIZONTAL",
+      "points": 1,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "TAMBOR LA VERTICAL",
+      "points": 1,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "TAMBOR LA VERTICAL (HF)",
+      "points": 1,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "TAMBOR LA VERTICAL PEAKVUE",
+      "points": 1,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "TAMBOR LOA HORIZONTAL",
+      "points": 1,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "TAMBOR LOA VERTICAL",
+      "points": 1,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "TAMBOR LOA VERTICAL PEAKVUE",
+      "points": 1,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Tambor LA (HF)",
+      "points": 1,
+      "location": "DE",
+      "direction": null
+    },
+    {
+      "name": "Tambor LA Horiz(P)",
+      "points": 1,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "Tambor LA Vertical",
+      "points": 1,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "Tambor LCA Horiz(P)",
+      "points": 1,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "Tambor LCA Vertical",
+      "points": 1,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "Tambor LOA Peakvue",
+      "points": 1,
+      "location": "NDE",
+      "direction": null
+    },
+    {
+      "name": "VENTILADOR LA AXIAL",
+      "points": 14,
+      "location": "DE",
+      "direction": "A"
+    },
+    {
+      "name": "VENTILADOR LA HORIZONTAL",
+      "points": 14,
+      "location": "DE",
+      "direction": "H"
+    },
+    {
+      "name": "VENTILADOR LA VERTICAL",
+      "points": 14,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "VENTILADOR LA VERTICAL (HF)",
+      "points": 1,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "VENTILADOR LA VERTICAL PEAKVUE",
+      "points": 14,
+      "location": "DE",
+      "direction": "V"
+    },
+    {
+      "name": "VENTILADOR LOA HORIZONTAL",
+      "points": 14,
+      "location": "NDE",
+      "direction": "H"
+    },
+    {
+      "name": "VENTILADOR LOA VERTICAL",
+      "points": 14,
+      "location": "NDE",
+      "direction": "V"
+    },
+    {
+      "name": "VENTILADOR LOA VERTICAL PEAKVUE",
+      "points": 14,
+      "location": "NDE",
+      "direction": "V"
+    }
+  ]
+}

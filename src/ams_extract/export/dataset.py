@@ -58,6 +58,7 @@ from ams_extract.models import (
     TrendBand,
     Waveform,
 )
+from ams_extract.point_naming import parse_point_name
 from ams_extract.reader import RbmReader
 from ams_extract.records.pdpa import ParamSetIndex
 from ams_extract.report import collect_inventory
@@ -229,6 +230,25 @@ def _machine_dir(out_dir: Path, equipment: Equipment) -> Path:
     return out_dir / f"{MACHINE_PARTITION_PREFIX}{equipment.short_code}"
 
 
+def _build_point_doc(point: Point) -> dict[str, Any]:
+    """Return the VibFrame ``PointDoc`` of an AMS point.
+
+    AMS stores no structured placement, so ``location``/``direction`` are read
+    off the point name — the only place the analyst wrote them (see
+    :mod:`ams_extract.point_naming`); names that declare neither stay ``None``.
+    ``sensor`` and ``speed_source`` have no counterpart in the ``.rbm`` at all.
+    """
+    placement = parse_point_name(point.long_name)
+    return {
+        "id": point.short_code,
+        "name": point.long_name,
+        "location": placement.location,
+        "direction": placement.direction,
+        "sensor": None,
+        "speed_source": None,
+    }
+
+
 def _build_machine_doc(
     *,
     source_path: str,
@@ -255,17 +275,7 @@ def _build_machine_doc(
             "fault_frequencies_order": {},
             "definition": None,
         },
-        "points": [
-            {
-                "id": point.short_code,
-                "name": point.long_name,
-                "location": None,
-                "direction": None,
-                "sensor": None,
-                "speed_source": None,
-            }
-            for point in equipment.points
-        ],
+        "points": [_build_point_doc(point) for point in equipment.points],
         "proc_modes": list(proc_modes),
         "config_generations": [],
         "states": [],

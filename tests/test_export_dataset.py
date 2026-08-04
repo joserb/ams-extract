@@ -72,6 +72,30 @@ class TestExportDataset:
         # Location levels only: the machine is its own level in the viewers.
         assert machine_doc["machine"]["path"] == ["AREA"]
 
+    def test_point_docs_carry_the_placement_read_off_the_name(self) -> None:
+        points = (
+            Point(record_num=1, long_name="MOTOR LOA HORIZONTAL", short_code="M1H"),
+            Point(record_num=2, long_name="Reductor Lado Libre Peakvue", short_code="R1P"),
+            Point(record_num=3, long_name="Campana Peakvue", short_code="C1P"),
+        )
+        equipment = Equipment(record_num=4, long_name="BOMBA", short_code="PUMP", points=points)
+
+        machine_doc = _build_machine_doc(
+            source_path="fixture.rbm",
+            extracted_at=datetime(2020, 1, 1, tzinfo=UTC),
+            area_long="AREA",
+            equipment=equipment,
+            proc_modes=[],
+        )
+
+        assert [(p["location"], p["direction"]) for p in machine_doc["points"]] == [
+            ("NDE", "H"),  # side and direction both declared
+            ("NDE", None),  # PeakVue point: side only
+            (None, None),  # neither: nothing is invented
+        ]
+        # The rest of the PointDoc has no counterpart in the .rbm.
+        assert all(p["sensor"] is None and p["speed_source"] is None for p in machine_doc["points"])
+
     def test_wave_row_n_samples_matches_the_emitted_array(self) -> None:
         # VibFrame derives the time axis from t + i / sample_rate_hz, so
         # n_samples must be len(data); the AMS nominal block (512 for these
