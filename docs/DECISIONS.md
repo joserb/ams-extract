@@ -849,6 +849,20 @@ cerraron dos incógnitas a la vez:
 - Nivel "Advertencia" de las gráficas (~0,95 G's en la captura) ≠ C/D del
   pdla: pendiente de localizar (FORMAT §5.8).
 
+### Nota 2026-08-04 (workplan 07) — el ejemplo de AG-100 no se sostiene
+
+Al decodificar `vdpm.0x164` se comprobó el contraste que este ADR daba por
+supuesto: **no hay ni una sola RPM de análisis doblada en BUNGE**. Los 5
+espectros del punto piloto de AG-100 llevan 1 455 crudo, igual que sus
+`vdfw` y que su nominal; y en los 137 270 espectros de la base, `vdps.0x28`
+coincide con `vdpm.0x164` en 134 183 (97,8 %), sin ningún caso de razón 2.
+La decisión (emitir el crudo, sin dividir) no cambia — el gold de
+PM-9101-A la sostiene, y su nominal es también 2 900 — pero el "OJO" del
+punto 1 y la frase "delatan las máquinas con RPM de análisis doblada" del
+tercer punto describen algo que esta base no contiene. Donde crudo y
+nominal difieren es en máquinas de velocidad variable, con el analista
+tecleando la velocidad medida.
+
 ## ADR-0014 — Tendencias de aceleración (PeakVue/HF) emitidas: overall crudo en G's
 
 - **Fecha**: 2026-07-20

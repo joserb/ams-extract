@@ -188,12 +188,50 @@ Registro de continuación (`gicm_record + 1`, sólo si el chunk tiene > 12 equip
 |---|---|---|
 | `0x00` | 8 | preámbulo (timestamp + version) |
 | `0x08` | 4 | tag ASCII `vdpm` |
-| `0x10` | 8 | flags / mini-header (no interpretado) |
+| `0x10` | 4 | u32 LE (+1 encoded) — puntero al `pdcd` del punto (§5.2) |
+| `0x14` | 4 | flags / mini-header (no interpretado) |
 | `0x18` | 32 | `long_name` (cp1252, space-padded) — p.ej. `MOTOR LA HORIZONTAL` |
-| `0x38+` | variable | resto del descriptor: template (`ESTÁNDAR`, …), unidades, Fmax, líneas, alarmas. Pendiente de Fase 3. |
+| `0x4B` | ? | familia de plantilla (`:ESTÁNDAR`, …) — sin parsear; el enlace a plantilla va por `pdcd.0xAC/0xAE` (§5.8) |
+| `0x7C` | 1 | `1` en los 5 203 puntos de BUNGE; función desconocida |
+| `0x7D` | 1 | u8 — **cuántos slots de rodamiento** están rellenos (0–7) |
+| `0x7E` | 7×14 | **designaciones de rodamiento**, 14 B cp1252 space-padded cada una; los slots sin usar llevan el literal `INDEFINID` |
+| `0x164` | 4 | float32 LE — **RPM nominal** del eje en que está el punto |
+| `0x1E4` | 4 | u32 LE (+1 encoded) — puntero al `gdsc` de estado (§5.9) |
+| resto | variable | unidades, Fmax, líneas, alarmas. Pendiente. |
 
 Parser: `ams_extract.tree.walk_hierarchy()` recorre la cadena entera y
 devuelve `list[Area]` con `equipment` y `points` poblados.
+
+**Rodamientos y RPM nominal** (decodificados el 2026-08-04, workplan 07;
+`records/point.py`: `parse_vdpm_bearings` / `parse_vdpm_nominal_rpm`). Son
+configuración del punto, no medida: se leen y se prueban, pero **no se
+emiten todavía** al dataset porque el contrato VibFrame aún no tiene hueco
+para ellos (fases A/B del marco de definiciones de máquina).
+
+- `0x07E` es **por punto**, no por máquina: el motor de AG-100 declara
+  `6204`/`6208` en su punto LOA y `6205`/`6208` en el LA, y el de DT-0070
+  `6316` en el lado libre y `6322` en el lado acople. El contador de `0x7D`
+  concuerda slot a slot con el centinela `INDEFINID` en los 5 203 puntos (0
+  discrepancias). Lo declaran 1 520 puntos (149 de 342 máquinas), con 79
+  designaciones distintas: números ISO pelados (`6204`, `23248`), con
+  fabricante (`SKF 6308`, `FAG 22220`, `NSK 22220E`), con sufijo
+  (`6205/2Z`, `22218 EKC3`, `2309EKTN9C`) y alguna que no es designación
+  (`RED`, 20 veces). Es texto libre del analista: normalizarlo contra un
+  catálogo es trabajo del enriquecedor, no del parser.
+- `0x164` es la velocidad **configurada** del eje, en RPM (no en Hz, no
+  ×2): 1 455 en el punto piloto de AG-100 y 2 900 en PM-9101-A M1H, que es
+  exactamente el `RPM = 2900,0 (48,33 Hz)` de la captura de AMS que cerró
+  ADR-0013. Todos los puntos la traen (114 valores distintos, 9–3 000 RPM),
+  y AMS la usa para prerrellenar la RPM de análisis de cada medida: coincide
+  con `vdps.0x28` en 134 183 de los 137 270 espectros (97,8 %); el resto son
+  máquinas de velocidad variable donde el analista tecleó la real. La
+  propagación por reductora está hecha en el propio dato (DT-0070 declara
+  1 500 en el motor y 32, 30 y 9,6 en los ejes sucesivos).
+- El aviso de ADR-0013 sobre AG-100 («análisis 2920 = 2 × nominal 1455»)
+  **no se reproduce** sobre esta base: los 5 espectros de ese punto llevan
+  1 455 crudo, igual que sus `vdfw` y que `0x164`. En los 137 270 espectros
+  no hay un solo caso de análisis = 2 × nominal. La decisión de ADR-0013
+  (emitir el crudo de `vdps.0x28`) no cambia; lo que decae es el ejemplo.
 
 **Observación operativa**: `rbm-dev scan --tags` sobre BUNGE encuentra
 6141 records `vdpm` en disco pero el walker sólo emite 3795. La
@@ -259,9 +297,12 @@ vdps chain (espectros FFT ordenados de antiguo a moderno):
               0x28 → float32 RPM del análisis — la que AMS "fija" para el
                      espectro (base de órdenes de las bandas pdpa). Gold:
                      captura AMS de PM-9101-A M1H 19/05/2021 muestra
-                     "RPM = 2900,0 (48,33 Hz)" = crudo exacto. OJO: puede no
-                     ser la velocidad física (AG-100 M1H: crudo 2920 = 2× la
-                     nominal vdpm.0x164 = 1455 y la rpm de sus vdfw)
+                     "RPM = 2900,0 (48,33 Hz)" = crudo exacto. Normalmente es
+                     la nominal del punto: coincide con vdpm.0x164 (§3.2) en
+                     134 183 de los 137 270 espectros; donde no, es que el
+                     analista tecleó la velocidad medida. (El aviso previo
+                     "AG-100 M1H: crudo 2920 = 2× la nominal 1455" no se
+                     reproduce sobre BUNGE: ese punto lleva 1455 crudo)
               0x2C → float32 CARGA % (100.0 en M1H)
               0x50 → u32 LE n_lines (1600 en M1H)
               0x78 → ASCII 8 bytes — units, p.ej. "plg/segs"
@@ -714,7 +755,8 @@ al record correcto, incluidos los 4 "NEW" en ~3.12M.
 BUNGE resuelven ambos índices sin fallos (72 parejas distintas; la más
 común `(1, 5)` = Estandar 1500 rpm + Motor Horizontal <300 kW). El `vdpm`
 lleva además la familia en `0x4B` (`:ESTÁNDAR`) y los rodamientos en
-`0x07E` (`6204`/`6208`) — ya no hacen falta para el enlace.
+`0x07E` (`6204`/`6208`) — no hacen falta para el enlace, pero sí son la
+configuración del punto: decodificados en §3.2.
 
 **Implementado** (2026-07-19): `records/pdpa.py` (parsers + directorios +
 `ParamSetIndex` + `alarm_level`), `pdcd.0xAC/0xAE` en
