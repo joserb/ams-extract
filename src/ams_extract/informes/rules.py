@@ -15,14 +15,26 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from dataclasses import dataclass
+from fractions import Fraction
 from typing import Any
 
-SCHEMA_VERSION = "0.1.4"
+SCHEMA_VERSION = "0.1.5"
 """Versión del esquema DiagGT que declara el documento emitido.
 
-Hasta la adopción en el paquete el script decía ``"0.1.0"`` mientras emitía
-0.1.4: el desalineado era un bug de la constante, no del contenido.
+0.1.5 añade ``weight`` al finding. Hasta la adopción en el paquete el script
+decía ``"0.1.0"`` mientras emitía 0.1.4: el desalineado era un bug de la
+constante, no del contenido.
 """
+
+WEIGHT_DECIMALS = 6
+"""Decimales del ``weight`` emitido.
+
+Un reparto entre cláusulas da fracciones periódicas (1/3, 1/6): se cuantizan a
+10⁻⁶ para que el JSON sea estable y la suma no se pase de 1 por redondeo.
+"""
+
+WEIGHT_UNITS = 10**WEIGHT_DECIMALS
 
 # ---------------------------------------------------------------------------
 # Estado canónico
@@ -157,14 +169,24 @@ buen estado.»). El corte importa: mirar el texto entero con ``search`` hacía
 que bastara una cláusula sana para tirar los fallos de las demás.
 """
 
-GLOBAL_STATUS_RE = re.compile(
-    r"^(M[AÁ]QUINA NO MEDIDA|M[AÁ]QUINA PARADA|FUERA DE SERVICIO|"
-    r"EN MANTENIMIENTO|SEGUIMIENTO|PELIGRO|ALERTA|BUENO|VIGILAR)\b"
+_GLOBAL_STATUS_LABELS = (
+    r"M[AÁ]QUINA NO MEDIDA|M[AÁ]QUINA PARADA|FUERA DE SERVICIO|"
+    r"EN MANTENIMIENTO|SEGUIMIENTO|PELIGRO|ALERTA|BUENO|VIGILAR"
 )
+
+GLOBAL_STATUS_RE = re.compile(rf"^({_GLOBAL_STATUS_LABELS})\b")
 """Vocabulario cerrado de la etiqueta global de máquina (auditoría §3.9.2).
 
 La banda geométrica de la cabecera recogía también la línea de RPM y el
 título; sólo se acepta lo que empieza por una de estas etiquetas.
+"""
+
+MARKER_RE = re.compile(rf"^({_GLOBAL_STATUS_LABELS})$", re.I)
+"""Cláusula que es **sólo** la etiqueta global, repetida dentro del texto.
+
+El analista escribe «-Desequilibrio del ventilador. ALERTA. -Debilidad
+estructural»: «ALERTA» es la severidad de la ficha, no un hallazgo, y no
+participa en el reparto de la masa de juicio.
 """
 
 
@@ -216,16 +238,26 @@ def status_from_text(text: str) -> tuple[str, int | None] | None:
     return STATUS_CLAUSES[min(ranks)][1]
 
 
-def map_findings(text: str) -> list[dict[str, Any]]:
-    """Aplica :data:`FINDING_RULES` sobre el texto de diagnóstico."""
-    if not text:
-        return []
-    low = text.lower()
-    if status_from_text(low) is not None:
-        return []
-    found: list[dict[str, Any]] = []
+@dataclass(slots=True)
+class _Merged:
+    """Un finding en construcción: su regla, su cita y la masa acumulada."""
+
+    index: int
+    matched_text: str
+    mass: Fraction
+
+
+def clause_findings(clause: str) -> list[tuple[int, str]]:
+    """``(índice de regla, fragmento que casó)`` de **una** cláusula.
+
+    Deduplicado por ``(fault_group, fault_mode)``: dos reglas que llegan a la
+    misma etiqueta desde la misma cláusula son una lectura, no dos (gana la de
+    menor índice, que es la prioridad de :data:`FINDING_RULES`).
+    """
+    low = clause.lower()
+    matched: list[tuple[int, str]] = []
     seen: set[str] = set()
-    for rule_id, pattern, fault_mode, group, quality in FINDING_RULES:
+    for index, (_rule_id, pattern, fault_mode, group, _quality) in enumerate(FINDING_RULES):
         match = re.search(pattern, low)
         if not match:
             continue
@@ -233,25 +265,123 @@ def map_findings(text: str) -> list[dict[str, Any]]:
         if key in seen:
             continue
         seen.add(key)
-        found.append(
+        matched.append((index, match.group(0)))
+    return matched
+
+
+def is_status_clause(clause: str) -> bool:
+    """La cláusula declara un estado (sano, parada, no medida, fuera de servicio)."""
+    return any(pattern.search(clause) for pattern, _ in STATUS_CLAUSES)
+
+
+def is_marker_clause(clause: str) -> bool:
+    """La cláusula es sólo la etiqueta global de la ficha repetida en el texto.
+
+    «-Desequilibrio del ventilador. ALERTA. -Debilidad estructural.» tiene tres
+    cláusulas pero dos juicios: «ALERTA» es la severidad de la máquina, no un
+    hallazgo, y sin esta regla se llevaría un tercio de la masa a `unmapped`.
+    El vocabulario es el mismo cerrado que valida la cabecera de la ficha.
+    """
+    return MARKER_RE.match(clause) is not None
+
+
+def quantize_weights(masses: list[Fraction]) -> list[float]:
+    """Redondea un reparto exacto a :data:`WEIGHT_DECIMALS` sin pasarse de 1.
+
+    Método del **resto mayor**: se reparte en unidades de 10⁻⁶ y el sobrante va
+    a las mayores partes fraccionarias, de modo que la suma en enteros sea
+    exactamente la del reparto original. El contrato exige suma ≤ 1 y no
+    perdona el redondeo hacia arriba.
+    """
+    scaled = [mass * WEIGHT_UNITS for mass in masses]
+    units = [int(value) for value in scaled]
+    spare = int(sum(masses) * WEIGHT_UNITS) - sum(units)
+    order = sorted(range(len(masses)), key=lambda i: (units[i] - scaled[i], i))
+    for index in order[:spare]:
+        units[index] += 1
+    weights = [value / WEIGHT_UNITS for value in units]
+    excess = sum(weights) - 1.0
+    if excess > 0:  # último seguro contra el error de coma flotante
+        largest = max(range(len(weights)), key=lambda i: weights[i])
+        weights[largest] -= excess
+    return weights
+
+
+def map_findings(text: str) -> list[dict[str, Any]]:
+    """Findings de un diagnóstico, con su reparto de la masa de juicio.
+
+    Las :data:`FINDING_RULES` se aplican **por cláusula**, no sobre el texto
+    entero: cada una de las ``n`` cláusulas de juicio recibe ``1/n`` y la
+    reparte a partes iguales entre los findings que produce; una cláusula que
+    ninguna regla reconoce cede su parte al finding ``unmapped``. Los findings
+    de la misma etiqueta se funden sumando masa y quedándose con la regla de
+    menor índice. Las cláusulas de estado y los marcadores de severidad no
+    reciben masa; si no queda ninguna cláusula de juicio, el diagnóstico no
+    afirma ningún fallo y la lista sale vacía.
+    """
+    if not text:
+        return []
+    verbatim = text.strip()
+    judged: list[list[tuple[int, str]]] = []
+    for clause in clauses(text):
+        matches = clause_findings(clause)
+        if not matches and (is_status_clause(clause) or is_marker_clause(clause)):
+            continue  # estado o severidad: no es un juicio de fallo
+        judged.append(matches)
+    if not judged:
+        return []
+
+    share = Fraction(1, len(judged))
+    merged: dict[str, _Merged] = {}
+    uncovered = Fraction(0)
+    for matches in judged:
+        if not matches:
+            uncovered += share
+            continue
+        each = share / len(matches)
+        for index, matched_text in matches:
+            _rule_id, _pattern, fault_mode, group, _quality = FINDING_RULES[index]
+            key = f"{group}:{fault_mode}"
+            current = merged.get(key)
+            if current is None:
+                merged[key] = _Merged(index=index, matched_text=matched_text, mass=each)
+                continue
+            current.mass += each
+            if index < current.index:
+                current.index = index
+                current.matched_text = matched_text
+
+    found = sorted(merged.values(), key=lambda entry: entry.index)
+    masses = [entry.mass for entry in found]
+    if uncovered > 0:
+        masses.append(uncovered)
+    weights = quantize_weights(masses)
+
+    findings: list[dict[str, Any]] = []
+    for entry, weight in zip(found, weights, strict=False):
+        rule_id, _pattern, fault_mode, group, quality = FINDING_RULES[entry.index]
+        findings.append(
             {
-                "source_text": text.strip(),
-                "matched_text": match.group(0),
+                "source_text": verbatim,
+                "matched_text": entry.matched_text,
                 "fault_mode": fault_mode,
                 "fault_group": group,
                 "label_quality": quality,
                 "mapping_rule": rule_id,
+                "weight": weight,
             }
         )
-    if not found:
-        found.append(
+    if uncovered > 0:
+        findings.append(
             {
-                "source_text": text.strip(),
+                "source_text": verbatim,
+                # ninguna regla disparó: no hay fragmento que citar (§2.5)
                 "matched_text": None,
                 "fault_mode": None,
                 "fault_group": UNMAPPED_GROUP,
                 "label_quality": UNMAPPED_QUALITY,
                 "mapping_rule": None,
+                "weight": weights[-1],
             }
         )
-    return found
+    return findings

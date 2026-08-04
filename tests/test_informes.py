@@ -107,6 +107,69 @@ class TestMapFindings:
         assert findings[0]["mapping_rule"] is None
 
 
+class TestWeights:
+    def test_a_single_clause_takes_the_whole_mass(self) -> None:
+        findings = map_findings("Desequilibrio del ventilador")
+        assert [f["weight"] for f in findings] == [1.0]
+
+    def test_the_clauses_split_the_mass_evenly(self) -> None:
+        findings = map_findings("-Desequilibrio del ventilador. -Debilidad estructural.")
+        assert [f["mapping_rule"] for f in findings] == ["GT001", "GT005"]
+        assert [f["weight"] for f in findings] == [0.5, 0.5]
+
+    def test_the_findings_of_one_clause_share_its_fraction(self) -> None:
+        # First clause: two findings of 1/2 · 1/2; second clause: 1/2.
+        findings = map_findings("Desalineación y cavitación. Desequilibrio.")
+        assert [f["mapping_rule"] for f in findings] == ["GT001", "GT002", "GT015"]
+        assert [f["weight"] for f in findings] == [0.5, 0.25, 0.25]
+
+    def test_the_uncovered_clause_gives_its_mass_to_the_unmapped(self) -> None:
+        findings = map_findings("Desequilibrio del ventilador. Suciedad en la válvula.")
+        assert [f["fault_group"] for f in findings] == ["IMBALANCE", "UNMAPPED"]
+        assert [f["weight"] for f in findings] == [0.5, 0.5]
+
+    def test_a_severity_marker_is_not_a_clause_of_judgement(self) -> None:
+        # "ALERTA" is the machine's global label repeated inside the text: it
+        # would otherwise carry a third of the mass to an unmapped finding.
+        findings = map_findings("-Desequilibrio del ventilador. ALERTA. -Resonancia.")
+        assert [f["fault_group"] for f in findings] == ["IMBALANCE", "STRUCTURE"]
+        assert [f["weight"] for f in findings] == [0.5, 0.5]
+
+    def test_a_healthy_clause_does_not_dilute_the_fault(self) -> None:
+        findings = map_findings("-Falta de rigidez. -Rodamientos en buen estado.")
+        assert [f["weight"] for f in findings] == [1.0]
+
+    def test_the_same_label_from_two_clauses_adds_up(self) -> None:
+        findings = map_findings(
+            "Holguras rotacionales en el motor. Desequilibrio. Holguras en la bomba."
+        )
+        weights = {f["mapping_rule"]: f["weight"] for f in findings}
+        # GT003 wins the merge over GT004 (lower rule index, same label) and
+        # keeps both thirds.
+        assert weights == {"GT003": 0.666667, "GT001": 0.333333}
+
+    def test_the_rounded_mass_never_goes_over_one(self) -> None:
+        for text in (
+            "Desequilibrio. Resonancia. Cavitación.",
+            "Desequilibrio. Resonancia. Cavitación. Correa. Engranaje. Rozamiento.",
+            "Desalineación y cavitación y correa. Desequilibrio. Suciedad.",
+        ):
+            weights = [f["weight"] for f in map_findings(text)]
+            assert sum(weights) <= 1.0
+            assert all(0.0 < w <= 1.0 for w in weights)
+            assert all(w == round(w, 6) for w in weights)
+
+    def test_every_observation_weights_all_of_its_findings_or_none(
+        self, regression_cases: list[dict[str, Any]]
+    ) -> None:
+        # The contract's all-or-none rule, over the whole corpus.
+        for case in regression_cases:
+            findings = map_findings(case["diagnosis_text"] or "")
+            weighted = [f for f in findings if f["weight"] is not None]
+            assert len(weighted) == len(findings)
+            assert not findings or sum(f["weight"] for f in findings) <= 1.0
+
+
 class TestRegressionAgainstTheStandaloneScript:
     def test_the_corpus_is_the_one_that_was_emitted(
         self, regression_cases: list[dict[str, Any]]
@@ -114,17 +177,52 @@ class TestRegressionAgainstTheStandaloneScript:
         assert len(regression_cases) == 251
         assert sum(case["observations"] for case in regression_cases) == 6_669
 
-    def test_every_diagnosis_text_maps_the_way_it_did(
+    def test_no_diagnosis_loses_a_finding(
         self, regression_cases: list[dict[str, Any]]
     ) -> None:
-        differences: list[str] = []
+        """Reading by clause may add, never subtract.
+
+        The clause is a *finer* window than the whole text, so a rule that
+        fired before has to fire on some clause — unless its match was
+        straddling a clause boundary, which is the bug this reading fixes.
+        """
+        lost: list[str] = []
+        for case in regression_cases:
+            text = case["diagnosis_text"] or ""
+            got = {_signature(f)[1:] for f in map_findings(text)}
+            for finding in case["findings"]:
+                if tuple(finding[key] for key in FINDING_KEYS)[1:] not in got:
+                    lost.append(f"{text!r}: lost {finding}")
+        assert not lost, "\n".join(lost)
+
+    def test_the_differences_are_the_ones_the_workplan_measured(
+        self, regression_cases: list[dict[str, Any]]
+    ) -> None:
+        """Pinned diff against the 0.2.0 emission (workplan 09 §3).
+
+        Of the 251 distinct texts of the corpus, 233 map identically; 11 gain
+        the partial ``unmapped`` that measures the share of the judgement the
+        rules do not cover, and 7 move the ``matched_text`` of GT012, whose
+        ``rodamiento.*deterior`` alternative used to match *across* clauses
+        («rodamientos del conjunto. Posible deterioro»).
+        """
+        identical = added_unmapped = moved_match = 0
         for case in regression_cases:
             text = case["diagnosis_text"] or ""
             expected = [tuple(f[key] for key in FINDING_KEYS) for f in case["findings"]]
             got = [_signature(f) for f in map_findings(text)]
-            if got != expected:
-                differences.append(f"{text!r}\n  was {expected}\n  now {got}")
-        assert not differences, "\n".join(differences)
+            if got == expected:
+                identical += 1
+                continue
+            appeared = [f for f in got if f not in expected]
+            vanished = [f for f in expected if f not in got]
+            if vanished:
+                assert all(f[4] == "GT012" for f in vanished), f"{text!r}: {vanished}"
+                moved_match += 1
+            else:
+                assert all(f[2] == "UNMAPPED" for f in appeared), f"{text!r}: {appeared}"
+                added_unmapped += 1
+        assert (identical, added_unmapped, moved_match) == (233, 11, 7)
 
     def test_the_source_text_is_the_verbatim_of_the_diagnosis(
         self, regression_cases: list[dict[str, Any]]
@@ -271,6 +369,25 @@ class TestConsolidation:
         assert str(table.schema.field("alarm").type) == "int8"
         header = written[1].read_text(encoding="utf-8").splitlines()[0]
         assert header == ",".join(OBSERVATION_COLUMNS)
+
+
+class TestContractConformance:
+    """The normative models of vibsynth-contracts are the schema (spec §7)."""
+
+    def test_a_weighted_observation_validates_against_the_models(self) -> None:
+        external = pytest.importorskip("vibsynth_contracts.diagnosis.external")
+        text = "-Desequilibrio del ventilador. -Suciedad en la válvula."
+        observation = _observation(diagnosis_text=text, findings=map_findings(text))
+        model = external.DiagGTObservation.model_validate(observation)
+        assert [f.weight for f in model.findings] == [0.5, 0.5]
+        assert model.alarm == external.STATUS_ALARM["ALERT"]
+
+    def test_the_schema_version_is_the_one_the_models_declare(self) -> None:
+        external = pytest.importorskip("vibsynth_contracts.diagnosis.external")
+        from ams_extract.informes.rules import SCHEMA_VERSION
+
+        assert SCHEMA_VERSION == external.DIAGGT_SCHEMA_VERSION
+
 
 
 def _informes_dir() -> Path:
