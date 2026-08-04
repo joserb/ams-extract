@@ -1,6 +1,6 @@
 # DiagGT — Formato de intercambio de ground truth de diagnóstico externo
 
-**Versión de esquema: 0.1.4** · Estado: propuesta · Ámbito: ecosistema VibFrame
+**Versión de esquema: 0.1.5** · Estado: propuesta · Ámbito: ecosistema VibFrame
 (vibsynth-contracts, vibsynth-diagnostics, vibsynth-metrics, ams-extract,
 t8-extract, t8-mapper)
 
@@ -13,6 +13,23 @@ t8-extract, t8-mapper)
 > entre este documento y los modelos, gana el modelo — y la discrepancia es un
 > bug de esta spec.
 >
+> **Cambios en 0.1.5** (2026-08-04, retrocompatible con toda la serie 0.1.x —
+> el campo nuevo es **opcional**, ninguna semántica anterior cambia; los
+> documentos que declaran cualquier `"0.1.x"` anterior siguen siendo válidos y
+> nadie tiene que reemitir):
+> - §2.5: **`weight`**, la *masa de juicio* que un finding se lleva dentro de su
+>   observación. Es la primera revisión de la serie que toca el modelo
+>   normativo: `DiagGTFinding.weight: float | None` en [0, 1], con las dos
+>   reglas de observación —todos o ninguno, suma ≤ 1— en `DiagGTObservation`.
+> - §5: **`findings.parquet`**, el consolidado a nivel de finding, modelado
+>   por columnas en el contrato (`FINDINGS_COLUMNS`). El aplanado con «+» de
+>   `observations.parquet` se queda como está.
+> - §3.3: el reparto por cláusulas del extractor de informes —la línea base
+>   determinista de pesos— y el **marcador de severidad** («ALERTA», «PELIGRO»)
+>   como cláusula que no es juicio.
+> - Primer productor con pesos: el extractor de informes
+>   (`ams_extract.informes`, adoptado en el paquete en el mismo workplan 09).
+
 > **Cambios en 0.1.4** (2026-07-28, retrocompatible con toda la serie 0.1.x —
 > ningún campo nuevo, ningún campo nuevo obligatorio, ninguna semántica
 > cambiada; sólo reglas del extractor, como en 0.1.1 con GT050 y en 0.1.3 con
@@ -127,7 +144,7 @@ por informe — para que la procedencia sea única y verificable (hash del PDF).
 
 | Campo | Tipo | Descripción |
 |---|---|---|
-| `$schema_version` | string | semver del esquema DiagGT (`"0.1.4"`; los documentos que declaran cualquier `"0.1.x"` anterior siguen siendo válidos — ninguna revisión de la serie añade obligaciones) |
+| `$schema_version` | string | semver del esquema DiagGT (`"0.1.5"`; los documentos que declaran cualquier `"0.1.x"` anterior siguen siendo válidos — ninguna revisión de la serie añade obligaciones) |
 | `kind` | string | literal `"diagnosis_ground_truth"` |
 | `provenance` | object | ver §2.2 |
 | `machines_stopped` | list[string] | máquinas declaradas paradas en el documento |
@@ -301,6 +318,7 @@ t8-mapper:
 | `fault_group` | string | grupo de fallo, ver §3.2 — siempre presente |
 | `label_quality` | string | `"direct"` \| `"approximate"` \| `"weak"` \| `"group"` \| `"unmapped"` |
 | `mapping_rule` | string\|null | id de la regla (GTxxx) — trazabilidad y versionado |
+| `weight` | float\|null | (0.1.5) masa de juicio en [0, 1] dentro de la observación; ver abajo |
 
 `"group"` significa "el origen dice el grupo pero no el modo concreto"
 (p. ej. «deterioro en rodamientos» → grupo `BEARING`, `fault_mode=null`: el
@@ -309,6 +327,56 @@ de no-medida produce `findings=[]`. Un texto de fallo que ninguna regla
 reconoce produce exactamente un finding `unmapped` con `fault_group="UNMAPPED"`
 — nunca se descarta en silencio (regla "no emitir lo no validado" de
 ams-extract, aplicada al revés: no callar lo no mapeado).
+
+#### `weight` — la masa de juicio (desde 0.1.5)
+
+Sin peso, un finding no dice **cuánto** del juicio se lleva. «Desalineación
+severa en el acoplamiento» y «desalineación severa en el acoplamiento; se
+observa además lubricación mejorable en el rodamiento del motor» producen
+etiquetas indistinguibles, y quien evalúe un diagnóstico automático contra el
+GT tiene que tratar las dos etiquetas de la segunda como si cada una fuese la
+afirmación central. El analista no dijo eso: repartió su juicio.
+
+`weight` es ese reparto. Reglas, todas dentro de la observación:
+
+- **Rango**: `[0, 1]`. Es una fracción del juicio de esa observación, no una
+  severidad ni una probabilidad — un `weight` alto no dice que el fallo sea
+  grave, dice que el origen dedicó a él la mayor parte de lo que afirmó.
+  La severidad sigue siendo `status`/`alarm` (§3.1), y §6 sigue sin inventar
+  una severidad numérica.
+- **Suma ≤ 1** (con tolerancia de redondeo; el contrato la fija en 1e-6).
+- **Todos o ninguno**: o cada finding de la observación lleva peso, o no lo
+  lleva ninguno. Un finding sin peso al lado de otros con peso describiría una
+  distribución a medias — el consumidor no sabría si vale cero, si vale el
+  resto o si el extractor se dejó uno.
+- **Opcional para siempre**: un origen que no sabe repartir masa emite `null`
+  en vez de inventarse un 1,0 uniforme. Es la misma honestidad de
+  `label_quality`: lo que no se sabe se declara, no se rellena.
+- **Duplicados de modo con peso son legales**: dos reglas GT distintas sobre el
+  mismo texto son dos lecturas, cada una con su parte. El esquema no decide si
+  eso es un hecho contado dos veces; la política es del consumidor.
+
+**Agregación en el consumidor**: sumar. La masa de un modo de fallo en una
+observación es la suma de los pesos de sus findings; la de un `fault_group`, la
+suma de los de su grupo (y es el nivel al que buena parte del corpus real puede
+puntuarse: quien dice «deterioro en rodamientos» no concreta la pista). Un
+consumidor que no quiera pesos filtra por `label_quality` como hasta ahora y
+los ignora — nada de lo anterior a 0.1.5 cambia.
+
+**La masa que falta hasta 1 es «otros / no concluido» implícito**: lo que el
+origen no diagnosticó. No hay que materializar un finding sumidero para ella —
+ningún finding existe sin `source_text` y ahí no habría texto que citar. Ahora
+bien, cuando el texto *sí* existe y es una parte del diagnóstico que ninguna
+regla reconoce, el sitio de esa masa es el finding `unmapped` que esta spec ya
+exige desde 0.1.0 (arriba): no es un sumidero inventado, es la cláusula que el
+analista escribió y el extractor no supo leer. El extractor de informes lo hace
+así (§3.3), y por eso sus observaciones suman exactamente 1: lo no cubierto
+está nombrado, no implícito. Los dos comportamientos son legales; el implícito
+es el de un productor que reserva masa sin texto que la respalde.
+
+Efecto lateral útil: la masa `unmapped` agregada es una **medida de cobertura**
+de las reglas GTxxx — qué fracción del juicio del analista sabe leer el
+extractor —, y baja sola cuando entra una regla nueva.
 
 ## 3. Vocabularios
 
@@ -400,6 +468,42 @@ sólo si *todas* las cláusulas son de estado el diagnóstico es de estado. Un
 y una parte sana, y lo que manda es el fallo. Buscar la frase sana en el texto
 completo (v0.1) tiraba los findings de las demás cláusulas.
 
+Hay un tercer tipo de cláusula, que no es ni fallo ni estado: el **marcador de
+severidad**. El analista repite dentro del texto la etiqueta global de la ficha
+(«-Desequilibrio del ventilador. ALERTA. -Debilidad estructural.») y esa
+palabra suelta no diagnostica nada. Se reconoce por el mismo vocabulario
+cerrado que valida la cabecera (BUENO, SEGUIMIENTO, VIGILAR, ALERTA, PELIGRO,
+MÁQUINA PARADA, MÁQUINA NO MEDIDA, FUERA DE SERVICIO, EN MANTENIMIENTO) cuando
+ocupa la cláusula **entera**, y no participa en el reparto de la masa (§2.5).
+En el corpus BUNGE son 44 de las 124 cláusulas que ninguna regla cubre.
+
+#### Reparto de la masa por cláusulas (desde 0.1.5)
+
+La cláusula es también la unidad del `weight` (§2.5), y por eso las reglas
+GTxxx se aplican **por cláusula** y no sobre el texto entero:
+
+1. Cada una de las `n` cláusulas de juicio —ni de estado ni marcador— recibe
+   `1/n`, y la reparte a partes iguales entre los findings que produce.
+2. Una cláusula de juicio que ninguna regla reconoce cede su `1/n` al finding
+   `unmapped`.
+3. Los findings de la misma etiqueta `(fault_group, fault_mode)` se funden
+   sumando masa y quedándose con la regla de menor número.
+
+El reparto es **uniforme a propósito**: es una línea base determinista,
+reproducible y explicable en una frase, sin ningún parámetro que ajustar.
+Ponderar por longitud de la cláusula, por su severidad o por el orden de
+mención sería una hipótesis sobre cómo escribe el analista, y habría que
+validarla contra él y no contra el texto.
+
+Leer por cláusula tiene además un efecto colateral que no es de pesos: una
+regla ya no puede casar **cruzando** cláusulas. La alternativa
+`rodamiento.*deterior` de GT012 casaba «rodamientos del conjunto. Posible
+deterioro» —dos frases distintas— y ahora cita el fragmento que de verdad
+nombra el fallo.
+
+Implementación de referencia: `ams_extract.informes` (workplan 09 de
+ams-extract), el extractor de los informes Preditec de Bunge Cartagena.
+
 ### 3.4 Reglas de banda de alarma GT050-GT059 (origen `system-alarm`)
 
 Una alarma de sistema no nombra un fallo: nombra una **banda del análisis**
@@ -459,6 +563,7 @@ verdad de construcción de los datasets demo de vibsynth.
     ├── <documento>.diaggt.json          # un DiagGT por documento fuente
     ├── observations.parquet             # consolidado plano (§5)
     ├── observations.csv                 # ídem, para inspección rápida
+    ├── findings.parquet                 # consolidado de findings (§5)
     ├── crosswalk.csv                    # tabla explícita TAG ↔ machine_id (§2.4)
     ├── crosswalk_ambiguities.md         # no-matches y ambigüedades, con evidencia
     ├── observations_system.parquet      # consolidado de los DiagGT origin=system-alarm
@@ -515,6 +620,32 @@ Reglas de deduplicación (los informes mensuales repiten los diagnósticos
 previos): para cada (normalized_tag, observed_at, modality) gana el registro
 `primary`; entre retrospectivos gana el del documento más reciente. Los
 `diaggt.json` conservan todo sin deduplicar — el consolidado es una vista.
+
+### 5.1 Consolidado de findings (`findings.parquet`, desde 0.1.5)
+
+Una fila por **finding**. Existe porque aplanar los findings dentro de la fila
+de su observación obliga a colapsarlos en una cadena (`fault_modes` unido por
+«+»), y ese colapso destruye justo lo que hace evaluable un juicio: la
+multiplicidad (un mismo modo alcanzado por dos reglas sobre el mismo texto es
+el caso normal, no el raro), el orden, y los campos que no sobreviven al join —
+`mapping_rule`, `label_quality`, `weight` y el `source_text`, que es el
+contrato de último recurso—. Aquí la multiplicidad la lleva el número de filas.
+
+Columnas (modeladas por el contrato en `FINDINGS_COLUMNS`, a diferencia de
+`observations.parquet`, que la spec describió desde el principio y nadie
+modeló): `document_id`, `observation_id`, `dataset_machine_id`, `observed_at`,
+`modality`, `record_kind`, `fault_mode`, `fault_group`, `label_quality`,
+`mapping_rule`, `weight` (float32), `source_text`. El join con el dataset es
+`dataset_machine_id`; con su observación, `observation_id`.
+
+Se proyecta del **mismo conjunto deduplicado** que `observations.parquet`, no
+de los documentos en bruto: un diagnóstico previo citado por seis informes
+mensuales es un solo juicio, y contarlo seis veces sesgaría cualquier masa
+agregada por modo de fallo. El aplanado con «+» de `observations.parquet` se
+queda como está, por compatibilidad.
+
+Es **opcional**, como todo el sidecar: su ausencia no dice nada y nunca es un
+error.
 
 ## 6. Qué NO cubre v0.1 (decisiones abiertas)
 
@@ -612,10 +743,11 @@ previos): para cada (normalized_tag, observed_at, modality) gana el registro
   vibsynth-contracts los aplica a los `*.diaggt.json` que encuentre en
   `<dataset>/ground-truth/`.
 - **Productores conocidos**: `ams_extract.export.diag_gt` (`system-alarm`,
-  alarmas `gdnl` de AMS), `t8_extract.ground_truth` (`system-alarm`,
-  `alarms.db` del T8), los extractores de informes de Bunge
-  (`inspection-report`) y `vibsynth_metrics.diag_gt_export`
-  (`synthetic-truth`, verdad de construcción de los datasets sintéticos).
+  alarmas `gdnl` de AMS), `ams_extract.informes` (`inspection-report`, los
+  informes PDF de Preditec para Bunge; el único que emite `weight` hoy),
+  `t8_extract.ground_truth` (`system-alarm`, `alarms.db` del T8) y
+  `vibsynth_metrics.diag_gt_export` (`synthetic-truth`, verdad de construcción
+  de los datasets sintéticos).
 - Lectores DiagGT deben ignorar campos desconocidos (regla VibFrame).
 - Añadir campo opcional o valor de vocabulario ⇒ sube versión menor;
   cambiar semántica de campo existente ⇒ versión mayor.
