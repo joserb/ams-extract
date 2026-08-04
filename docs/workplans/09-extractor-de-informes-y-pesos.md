@@ -1,7 +1,7 @@
 ---
-status: designed
+status: completed
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-08-05
 ---
 
 # Plan: hogar del extractor de informes y línea base de pesos por finding
@@ -64,10 +64,12 @@ tener que re-ejecutar el crosswalk.
 
 **Las dos copias sueltas** (`…/Informes Bunge Cartagena 2026/ground-truth/` y
 `~/wslprojects/RESONINS/datasets/bunge_cartagena_ams/ground-truth/`) quedan
-donde están como **artefactos desplegados** junto a la salida que produjeron;
-no se borran ni se sincronizan. La relación queda anotada en la cabecera del
-subpaquete: el código vivo es el del repo, esas copias son el sello de la
-emisión de 2026-07-28.
+donde están como **artefactos desplegados**; no se borran ni se sincronizan. La
+relación queda anotada en la cabecera del subpaquete y en `AGENTS.md`: el
+código vivo es el del repo, esas copias son el sello de la emisión de
+2026-07-28. Ojo al leerlas después del paso 4 de este plan: los ficheros que
+tienen al lado ya no los produjo ese script, sino
+`ams_extract.informes` 0.3.0, y su `provenance.extractor` lo dice.
 
 `SCHEMA_VERSION` pasa de `"0.1.0"` a la constante del contrato (0.1.5 con este
 plan). El desalineado era un bug: el documento declaraba 0.1.0 emitiendo
@@ -174,7 +176,80 @@ veces al agregar masa por modo de fallo.
 
 ## Hecho
 
-(pendiente)
+**Estado: COMPLETADO (2026-08-05).** Los cinco pasos, con la re-emisión de los
+6 informes desplegada y verificada.
+
+1. **Subpaquete `src/ams_extract/informes/`** (`rules`, `parse`,
+   `consolidate`) + extra `informes` (pdfplumber) + comando `rbm informes` +
+   los dos acompañantes en `scripts/`. `SCHEMA_VERSION` deja de decir `"0.1.0"`.
+   Suite: 313 → **333** tests (20 nuevos), `ruff` y `pyright src` limpios (los
+   3 errores de `pyright` de `vibframe_viewer.cli` son de siempre, del entorno
+   que no resuelve el editable).
+2. **Pesos por cláusula** en `rules.map_findings` (extractor 0.3.0, DiagGT
+   0.1.5). 345 tests.
+3. **`findings.parquet`** en `consolidate` y en el comando. 350 tests.
+4. **Re-emisión** de los 6 informes (49–73 MB de PDF, ~7 s cada uno) y
+   despliegue a las dos copias: `<informes>/ground-truth/` y
+   `bunge_cartagena_ams/ground-truth/`. Backup previo en
+   `/tmp/wp09-backup-<ts>/` con `MD5SUMS`.
+5. **Spec `GROUND_TRUTH.md` a 0.1.5** (§2.5 `weight`, §3.3 reparto por
+   cláusulas y marcador de severidad, §4 y §5.1 `findings.parquet`, §7
+   productores) y las dos copias de cortesía `FORMATO_GROUND_TRUTH.md`
+   sincronizadas.
+
+### La re-emisión, número a número
+
+Lo que **no** se movió: 6 documentos, **6.669 observaciones** (1.670 primarias
++ 4.999 retrospectivas), 826 fichas de máquina, invariante de anclas
+4.960 = 4.960, 6 páginas de continuación arrastradas, y el bloque `provenance`
+entero —incluido el `source_sha256` de cada PDF— salvo `extracted_at` y
+`extractor`. Ningún campo de ninguna observación cambió fuera de `findings`.
+La lectura de pdfplumber 0.11.10 reproduce la geometría de la emisión de julio
+sin una sola diferencia.
+
+Lo que cambió, exactamente lo previsto:
+
+| | observaciones |
+|---|---|
+| findings idénticos | 6.624 |
+| gana un `unmapped` parcial | 34 |
+| se mueve el `matched_text` (GT012) | 11 |
+| pierde algún finding | **0** |
+
+Pesos: **823 observaciones** con findings (12,3 % de 6.669), **1.321 findings**
+en los seis documentos, y la masa suma **exactamente 1,0 en las 823**. Reparto:
+
+| peso | findings |
+|---|---|
+| 1 | 430 |
+| 1/2 | 635 |
+| 1/3 (0,333333 / 0,333334) | 148 |
+| 1/4 | 86 |
+| 1/6 | 20 |
+| 2/3 | 2 |
+
+`findings.parquet`: **628 filas** sobre las 3.379 del consolidado (389
+observaciones tras la deduplicación), 600 con `dataset_machine_id`, masa total
+389,0 = una unidad por observación. Por grupo: STRUCTURE 103,6 · BEARING 62,7 ·
+LUBRICATION 48,6 · LOOSENESS 44,1 · ELECTRICAL 33,3 · IMBALANCE 27,6 ·
+**UNMAPPED 24,1** · MISALIGNMENT 20,0 · OTHER 18,8 · FLOW 4,3 · GEAR 2,0. Ese
+UNMAPPED es el 6,2 % de la masa: la cobertura que le falta a las reglas GTxxx,
+por fin medible.
+
+`observations.parquet`/`.csv`: mismas 3.379 filas, mismas claves, mismo orden.
+La única diferencia con la emisión de julio es `alarm`, que pasa de float64 de
+pandas (`2.0`) a **int8** (`2`) — el tipo que declara VibFrame para esa escala
+— en 2.151 filas. `fault_modes`/`fault_groups` no se mueven: los `unmapped`
+nuevos no entran en el aplanado (§5).
+
+Verificación: los 6 documentos validan contra `DiagGTDocument` de
+vibsynth-contracts 0.1.5, y `vibframe-validate --strict` sobre el dataset da
+**0 errores** y las **mismas 15 advertencias** que daba antes de tocar nada
+(todas `config.inconsistent-capture-span` sobre `spectra.parquet`, del control
+de generaciones que contracts añadió en su workplan 05 — comprobado
+restaurando el ground truth viejo y volviendo a validar). Nuevo en el informe:
+`ground-truth/findings.parquet: 628 finding row(s), 628 with a weight`. La capa
+`analysis/diaggt-contrast` no se tocó.
 
 ## Decisiones
 
@@ -195,4 +270,29 @@ veces al agregar masa por modo de fallo.
   parámetro que ajustar. Cualquier reparto más fino (por severidad de la
   cláusula, por orden de mención) es una hipótesis sobre cómo escribe el
   analista que habría que validar contra él, no contra el texto.
-- **El crosswalk no se integra.** Ver §1.
+- **El crosswalk no se integra.** Ver §1. El extractor lee `crosswalk.csv` del
+  directorio de salida y proyecta el `dataset_machine_id` sobre los dos
+  consolidados (3.239 de 3.379 filas resueltas desde 273 entradas), que es lo
+  que necesitaba `findings.parquet` para tener su clave de join sin volver a
+  ejecutar nada.
+- **El CSV se escribe con LF**, no con el CRLF del dialecto `excel` de
+  `csv.writer`: es el salto con el que nació `observations.csv` y el fichero se
+  lee en Linux. (`observations_system.csv`, del productor de alarmas, sí quedó
+  con CRLF; no se toca aquí.)
+
+## Pendiente
+
+- **Vista de contraste con pesos**: `analysis/diaggt-contrast` sigue leyendo
+  `observations`, que es lo que necesita (`alarm` contra `alarm`). El primer
+  consumidor de `findings.parquet` será el contraste por modo de fallo, en
+  `vibframe-viewer`.
+- **Los 33 findings `unmapped`** que quedan (24,1 de masa) son la lista de la
+  compra de las reglas GT025+: «suciedad/desgaste en la válvula», «deterioro
+  del acoplamiento», «bandas laterales de barras rotas», «sin evolución en el
+  último mes». Las tres primeras son fallo; la última es un texto de estado que
+  `HEALTHY_RE` no reconoce. Ampliar el vocabulario baja la masa `unmapped` sin
+  tocar el esquema.
+- **`weight` en los otros productores**: las alarmas `gdnl` (`system-alarm`)
+  emiten un finding por observación, así que su peso sería siempre 1 y no
+  aporta; el sintético (`synthetic-truth`) sí tiene un reparto natural (la
+  severidad relativa de cada modo inyectado) y es decisión de su repo.
