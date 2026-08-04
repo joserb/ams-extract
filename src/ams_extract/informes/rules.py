@@ -140,6 +140,29 @@ demás calidades lo exigen no nulo.
 UNMAPPED_GROUP = "UNMAPPED"
 UNMAPPED_QUALITY = "unmapped"
 
+FAULT_GROUPS: frozenset[str] = frozenset(
+    {
+        "IMBALANCE",
+        "MISALIGNMENT",
+        "LOOSENESS",
+        "BEARING",
+        "LUBRICATION",
+        "GEAR",
+        "ELECTRICAL",
+        "FLOW",
+        "BELT",
+        "STRUCTURE",
+        "OTHER",
+        UNMAPPED_GROUP,
+    }
+)
+"""Vocabulario ``FaultGroup`` de DiagGT, replicado del contrato (ADR-0009).
+
+Las :data:`FINDING_RULES` sólo usan los grupos que el corpus necesita; esta
+constante existe para validar grupos que no salen de una regla — hoy, los
+re-mapeos por juicio de ``informes.overlay``.
+"""
+
 # ---------------------------------------------------------------------------
 # Textos de estado (spec §3.3): producen findings=[]
 # ---------------------------------------------------------------------------

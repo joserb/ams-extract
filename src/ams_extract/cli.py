@@ -631,6 +631,97 @@ def informes(
     )
 
 
+@app.command("informes-weights")
+def informes_weights(
+    gt_dir: Annotated[
+        Path,
+        typer.Argument(help="Directory holding the emitted <report>.diaggt.json documents."),
+    ],
+    overlay_path: Annotated[
+        Path,
+        typer.Option("--overlay", help="Weight overlay to apply (diaggt_weight_overlay)."),
+    ],
+    out: Annotated[
+        Path | None,
+        typer.Option("--out", help="Where to write the second generation; defaults in place."),
+    ] = None,
+) -> None:
+    """Re-weight an emitted DiagGT ground truth with a contextual judgement overlay.
+
+    Reads the ``*.diaggt.json`` of ``GT_DIR`` — not the PDFs: the geometry is
+    not touched, only how each observation's judgement is shared out — applies
+    the overlay and writes the second generation with
+    ``extraction_method="llm"``, plus the flat consolidations (workplan 10).
+
+    Aborts if the overlay does not match the documents: an observation whose
+    findings the overlay does not score, or scores with other labels, means the
+    overlay is stale, and half an overlay is not a distribution.
+    """
+    from ams_extract.informes.consolidate import (
+        finding_rows,
+        observation_rows,
+        read_crosswalk,
+        write_findings,
+        write_observations,
+    )
+    from ams_extract.informes.overlay import ApplyReport, OverlayError, apply_overlay, load_overlay
+
+    if not gt_dir.is_dir():
+        raise _abort(f"not a directory: {gt_dir}")
+    sources = sorted(gt_dir.glob("*.diaggt.json"))
+    if not sources:
+        raise _abort(f"no *.diaggt.json in {gt_dir}")
+    destination = out or gt_dir
+    destination.mkdir(parents=True, exist_ok=True)
+
+    try:
+        overlay = load_overlay(overlay_path)
+    except (OSError, json.JSONDecodeError, OverlayError) as exc:
+        raise _abort(f"unusable overlay: {exc}") from exc
+
+    report = ApplyReport()
+    documents: list[dict[str, Any]] = []
+    for path in sources:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        if document.get("provenance", {}).get("origin") != "inspection-report":
+            _console.print(f"  [yellow]skipping {path.name}: not an inspection report[/yellow]")
+            continue
+        try:
+            weighted = apply_overlay(document, overlay, report)
+        except OverlayError as exc:
+            raise _abort(f"{path.name}: {exc}") from exc
+        documents.append(weighted)
+        (destination / path.name).write_text(
+            json.dumps(weighted, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        _console.print(f"  wrote {path.name}")
+    if not documents:
+        raise _abort(f"no inspection-report documents in {gt_dir}")
+
+    unused = report.unused(overlay)
+    _console.print(
+        f"re-weighted [bold]{report.judged}[/bold] observations "
+        f"({report.reweighted} findings, {report.remapped} remapped) over "
+        f"{report.documents} documents\n"
+        f"  {report.with_findings} observations carry findings; "
+        f"{report.single_finding} of them a single one (weight 1.0 by construction)"
+    )
+    if unused:
+        _console.print(
+            f"  [yellow]{len(unused)} overlay judgement(s) matched no observation[/yellow]"
+        )
+
+    crosswalk = read_crosswalk(destination)
+    rows = observation_rows(documents, crosswalk)
+    written = write_observations(rows, destination)
+    findings = finding_rows(rows)
+    written.append(write_findings(findings, destination))
+    _console.print(
+        f"consolidated {len(rows)} observations and {len(findings)} findings -> "
+        f"{', '.join(p.name for p in written)}"
+    )
+
+
 def _serve_vibframe_dataset(source: Path, *, host: str, port: int, no_browser: bool) -> int:
     """Delegate an exported dataset to the ecosystem viewer (``vibframe-viewer``).
 
