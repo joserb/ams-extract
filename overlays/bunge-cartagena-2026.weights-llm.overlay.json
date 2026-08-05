@@ -1,15 +1,15 @@
 {
- "$overlay_version": "0.1.0",
+ "$overlay_version": "0.1.1",
  "kind": "diaggt_weight_overlay",
  "target": {
   "origin": "inspection-report",
   "provider": "Preditec",
   "client": "BUNGE",
   "plant": "CARTAGENA",
-  "base_extractor": "informes-gt-extract 0.3.0",
+  "base_extractor": "informes-gt-extract 0.4.0",
   "schema_version": "0.1.5"
  },
- "extractor": "informes-gt-weights-llm 0.1.0",
+ "extractor": "informes-gt-weights-llm 0.1.1",
  "extraction_method": "llm",
  "scale": {
   "3": "conclusión principal: el análisis se centra ahí, o de ahí sale el estado",
@@ -834,7 +834,7 @@
   {
    "diagnosis_text": "Debilidad estructural / Desequilibrio, excentricidad en polea.",
    "observations": 3,
-   "rationale": "la excentricidad es «en polea», mecánica: GT021 la lleva a ELECTRICAL_ROTOR y esa lectura no merece un tercio.",
+   "rationale": "GT025 lee ya la excentricidad de polea como fallo de transmisión, así que el motivo para rebajarla —que GT021 la llevaba al rotor eléctrico— desaparece: tres afirmaciones enumeradas sin análisis que decida, empatadas.",
    "findings": [
     {
      "finding": "IMBALANCE:IMBALANCE",
@@ -845,8 +845,8 @@
      "score": 2
     },
     {
-     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
-     "score": 1
+     "finding": "BELT:-",
+     "score": 2
     }
    ]
   },
@@ -883,27 +883,15 @@
   {
    "diagnosis_text": "Desbalanceo - Debilidad estructural del motor.",
    "observations": 3,
-   "rationale": "«Desbalanceo» y «Debilidad estructural» se enuncian en paralelo y sin análisis que decida.",
+   "rationale": "«Desbalanceo» y «Debilidad estructural» se enuncian en paralelo y sin análisis que decida; el desequilibrio lo casa ya GT001v2, así que no hay nada que re-mapear.",
    "findings": [
     {
-     "finding": "STRUCTURE:LOOSENESS",
+     "finding": "IMBALANCE:IMBALANCE",
      "score": 2
     },
     {
-     "finding": "UNMAPPED:-",
+     "finding": "STRUCTURE:LOOSENESS",
      "score": 2
-    }
-   ],
-   "remap": [
-    {
-     "from": "UNMAPPED:-",
-     "to": {
-      "fault_group": "IMBALANCE",
-      "fault_mode": "IMBALANCE",
-      "label_quality": "approximate",
-      "matched_text": "Desbalanceo"
-     },
-     "why": "«Desbalanceo» es el sinónimo del analista para desequilibrio; GT001 sólo casa «desequilibri»."
     }
    ]
   },
@@ -1389,11 +1377,15 @@
   {
    "diagnosis_text": "Desbalanceo en el rotor del ventilador posiblemente amplificado por debilidad en la estructura.Frecuencias de naturaleza eléctrica en el lado acoplado del motor. Lubricación mejorable en rodamientos del ventilador. Huelgo leve.",
    "observations": 2,
-   "rationale": "el desbalanceo amplificado por la estructura encabeza; «Huelgo leve» va matizado.",
+   "rationale": "el desbalanceo del rotor encabeza y la estructura es su amplificador «posiblemente»; lubricación y frecuencias eléctricas son las dos notas siguientes, y «Huelgo leve» va matizado.",
    "findings": [
     {
-     "finding": "STRUCTURE:LOOSENESS",
+     "finding": "IMBALANCE:IMBALANCE",
      "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1
     },
     {
      "finding": "LUBRICATION:BEARING_LUBRICATION",
@@ -1569,15 +1561,11 @@
   {
    "diagnosis_text": "Se aprecia buen estado de lubricación de los rodamientos del conjunto. Se establece su buen estado y se vigilará su evolución.",
    "observations": 2,
-   "rationale": "el texto afirma BUEN estado de lubricación: GT011 lo lee al revés, así que la masa se va a lo que las reglas no cubren.",
+   "rationale": "GT011v2 ya no lee un fallo donde el texto afirma buen estado: lo que queda es la cláusula de cierre, que ninguna regla cubre, y se lleva la masa entera.",
    "findings": [
     {
-     "finding": "LUBRICATION:BEARING_LUBRICATION",
-     "score": 1
-    },
-    {
      "finding": "UNMAPPED:-",
-     "score": 3
+     "score": 1
     }
    ]
   },
@@ -2108,11 +2096,15 @@
   {
    "diagnosis_text": "Desbalanceo en el rotor del ventilador posiblemente amplificado por debilidad en la estructura.Frecuencias de naturaleza eléctrica en el lado acoplado del motor.",
    "observations": 1,
-   "rationale": "dos cláusulas en paralelo, cada una sobre un componente.",
+   "rationale": "dos cláusulas en paralelo, cada una sobre un componente; dentro de la primera manda el desbalanceo del rotor y la estructura entra como amplificador «posiblemente».",
    "findings": [
     {
-     "finding": "STRUCTURE:LOOSENESS",
+     "finding": "IMBALANCE:IMBALANCE",
      "score": 2
+    },
+    {
+     "finding": "STRUCTURE:LOOSENESS",
+     "score": 1
     },
     {
      "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
@@ -2232,6 +2224,16 @@
      "score": 3
     }
    ]
+  }
+ ],
+ "addenda": [
+  {
+   "version": "0.1.1",
+   "date": "2026-08-05",
+   "workplan": "docs/workplans/11-motor-calibrado-gt-corregido.md",
+   "why": "las reglas corregidas de informes-gt-extract 0.4.0 (GT001v2, GT011v2, GT021v2, GT025) cambian los findings de 5 textos, y el aplicador rechaza un juicio cuyas claves no casan: se re-juzgan esos 5, y sólo esos.",
+   "judgements_revised": 5,
+   "observations_revised": 11
   }
  ]
 }

@@ -53,12 +53,18 @@ copias del extractor que siguen junto a los informes y dentro del dataset
 `bunge_cartagena_ams` son artefactos desplegados, no código vivo.
 
 El GT del analista tiene **dos generaciones** (workplan 10): la determinista
-(`informes-gt-extract`, reparto `1/n` por cláusula, archivada en
-`<informes>/ground-truth/deterministic-0.3.0/`) y la contextual
-(`informes-gt-weights-llm`, `extraction_method="llm"`, desplegada en el dataset
-y en `<informes>/ground-truth/`). La segunda sale de la primera aplicándole un
-overlay de juicio de `overlays/`; los documentos, la geometría y el
-`source_sha256` del PDF son los mismos, sólo cambia el reparto de `weight`.
+(`informes-gt-extract 0.4.0`, reparto `1/n` por cláusula, archivada en
+`<informes>/ground-truth/deterministic-0.4.0/`, con la 0.3.0 al lado como la
+línea sobre la que se midió el workplan 10) y la contextual
+(`informes-gt-weights-llm 0.1.1`, `extraction_method="llm"`, desplegada en el
+dataset y en `<informes>/ground-truth/`). La segunda sale de la primera
+aplicándole un overlay de juicio de `overlays/`; los documentos, la geometría y
+el `source_sha256` del PDF son los mismos, sólo cambia el reparto de `weight`.
+
+Cambiar la lógica de una regla `GTxxx` obliga a **versionar su id** (`GT001v2`,
+como los `IRxxx` del t8-mapper) y deja el overlay desfasado allí donde cambien
+los findings: el aplicador lo dice en voz alta y esos juicios —sólo ésos— se
+re-juzgan como adenda versionada del overlay (workplan 11).
 
 ## Comandos
 

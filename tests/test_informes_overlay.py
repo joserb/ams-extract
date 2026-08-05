@@ -399,9 +399,12 @@ class TestTheBungeOverlay:
 
     def test_every_remap_leaves_an_unmapped_for_a_real_group(self, bunge) -> None:
         remaps = [r for j in bunge.judgements.values() for r in j.remaps]
-        assert len(remaps) == 6
+        # 5 desde la adenda 0.1.1: el re-mapeo de «Desbalanceo» sobra porque
+        # GT001v2 casa ya el sinónimo y no queda un `unmapped` que rescatar.
+        # Un re-mapeo es el parche que se retira cuando la regla se arregla.
+        assert len(remaps) == 5
         assert all(remap.why for remap in remaps), "a judgement without a reason is not auditable"
-        assert {r.fault_group for r in remaps} == {"OTHER", "ELECTRICAL", "IMBALANCE", "LOOSENESS"}
+        assert {r.fault_group for r in remaps} == {"OTHER", "ELECTRICAL", "LOOSENESS"}
 
     def test_the_scores_live_in_the_declared_scale(self, bunge) -> None:
         scale = {"0.25", "0.5", "1", "1.5", "2", "3"}
