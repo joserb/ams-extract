@@ -69,7 +69,7 @@ MODALITY_MAP: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 FINDING_RULES: tuple[tuple[str, str, str | None, str, str], ...] = (
-    ("GT001", r"desequilibri", "IMBALANCE", "IMBALANCE", "direct"),
+    ("GT001v2", r"desequilibri|desbalance", "IMBALANCE", "IMBALANCE", "direct"),
     ("GT002", r"desalineac", None, "MISALIGNMENT", "group"),
     ("GT003", r"holguras? rotacional", "LOOSENESS", "LOOSENESS", "direct"),
     ("GT004", r"holgura", "LOOSENESS", "LOOSENESS", "approximate"),
@@ -79,7 +79,7 @@ FINDING_RULES: tuple[tuple[str, str, str | None, str, str], ...] = (
     ("GT008", r"pista interna|bpfi", "BEARING_INNER", "BEARING", "direct"),
     ("GT009", r"elementos? rodantes?|bsf", "BEARING_BALL", "BEARING", "direct"),
     ("GT010", r"jaula|ftf", "BEARING_CAGE", "BEARING", "direct"),
-    ("GT011", r"lubricaci", "BEARING_LUBRICATION", "LUBRICATION", "direct"),
+    ("GT011v2", r"lubricaci", "BEARING_LUBRICATION", "LUBRICATION", "direct"),
     (
         "GT012",
         r"deterioro .*rodamiento|rodamiento.*deterior|fallo .*rodamiento|"
@@ -104,7 +104,7 @@ FINDING_RULES: tuple[tuple[str, str, str | None, str, str], ...] = (
         "ELECTRICAL",
         "group",
     ),
-    ("GT021", r"excentricidad", "ELECTRICAL_ROTOR", "ELECTRICAL", "approximate"),
+    ("GT021v2", r"excentricidad", "ELECTRICAL_ROTOR", "ELECTRICAL", "approximate"),
     (
         "GT022",
         r"excitaci[oó]n as[ií]ncrona|arm[oó]nicos as[ií]ncronos|"
@@ -128,6 +128,17 @@ FINDING_RULES: tuple[tuple[str, str, str | None, str, str], ...] = (
         "OTHER",
         "group",
     ),
+    # v0.4.0 (workplan 11): la excentricidad de una polea es de la transmisión,
+    # no del rotor eléctrico. El grupo BELT sólo tiene BELT_FAULT en el
+    # catálogo `FaultMode` y el fallo no es la correa, así que se declara el
+    # grupo y no se fuerza el modo (§2.5).
+    (
+        "GT025",
+        r"excentricidad\s+(?:en|de|del)\s+(?:la\s+)?polea|polea\s+exc[eé]ntrica",
+        None,
+        "BELT",
+        "group",
+    ),
 )
 """``(rule_id, patrón, fault_mode|None, fault_group, label_quality)``.
 
@@ -135,6 +146,51 @@ FINDING_RULES: tuple[tuple[str, str, str | None, str, str], ...] = (
 ``FaultMode``) para diagnósticos que el informe no concreta. Invariante del
 modelo normativo: ``label_quality="group"`` exige ``fault_mode`` nulo; las
 demás calidades lo exigen no nulo.
+
+El sufijo ``vN`` del id versiona la **lectura** de una regla, como los
+``IRxxx`` del t8-mapper: cambiarle la lógica obliga a versionar el id para que
+un finding ya emitido siga diciendo qué regla lo produjo. En 0.4.0 (workplan
+11) se versionaron las tres que el corpus desmentía: ``GT001v2`` (añade el
+sinónimo «desbalanceo»), ``GT011v2`` y ``GT021v2`` (ganan veto, ver
+:data:`RULE_VETOES`).
+"""
+
+RULE_VETOES: dict[str, re.Pattern[str]] = {
+    "GT011v2": re.compile(
+        r"\bbuen(?:a|as|os)?\s+(?:estado\s+de\s+)?lubricaci"
+        # \b delante: «Ineficiente/Deficiente lubricación» son fallos, y sin él
+        # el veto los leía como su contrario.
+        r"|\b(?:correcta|adecuada|eficiente|[oó]ptima)s?\s+lubricaci"
+        r"|lubricaci\w*\s+(?:\S+\s+){0,3}?"
+        r"(?:en\s+buen\s+estado|\bcorrecta\b|\badecuada\b|\beficiente\b|\b[oó]ptima\b)"
+        r"|(?:sin|no\s+se\s+aprecian?)\s+(?:\S+\s+){0,4}?"
+        r"(?:problemas?|indicios?|s[ií]ntomas?|deficiencias?)\s+(?:\S+\s+){0,2}?lubricaci",
+    ),
+    "GT021v2": re.compile(
+        r"excentricidad\s+(?:en|de|del)\s+(?:la\s+)?polea|polea\s+exc[eé]ntrica",
+    ),
+}
+"""Contextos en los que una regla **no** dispara, por ``rule_id``.
+
+Un patrón de regla es una palabra suelta y el analista escribe frases: hay
+cláusulas donde la palabra aparece afirmando justo lo contrario de lo que la
+regla lee. El veto es la forma honesta de decirlo — la regla se calla y la
+cláusula pasa a lo que no cubre ninguna regla, en vez de emitir un fallo que
+el texto niega.
+
+- **GT011v2**: «Se aprecia **buen estado de lubricación** de los rodamientos
+  del conjunto» no es un fallo de lubricación. El veto cubre además las
+  fórmulas afirmativas y negadas del mismo juicio («correcta lubricación»,
+  «sin problemas de lubricación»); «*mejorable*» y «*mejor* estado de
+  lubricación» quedan fuera a propósito: la primera es un fallo y la segunda,
+  una nota de evolución que el reparto de pesos ya matiza.
+- **GT021v2**: «excentricidad **en polea**» es mecánica, de la transmisión, y
+  la recoge :data:`GT025 <FINDING_RULES>`; llevarla a ``ELECTRICAL_ROTOR``
+  era leer «excentricidad» sin mirar de qué.
+
+Los vetos son **por cláusula**, la misma unidad en la que se aplican las
+reglas: una cláusula que niega la lubricación y otra que la afirma son dos
+cláusulas, y cada una se lee sola.
 """
 
 UNMAPPED_GROUP = "UNMAPPED"
@@ -169,7 +225,11 @@ re-mapeos por juicio de ``informes.overlay``.
 
 HEALTHY_RE = re.compile(
     r"(m[aá]quina|equipo|conjunto|rodamientos?|motor|reductor)\s+"
-    r"(?:\S+\s+){0,3}?en buen estado",
+    r"(?:\S+\s+){0,3}?en buen estado"
+    # «Se aprecia buen estado de lubricación de los rodamientos del conjunto»
+    # declara una parte sana; sin esto la cláusula era masa de juicio y GT011
+    # la leía como fallo de lubricación (workplan 11).
+    r"|\bbuen(?:a|as|os)?\s+(?:estado\s+de\s+)?lubricaci",
     re.I,
 )
 STOPPED_RE = re.compile(r"m[aá]quina parada", re.I)
@@ -276,14 +336,21 @@ def clause_findings(clause: str) -> list[tuple[int, str]]:
     Deduplicado por ``(fault_group, fault_mode)``: dos reglas que llegan a la
     misma etiqueta desde la misma cláusula son una lectura, no dos (gana la de
     menor índice, que es la prioridad de :data:`FINDING_RULES`).
+
+    Una regla con veto en :data:`RULE_VETOES` no dispara si la cláusula casa su
+    contexto de veto, aunque su patrón esté ahí: la palabra aparece afirmando
+    lo contrario de lo que la regla lee.
     """
     low = clause.lower()
     matched: list[tuple[int, str]] = []
     seen: set[str] = set()
-    for index, (_rule_id, pattern, fault_mode, group, _quality) in enumerate(FINDING_RULES):
+    for index, (rule_id, pattern, fault_mode, group, _quality) in enumerate(FINDING_RULES):
         match = re.search(pattern, low)
         if not match:
             continue
+        veto = RULE_VETOES.get(rule_id)
+        if veto is not None and veto.search(low):
+            continue  # la cláusula dice lo contrario de lo que la regla lee
         key = f"{group}:{fault_mode}"
         if key in seen:
             continue

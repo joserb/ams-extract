@@ -418,14 +418,14 @@ cambiar la lógica de una regla obliga a nuevo id o sufijo de versión.
 
 | Regla | Patrón (es) | fault_mode | grupo | calidad |
 |---|---|---|---|---|
-| GT001 | desequilibri- | IMBALANCE | IMBALANCE | direct |
+| GT001v2 | desequilibri- / desbalance- | IMBALANCE | IMBALANCE | direct |
 | GT002 | desalineac- | — | MISALIGNMENT | group |
 | GT003 | holguras rotacionales | LOOSENESS | LOOSENESS | direct |
 | GT004 | holgura (genérica) | LOOSENESS | LOOSENESS | approximate |
 | GT005 | debilidad estructural | LOOSENESS | STRUCTURE | approximate |
 | GT006 | resonancia | RESONANCE | STRUCTURE | direct |
 | GT007–GT010 | pista externa/interna, elementos rodantes, jaula (o BPFO/BPFI/BSF/FTF) | BEARING_* | BEARING | direct |
-| GT011 | lubricaci- | BEARING_LUBRICATION | LUBRICATION | direct |
+| GT011v2 | lubricaci- (con veto, §3.3.1) | BEARING_LUBRICATION | LUBRICATION | direct |
 | GT012 | deterioro/fallo/desgaste de rodamiento sin concretar | — | BEARING | group |
 | GT013 | eléctric- | ELECTRICAL_ROTOR | ELECTRICAL | approximate |
 | GT014 | engran-/GMF | GEAR_WEAR | GEAR | approximate |
@@ -442,7 +442,7 @@ completa de los informes Bunge (2026-07-28 §3.8) encontró **repetidas** en el
 | Regla | Patrón (es) | fault_mode | grupo | calidad |
 |---|---|---|---|---|
 | GT020 | distorsión armónica / variador de frecuencia / calidad de la energía | — | ELECTRICAL | group |
-| GT021 | excentricidad | ELECTRICAL_ROTOR | ELECTRICAL | approximate |
+| GT021v2 | excentricidad (con veto, §3.3.1) | ELECTRICAL_ROTOR | ELECTRICAL | approximate |
 | GT022 | excitación asíncrona / armónicos asíncronos / traza asíncrona | — | BEARING | group |
 | GT023 | falta de rigidez / holgura estructural / pata coja | LOOSENESS | STRUCTURE | approximate |
 | GT024 | ruido mecánico / ruido de origen eléctrico / ruido ultrasónico / cabeceo / fuga de… | — | OTHER | group |
@@ -453,13 +453,50 @@ GT022 se emite como `group` y no como `weak`: el origen no nombra ningún
 `fault_mode` a toda calidad que no sea `group`/`unmapped` (§2.5). GT023 cruza
 la agrupación a propósito, como GT005 y GT019.
 
+**GT025** (desde `informes-gt-extract` 0.4.0) recoge lo que GT021 leía mal:
+
+| Regla | Patrón (es) | fault_mode | grupo | calidad |
+|---|---|---|---|---|
+| GT025 | excentricidad en/de polea, polea excéntrica | — | BELT | group |
+
+Es un fallo de la **transmisión**, no del rotor eléctrico. Se declara el grupo
+y no el modo porque el único `FaultMode` de `BELT` es `BELT_FAULT` y el fallo
+no es la correa sino la polea: el catálogo no tiene modo para eso y el
+contrato prefiere `group` con `fault_mode` nulo a un modo cercano (§2.5).
+
+#### 3.3.1 Vetos: la cláusula que afirma lo contrario
+
+El patrón de una regla es una palabra y el analista escribe frases. Desde
+0.4.0 una regla puede llevar un **veto**: un contexto en el que, aunque su
+patrón esté en la cláusula, la regla **no dispara** porque la frase afirma lo
+contrario de lo que la regla lee. El veto es por cláusula, la misma unidad en
+la que se aplican las reglas.
+
+| Regla | No dispara ante |
+|---|---|
+| GT011v2 | «buen estado de lubricación», «correcta/adecuada/eficiente lubricación», «sin problemas de lubricación» |
+| GT021v2 | «excentricidad en polea» (la recoge GT025) |
+
+«Mejorable» y «mejor estado de lubricación» quedan **fuera** del veto: la
+primera es un fallo y la segunda es una nota de evolución favorable que el
+reparto de pesos ya matiza, no una afirmación de buen estado. Y el veto de
+GT011v2 lee palabras enteras: «Deficiente/Ineficiente lubricación» llevan
+«eficiente» dentro y son fallos.
+
+Las tres reglas versionadas en 0.4.0 (`GT001v2`, `GT011v2`, `GT021v2`) son las
+lecturas que la lectura completa del corpus desmintió y que el reparto
+contextual de pesos sólo pudo paliar (workplan 11). El sufijo `vN` versiona la
+**lectura**: un finding ya emitido sigue diciendo qué regla lo produjo.
+
 #### Textos de estado, no de fallo
 
 Un diagnóstico sano, de parada, de no-medida o de fuera de servicio produce
 `findings=[]` (§2.5). El vocabulario de «sano» de los informes no es sólo
 «máquina en buen estado»: el analista escribe también «equipo», «conjunto»,
 «motor», «reductor» o «rodamientos … en buen estado», y v0.1 emitía por ellos
-un `unmapped` espurio.
+un `unmapped` espurio. Desde 0.4.0 entra en ese vocabulario «buen estado de
+lubricación», que además lleva el veto de GT011v2 (§3.3.1): sin las dos cosas
+la cláusula era masa de juicio *y* fallo de lubricación.
 
 La comprobación es **por cláusula** —el analista redacta el diagnóstico como
 una lista separada por punto o por guion de viñeta—, no sobre el texto entero:

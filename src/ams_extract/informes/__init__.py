@@ -32,11 +32,15 @@ from __future__ import annotations
 
 __all__ = ["EXTRACTOR_VERSION"]
 
-EXTRACTOR_VERSION = "informes-gt-extract 0.3.0"
+EXTRACTOR_VERSION = "informes-gt-extract 0.4.0"
 """Herramienta y versión que se anota en ``provenance.extractor``.
 
-0.3.0 reparte la masa de juicio entre las cláusulas del diagnóstico
-(``weight``, DiagGT 0.1.5); 0.2.0 fue el fix de geometría de la auditoría de
-lectura completa (2026-07-28). La adopción en el paquete, por sí sola, no
-cambió lo que el extractor lee.
+0.4.0 corrige las tres lecturas que el corpus desmintió (workplan 11):
+``GT001v2`` casa también «desbalanceo», ``GT011v2`` no dispara sobre «buen
+estado de lubricación» y ``GT021v2`` deja de llevar «excentricidad en polea»
+al rotor eléctrico — la recoge ``GT025`` como fallo de transmisión. 0.3.0
+repartió la masa de juicio entre las cláusulas del diagnóstico (``weight``,
+DiagGT 0.1.5); 0.2.0 fue el fix de geometría de la auditoría de lectura
+completa (2026-07-28). La adopción en el paquete, por sí sola, no cambió lo
+que el extractor lee.
 """

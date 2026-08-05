@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -39,8 +40,52 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 FINDING_KEYS = ("matched_text", "fault_mode", "fault_group", "label_quality", "mapping_rule")
 
 
+def _rule_family(rule: str | None) -> str | None:
+    """``"GT001v2"`` → ``"GT001"``.
+
+    The regression fixture predates the ``vN`` suffix that versions the
+    *reading* of a rule (workplan 11). What it protects is the label a text
+    gets, not how the version of the rule that gave it travels.
+    """
+    return re.sub(r"v\d+$", "", rule) if rule else rule
+
+
 def _signature(finding: dict[str, Any]) -> tuple[Any, ...]:
-    return tuple(finding[key] for key in FINDING_KEYS)
+    return tuple(
+        _rule_family(finding[key]) if key == "mapping_rule" else finding[key]
+        for key in FINDING_KEYS
+    )
+
+
+WORKPLAN_11_TEXTS: dict[str, tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]] = {
+    # text → (findings that appear, findings that vanish), as
+    # (fault_group, fault_mode, rule family).
+    "Debilidad estructural / Desequilibrio, excentricidad en polea.": (
+        [("BELT", None, "GT025")],
+        [("ELECTRICAL", "ELECTRICAL_ROTOR", "GT021")],
+    ),
+    "Desbalanceo - Debilidad estructural del motor.": (
+        [("IMBALANCE", "IMBALANCE", "GT001")],
+        [],
+    ),
+    "Desbalanceo en el rotor del ventilador posiblemente amplificado por debilidad en la "
+    "estructura.Frecuencias de naturaleza eléctrica en el lado acoplado del motor.": (
+        [("IMBALANCE", "IMBALANCE", "GT001")],
+        [],
+    ),
+    "Desbalanceo en el rotor del ventilador posiblemente amplificado por debilidad en la "
+    "estructura.Frecuencias de naturaleza eléctrica en el lado acoplado del motor. "
+    "Lubricación mejorable en rodamientos del ventilador. Huelgo leve.": (
+        [("IMBALANCE", "IMBALANCE", "GT001"), ("UNMAPPED", None, None)],
+        [],
+    ),
+    "Se aprecia buen estado de lubricación de los rodamientos del conjunto. Se establece "
+    "su buen estado y se vigilará su evolución.": (
+        [("UNMAPPED", None, None)],
+        [("LUBRICATION", "BEARING_LUBRICATION", "GT011")],
+    ),
+}
+"""Los cinco textos del corpus que las reglas corregidas de 0.4.0 leen distinto."""
 
 
 @pytest.fixture(scope="module")
@@ -98,7 +143,7 @@ class TestMapFindings:
     def test_fault_text_carries_the_rule_and_the_verbatim(self) -> None:
         findings = map_findings("Desequilibrio del ventilador")
         assert len(findings) == 1
-        assert findings[0]["mapping_rule"] == "GT001"
+        assert findings[0]["mapping_rule"] == "GT001v2"
         assert findings[0]["fault_mode"] == "IMBALANCE"
         assert findings[0]["label_quality"] == "direct"
         assert findings[0]["source_text"] == "Desequilibrio del ventilador"
@@ -110,6 +155,76 @@ class TestMapFindings:
         assert findings[0]["mapping_rule"] is None
 
 
+class TestTheRulesTheCorpusDisproved:
+    """The three readings the full read of the corpus denied (workplan 11).
+
+    Every text here is verbatim from the BUNGE 2026 reports; the quotes are
+    what workplan 10 cited when it could only paper over them with weights.
+    """
+
+    def test_the_analyst_also_writes_desbalanceo(self) -> None:
+        # GT001 only knew «desequilibri», so the imbalance of this card
+        # vanished from the document: the clause matched GT005 and nothing
+        # said that the analyst had diagnosed an imbalance at all.
+        findings = map_findings(
+            "Desbalanceo en el rotor del ventilador posiblemente amplificado "
+            "por debilidad en la estructura."
+        )
+        assert [(f["fault_group"], f["mapping_rule"]) for f in findings] == [
+            ("IMBALANCE", "GT001v2"),
+            ("STRUCTURE", "GT005"),
+        ]
+        assert map_findings("Desbalanceo.")[0]["fault_mode"] == "IMBALANCE"
+
+    def test_desbalanceo_no_longer_falls_into_the_unmapped(self) -> None:
+        findings = map_findings("Desbalanceo - Debilidad estructural del motor.")
+        assert [f["fault_group"] for f in findings] == ["IMBALANCE", "STRUCTURE"]
+        assert [f["weight"] for f in findings] == [0.5, 0.5]
+
+    def test_good_lubrication_is_not_a_lubrication_fault(self) -> None:
+        # GT011 read the word and ignored the sentence: this text says the
+        # opposite of what the rule was claiming.
+        assert map_findings("Se aprecia buen estado de lubricación de los rodamientos.") == []
+        findings = map_findings(
+            "Se aprecia buen estado de lubricación de los rodamientos del conjunto. "
+            "Se establece su buen estado y se vigilará su evolución."
+        )
+        assert [f["fault_group"] for f in findings] == ["UNMAPPED"]
+
+    def test_the_veto_does_not_reach_the_lubrication_that_is_a_fault(self) -> None:
+        # «Mejorable» is a fault and «Deficiente/Ineficiente» carry «eficiente»
+        # inside: the veto has to read the word, not find it.
+        for text in (
+            "Lubricación mejorable en rodamientos del ventilador",
+            "Mejorable estado de lubricación",
+            "Mejor estado de lubricación",
+            "Deficiente lubricación en rodamiento lado polea",
+            "Ineficiente lubricación en rodamiento del punto 4 de la centrífuga",
+            "Lubricación inadecuada en rodamientos de la bomba",
+        ):
+            assert [f["fault_group"] for f in map_findings(text)] == ["LUBRICATION"], text
+
+    def test_an_eccentric_pulley_is_a_transmission_fault(self) -> None:
+        # GT021 took every eccentricity to the electrical rotor without
+        # looking at what was eccentric.
+        findings = map_findings("Debilidad estructural / Desequilibrio, excentricidad en polea.")
+        assert [(f["fault_group"], f["fault_mode"], f["mapping_rule"]) for f in findings] == [
+            ("IMBALANCE", "IMBALANCE", "GT001v2"),
+            ("STRUCTURE", "LOOSENESS", "GT005"),
+            ("BELT", None, "GT025"),
+        ]
+
+    def test_a_bare_eccentricity_is_still_read_as_electrical(self) -> None:
+        findings = map_findings("-Distorsión armónica proveniente del variador. -Excentricidad.")
+        assert [(f["fault_group"], f["fault_mode"], f["mapping_rule"]) for f in findings] == [
+            ("ELECTRICAL", None, "GT020"),
+            ("ELECTRICAL", "ELECTRICAL_ROTOR", "GT021v2"),
+        ]
+        assert [f["mapping_rule"] for f in map_findings("Excentricidad en el rotor.")] == [
+            "GT021v2"
+        ]
+
+
 class TestWeights:
     def test_a_single_clause_takes_the_whole_mass(self) -> None:
         findings = map_findings("Desequilibrio del ventilador")
@@ -117,13 +232,13 @@ class TestWeights:
 
     def test_the_clauses_split_the_mass_evenly(self) -> None:
         findings = map_findings("-Desequilibrio del ventilador. -Debilidad estructural.")
-        assert [f["mapping_rule"] for f in findings] == ["GT001", "GT005"]
+        assert [f["mapping_rule"] for f in findings] == ["GT001v2", "GT005"]
         assert [f["weight"] for f in findings] == [0.5, 0.5]
 
     def test_the_findings_of_one_clause_share_its_fraction(self) -> None:
         # First clause: two findings of 1/2 · 1/2; second clause: 1/2.
         findings = map_findings("Desalineación y cavitación. Desequilibrio.")
-        assert [f["mapping_rule"] for f in findings] == ["GT001", "GT002", "GT015"]
+        assert [f["mapping_rule"] for f in findings] == ["GT001v2", "GT002", "GT015"]
         assert [f["weight"] for f in findings] == [0.5, 0.25, 0.25]
 
     def test_the_uncovered_clause_gives_its_mass_to_the_unmapped(self) -> None:
@@ -149,7 +264,7 @@ class TestWeights:
         weights = {f["mapping_rule"]: f["weight"] for f in findings}
         # GT003 wins the merge over GT004 (lower rule index, same label) and
         # keeps both thirds.
-        assert weights == {"GT003": 0.666667, "GT001": 0.333333}
+        assert weights == {"GT003": 0.666667, "GT001v2": 0.333333}
 
     def test_the_rounded_mass_never_goes_over_one(self) -> None:
         for text in (
@@ -180,36 +295,44 @@ class TestRegressionAgainstTheStandaloneScript:
         assert len(regression_cases) == 251
         assert sum(case["observations"] for case in regression_cases) == 6_669
 
-    def test_no_diagnosis_loses_a_finding(
+    def test_only_a_veto_takes_a_finding_away(
         self, regression_cases: list[dict[str, Any]]
     ) -> None:
-        """Reading by clause may add, never subtract.
+        """Reading by clause may add; only a veto subtracts.
 
         The clause is a *finer* window than the whole text, so a rule that
         fired before has to fire on some clause — unless its match was
-        straddling a clause boundary, which is the bug this reading fixes.
+        straddling a clause boundary, which is the bug that reading fixed.
+        The one deliberate exception is ``RULE_VETOES`` (workplan 11): a clause
+        that says the opposite of what the rule reads loses it, and that is the
+        whole point of the veto.
         """
-        lost: list[str] = []
+        lost: list[tuple[str, str]] = []
         for case in regression_cases:
             text = case["diagnosis_text"] or ""
             got = {_signature(f)[1:] for f in map_findings(text)}
             for finding in case["findings"]:
                 if tuple(finding[key] for key in FINDING_KEYS)[1:] not in got:
-                    lost.append(f"{text!r}: lost {finding}")
-        assert not lost, "\n".join(lost)
+                    lost.append((text, str(finding["mapping_rule"])))
+        assert sorted(rule for _text, rule in lost) == ["GT011", "GT021"]
+        by_rule = dict((rule, text) for text, rule in lost)
+        assert by_rule["GT011"].startswith("Se aprecia buen estado de lubricación")
+        assert "excentricidad en polea" in by_rule["GT021"]
 
-    def test_the_differences_are_the_ones_the_workplan_measured(
+    def test_the_differences_are_the_ones_the_workplans_measured(
         self, regression_cases: list[dict[str, Any]]
     ) -> None:
-        """Pinned diff against the 0.2.0 emission (workplan 09 §3).
+        """Pinned diff against the 0.2.0 emission (workplans 09 §3 and 11).
 
-        Of the 251 distinct texts of the corpus, 233 map identically; 11 gain
+        Of the 251 distinct texts of the corpus, 231 map identically; 8 gain
         the partial ``unmapped`` that measures the share of the judgement the
-        rules do not cover, and 7 move the ``matched_text`` of GT012, whose
+        rules do not cover; 7 move the ``matched_text`` of GT012, whose
         ``rodamiento.*deterior`` alternative used to match *across* clauses
-        («rodamientos del conjunto. Posible deterioro»).
+        («rodamientos del conjunto. Posible deterioro»); and 5 are the texts
+        the corrected rules of 0.4.0 read differently, pinned one by one in
+        :data:`WORKPLAN_11_TEXTS`.
         """
-        identical = added_unmapped = moved_match = 0
+        identical = added_unmapped = moved_match = corrected = 0
         for case in regression_cases:
             text = case["diagnosis_text"] or ""
             expected = [tuple(f[key] for key in FINDING_KEYS) for f in case["findings"]]
@@ -217,15 +340,18 @@ class TestRegressionAgainstTheStandaloneScript:
             if got == expected:
                 identical += 1
                 continue
-            appeared = [f for f in got if f not in expected]
-            vanished = [f for f in expected if f not in got]
-            if vanished:
-                assert all(f[4] == "GT012" for f in vanished), f"{text!r}: {vanished}"
+            appeared = [(f[2], f[1], f[4]) for f in got if f not in expected]
+            vanished = [(f[2], f[1], f[4]) for f in expected if f not in got]
+            if text in WORKPLAN_11_TEXTS:
+                corrected += 1
+                assert (appeared, vanished) == WORKPLAN_11_TEXTS[text], text
+            elif vanished:
+                assert all(rule == "GT012" for _g, _m, rule in vanished), f"{text!r}"
                 moved_match += 1
             else:
-                assert all(f[2] == "UNMAPPED" for f in appeared), f"{text!r}: {appeared}"
+                assert all(group == "UNMAPPED" for group, _m, _r in appeared), f"{text!r}"
                 added_unmapped += 1
-        assert (identical, added_unmapped, moved_match) == (233, 11, 7)
+        assert (identical, added_unmapped, moved_match, corrected) == (231, 8, 7, 5)
 
     def test_the_source_text_is_the_verbatim_of_the_diagnosis(
         self, regression_cases: list[dict[str, Any]]
@@ -384,7 +510,7 @@ class TestFindingsConsolidation:
         findings = finding_rows(rows)
         assert len(findings) == 2
         assert set(findings[0]) == set(FINDING_COLUMNS)
-        assert [f["mapping_rule"] for f in findings] == ["GT001", "GT005"]
+        assert [f["mapping_rule"] for f in findings] == ["GT001v2", "GT005"]
         assert [f["weight"] for f in findings] == [0.5, 0.5]
         assert all(f["observation_id"] == "P2581115260126:AG100:vibration" for f in findings)
         assert all(f["dataset_machine_id"] == "MECLADOR_AGITADOR_AG_100" for f in findings)
