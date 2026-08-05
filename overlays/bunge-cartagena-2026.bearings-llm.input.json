@@ -1,0 +1,328 @@
+{
+  "bearings": {
+    "6213": {
+      "model": "6213",
+      "type": "ball",
+      "n_balls": 10,
+      "d_ball_mm": 17.46,
+      "d_pitch_mm": 92.5,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6213"
+      ],
+      "_bore_od_mm": [
+        65,
+        120
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 65×120 mm; Z de la serie 62xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6209–6212 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 4.0562,
+        "BPFI": 5.9438,
+        "BSF": 2.5545,
+        "FTF": 0.4056
+      }
+    },
+    "6215": {
+      "model": "6215",
+      "type": "ball",
+      "n_balls": 10,
+      "d_ball_mm": 17.46,
+      "d_pitch_mm": 102.5,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6215"
+      ],
+      "_bore_od_mm": [
+        75,
+        130
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 75×130 mm; Z de la serie 62xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6209–6212 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 4.1483,
+        "BPFI": 5.8517,
+        "BSF": 2.8501,
+        "FTF": 0.4148
+      }
+    },
+    "6216": {
+      "model": "6216",
+      "type": "ball",
+      "n_balls": 10,
+      "d_ball_mm": 19.05,
+      "d_pitch_mm": 110.0,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6216"
+      ],
+      "_bore_od_mm": [
+        80,
+        140
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 80×140 mm; Z de la serie 62xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6209–6212 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 4.1341,
+        "BPFI": 5.8659,
+        "BSF": 2.8005,
+        "FTF": 0.4134
+      }
+    },
+    "6217": {
+      "model": "6217",
+      "type": "ball",
+      "n_balls": 10,
+      "d_ball_mm": 20.64,
+      "d_pitch_mm": 117.5,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6217"
+      ],
+      "_bore_od_mm": [
+        85,
+        150
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 85×150 mm; Z de la serie 62xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6209–6212 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 4.1217,
+        "BPFI": 5.8783,
+        "BSF": 2.7586,
+        "FTF": 0.4122
+      }
+    },
+    "6219": {
+      "model": "6219",
+      "type": "ball",
+      "n_balls": 10,
+      "d_ball_mm": 23.81,
+      "d_pitch_mm": 132.5,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6219"
+      ],
+      "_bore_od_mm": [
+        95,
+        170
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 95×170 mm; Z de la serie 62xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6209–6212 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 4.1015,
+        "BPFI": 5.8985,
+        "BSF": 2.6926,
+        "FTF": 0.4102
+      }
+    },
+    "6220": {
+      "model": "6220",
+      "type": "ball",
+      "n_balls": 10,
+      "d_ball_mm": 25.4,
+      "d_pitch_mm": 140.0,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6220"
+      ],
+      "_bore_od_mm": [
+        100,
+        180
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 100×180 mm; Z de la serie 62xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6209–6212 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 4.0929,
+        "BPFI": 5.9071,
+        "BSF": 2.6652,
+        "FTF": 0.4093
+      }
+    },
+    "6311": {
+      "model": "6311",
+      "type": "ball",
+      "n_balls": 8,
+      "d_ball_mm": 20.64,
+      "d_pitch_mm": 87.5,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6311"
+      ],
+      "_bore_od_mm": [
+        55,
+        120
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 55×120 mm; Z de la serie 63xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6307–6310 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 3.0565,
+        "BPFI": 4.9435,
+        "BSF": 2.0017,
+        "FTF": 0.3821
+      }
+    },
+    "6312": {
+      "model": "6312",
+      "type": "ball",
+      "n_balls": 8,
+      "d_ball_mm": 22.23,
+      "d_pitch_mm": 95.0,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6312"
+      ],
+      "_bore_od_mm": [
+        60,
+        130
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 60×130 mm; Z de la serie 63xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6307–6310 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 3.064,
+        "BPFI": 4.936,
+        "BSF": 2.0198,
+        "FTF": 0.383
+      }
+    },
+    "6314": {
+      "model": "6314",
+      "type": "ball",
+      "n_balls": 8,
+      "d_ball_mm": 25.4,
+      "d_pitch_mm": 110.0,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6314"
+      ],
+      "_bore_od_mm": [
+        70,
+        150
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 70×150 mm; Z de la serie 63xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6307–6310 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 3.0764,
+        "BPFI": 4.9236,
+        "BSF": 2.0499,
+        "FTF": 0.3845
+      }
+    },
+    "6315": {
+      "model": "6315",
+      "type": "ball",
+      "n_balls": 8,
+      "d_ball_mm": 26.99,
+      "d_pitch_mm": 117.5,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6315",
+        "FAG 6315",
+        "SKF 6315"
+      ],
+      "_bore_od_mm": [
+        75,
+        160
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 75×160 mm; Z de la serie 63xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6307–6310 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 3.0812,
+        "BPFI": 4.9188,
+        "BSF": 2.0619,
+        "FTF": 0.3851
+      }
+    },
+    "6316": {
+      "model": "6316",
+      "type": "ball",
+      "n_balls": 8,
+      "d_ball_mm": 28.57,
+      "d_pitch_mm": 125.0,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6316"
+      ],
+      "_bore_od_mm": [
+        80,
+        170
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 80×170 mm; Z de la serie 63xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6307–6310 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 3.0858,
+        "BPFI": 4.9142,
+        "BSF": 2.0733,
+        "FTF": 0.3857
+      }
+    },
+    "6317": {
+      "model": "6317",
+      "type": "ball",
+      "n_balls": 8,
+      "d_ball_mm": 30.16,
+      "d_pitch_mm": 132.5,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6317"
+      ],
+      "_bore_od_mm": [
+        85,
+        180
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 85×180 mm; Z de la serie 63xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6307–6310 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 3.0895,
+        "BPFI": 4.9105,
+        "BSF": 2.0828,
+        "FTF": 0.3862
+      }
+    },
+    "6319": {
+      "model": "6319",
+      "type": "ball",
+      "n_balls": 8,
+      "d_ball_mm": 33.34,
+      "d_pitch_mm": 147.5,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6319"
+      ],
+      "_bore_od_mm": [
+        95,
+        200
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 95×200 mm; Z de la serie 63xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6307–6310 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 3.0959,
+        "BPFI": 4.9041,
+        "BSF": 2.099,
+        "FTF": 0.387
+      }
+    },
+    "6322": {
+      "model": "6322",
+      "type": "ball",
+      "n_balls": 8,
+      "d_ball_mm": 41.27,
+      "d_pitch_mm": 175.0,
+      "contact_angle_deg": 0.0,
+      "_designations": [
+        "6322"
+      ],
+      "_bore_od_mm": [
+        110,
+        240
+      ],
+      "_provenance": "llm-inference",
+      "_basis": "dimensiones ISO 110×240 mm; Z de la serie 63xx tal como la trae el catálogo del enriquecedor en las tallas contiguas; d_ball = 0,3175·(D−d), la regla que reproduce exactamente las entradas 6307–6310 de ese mismo catálogo",
+      "_orders": {
+        "BPFO": 3.0567,
+        "BPFI": 4.9433,
+        "BSF": 2.0023,
+        "FTF": 0.3821
+      }
+    }
+  }
+}
