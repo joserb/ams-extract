@@ -166,6 +166,42 @@ class TestRbmDevScan:
         assert result.exit_code == 1
 
 
+class TestRbmExport:
+    def test_dataset_path_is_repeatable_and_lands_in_the_document(
+        self, synthetic_rbm: Path, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "dataset"
+        result = runner.invoke(
+            rbm_app,
+            [
+                "export",
+                str(synthetic_rbm),
+                "--out",
+                str(out),
+                "--types",
+                "fft",
+                "--dataset-path",
+                "Bunge",
+                "--dataset-path",
+                "Cartagena",
+            ],
+        )
+        assert result.exit_code == 0, result.output
+        document = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
+        assert document["path"] == ["Bunge", "Cartagena"]
+
+    def test_without_the_option_nothing_is_claimed(
+        self, synthetic_rbm: Path, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "dataset"
+        result = runner.invoke(
+            rbm_app, ["export", str(synthetic_rbm), "--out", str(out), "--types", "fft"]
+        )
+        assert result.exit_code == 0, result.output
+        document = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
+        assert "path" not in document
+
+
 class TestStats:
     def test_summary_runs_on_synthetic(self, synthetic_rbm: Path) -> None:
         result = runner.invoke(rbm_app, ["stats", "summary", str(synthetic_rbm)])

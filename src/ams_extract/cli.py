@@ -409,6 +409,16 @@ def export(
         str | None,
         typer.Option("--areas", help="Comma-separated area filter; all areas if omitted."),
     ] = None,
+    dataset_path: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--dataset-path",
+            help=(
+                "Grouping level above the dataset, outermost first; repeat for "
+                "deeper levels. Written to dataset.json:path."
+            ),
+        ),
+    ] = None,
     parallel: Annotated[
         int,
         typer.Option("--parallel", help="Worker processes; 1 means serial."),
@@ -419,6 +429,12 @@ def export(
     Writes ``dataset.json``, ``report.html`` and one ``machine=<asset_id>``
     directory per AMS equipment, with ``machine.json`` plus spectra, waves,
     trends and metrics Parquet tables.
+
+    ``--dataset-path`` is the one thing here that does not come out of the
+    ``.rbm``: where the dataset hangs in the fleet ("Bunge Cartagena") is
+    something the database does not know and whoever curates the dataset does.
+    Without it the field is not written, and a re-export leaves it to be put
+    back by hand — which is the chore this option exists to end.
     """
     if not file.exists():
         raise _abort(f"file not found: {file}")
@@ -443,6 +459,9 @@ def export(
             out,
             types=type_set,
             area_filter=area_filter,
+            # No option at all is "say nothing" (typer hands over an empty
+            # list); `path: []` is a claim and needs to be asked for.
+            dataset_path=dataset_path or None,
             parallel=parallel,
         )
     except (RbmFileError, ValueError) as exc:

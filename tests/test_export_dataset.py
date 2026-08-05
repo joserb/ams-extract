@@ -231,6 +231,9 @@ class TestExportDataset:
         document = json.loads(dataset_json.read_text(encoding="utf-8"))
         assert document["schema_version"] == "0.1.0"
         assert document["generator"].startswith("ams-extract")
+        # Nobody said where the dataset hangs, so nothing is claimed: an
+        # absent `path` and `path: []` say different things.
+        assert "path" not in document
 
         # No equipment in the synthetic fixture -> nothing to export.
         assert summary.areas == 5
@@ -238,6 +241,43 @@ class TestExportDataset:
         assert summary.fft_samples == 0
         assert summary.waveform_samples == 0
         assert summary.parquet_files == 0
+
+    def test_dataset_path_survives_a_re_export(
+        self, synthetic_rbm: Path, tmp_path: Path
+    ) -> None:
+        """The grouping level above the dataset, emitted instead of restored.
+
+        Before this, ``dataset.json:path`` was typed in by whoever curated the
+        dataset and every re-export wiped it (workplan 08).
+        """
+        out = tmp_path / "dataset"
+        for _ in range(2):
+            export_dataset(
+                synthetic_rbm,
+                out,
+                types={"fft"},
+                dataset_path=["Bunge Cartagena"],
+                show_progress=False,
+            )
+            document = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
+            assert document["path"] == ["Bunge Cartagena"]
+
+    def test_dataset_path_keeps_the_order_of_the_levels(
+        self, synthetic_rbm: Path, tmp_path: Path
+    ) -> None:
+        out = tmp_path / "dataset"
+        export_dataset(
+            synthetic_rbm,
+            out,
+            types={"fft"},
+            dataset_path=("Bunge", "Cartagena"),
+            show_progress=False,
+        )
+        document = json.loads((out / "dataset.json").read_text(encoding="utf-8"))
+        # Outermost first, and composed with MachineInfo.path downstream.
+        assert document["path"] == ["Bunge", "Cartagena"]
+        contracts = pytest.importorskip("vibsynth_contracts.dataset")
+        assert contracts.DatasetInfo.model_validate(document).path == ["Bunge", "Cartagena"]
 
     def test_area_filter_selects_subset(self, synthetic_rbm: Path, tmp_path: Path) -> None:
         out = tmp_path / "dataset"

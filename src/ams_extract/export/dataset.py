@@ -775,10 +775,20 @@ def export_dataset(
     *,
     types: set[str],
     area_filter: set[str] | None = None,
+    dataset_path: Sequence[str] | None = None,
     parallel: int = 1,
     show_progress: bool = True,
 ) -> ExportSummary:
-    """Export the database under ``file`` to VibFrame rooted at ``out``."""
+    """Export the database under ``file`` to VibFrame rooted at ``out``.
+
+    ``dataset_path`` are the grouping levels **above** the dataset (client,
+    site…), outermost first, and they land in ``DatasetInfo.path``. Nobody can
+    read them off a ``.rbm``: the database knows its areas and its machines,
+    not what the dataset is grouped with, so whoever curates the dataset says
+    it. Left out, the field is not written at all — absent and ``[]`` are
+    different statements, and the second one ("this dataset groups with no
+    other") is not ours to make.
+    """
     out = Path(out)
     _prepare_output_dir(out)
     extracted_at = datetime.now(UTC)
@@ -788,9 +798,13 @@ def export_dataset(
         document = build_tree_document(reader, areas, source_path=file)
         inventory = collect_inventory(reader, source_path=file)
 
-    dataset_doc = {
+    dataset_doc: dict[str, Any] = {
         "schema_version": SCHEMA_VERSION,
         "name": Path(file).stem,
+    }
+    if dataset_path is not None:
+        dataset_doc["path"] = list(dataset_path)
+    dataset_doc |= {
         "generator": _extractor_name(),
         "created_at": extracted_at,
         "description": document["meta"].get("description") or "",
