@@ -86,6 +86,14 @@ auditable, con la designación verbatim y la procedencia de cada entrada), con
 los factores en órdenes del eje —nivel 3 de `BearingDefinition`— que es
 exactamente lo que `vibsynth-machines enrich --input` consume.
 
+> **Nota (2026-08-05)**: el cierre entregó **nivel 2** (la geometría: `Z`,
+> diámetro de bola, diámetro primitivo, ángulo), no nivel 3 (los cuatro
+> factores). El motivo está en «Decisiones» — «La geometría, no los cuatro
+> factores»: un lector puede contrastar «6316 = 80×170 mm, 8 bolas» con
+> cualquier catálogo, mientras que un `BPFO: 3,0858` sólo se puede creer o no,
+> y los órdenes los deriva el enriquecedor con las mismas fórmulas que aplica a
+> su catálogo.
+
 Reglas de honestidad, que son la mitad del diseño:
 
 - **Sólo designaciones estándar inequívocas.** Un `6316` o un `22220` lo son;
@@ -307,6 +315,12 @@ rodamientos inferidos:
 Los 15 tests nuevos: 6 sobre las reglas corregidas (con los textos reales del
 corpus), 5 sobre el fichero de rodamientos, 4 sobre `--dataset-path`.
 
+**Nota (2026-08-05)**: el «antes» de la fila de `pytest` dice 377 y el cierre
+del [workplan 10](10-pesos-contextuales-llm.md) había anotado **378** pasados
+con los mismos 49 saltados. Una de las dos cifras está mal por uno y no se
+puede saber cuál sin volver a correr la suite en cada commit; se deja anotado.
+El delta de este frente (+15 tests nuevos) no depende de ello.
+
 **Un test rojo que no es de este frente**:
 `test_the_goldens_round_trip_through_our_writer[vibsynth]` falla ya en `HEAD`
 antes de tocar nada, porque el checkout vecino de `vibsynth-contracts` ganó la
@@ -348,6 +362,19 @@ re-exportar—, no un daño colateral de éste.
 
 ## Pendiente
 
+- **`snap_t` en `trends.parquet`: un test rojo en `HEAD`** (pendiente de
+  código, anotado el 2026-08-05 al promoverlo desde §6). El
+  `TRENDS_COLUMNS` del contrato vendorizado
+  (`src/ams_extract/export/vibframe_contract.py`) **no** lleva `snap_t`,
+  mientras que `vibsynth-contracts` ya lo declara opcional en las tres tablas
+  de captura y tendencia; el golden de vibsynth lo trae y
+  `test_the_goldens_round_trip_through_our_writer[vibsynth]` falla por eso —
+  ya antes de este frente, no es daño colateral suyo. Adoptarlo es trabajo de
+  conformidad con su propio alcance: re-vendorizar el contrato (anotando el
+  commit de origen) y re-exportar. La columna sería null, como ya lo es en
+  `spectra`/`waves` (`_spectrum_row`/`_waveform_row` la escriben así): el `.rbm`
+  no tiene noción de snapshot. Mientras no se haga, la suite tiene un rojo
+  conocido que no viene de este repo.
 - **El vocabulario de estado no cubre las fórmulas de cierre del analista.**
   «Se establece su buen estado», «Estable», «Sin evolución en el último mes»,
   «Informar a Preditec si se ha intervenido». Con GT011v2 arreglado, la ficha

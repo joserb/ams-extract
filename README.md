@@ -4,15 +4,18 @@ CLI tool to extract data from RBMware / AMS Machinery Manager `.rbm` databases
 into modern formats (Parquet + JSON), without depending on the legacy Windows XP
 VM or the original AMS software.
 
-See [docs/workplans/01-plan-general.md](docs/workplans/01-plan-general.md) for the project plan and roadmap, and
-[docs/FORMAT.md](docs/FORMAT.md) for the reverse-engineered `.rbm` format.
+See [docs/workplans/01-plan-general.md](docs/workplans/01-plan-general.md) for the project plan and roadmap,
+[docs/FORMAT.md](docs/FORMAT.md) for the reverse-engineered `.rbm` format, and
+[docs/GROUND_TRUTH.md](docs/GROUND_TRUTH.md) for **DiagGT**, the diagnosis
+ground-truth interchange format this repo hosts and produces (`rbm alarms`,
+`rbm informes`).
 
 ## Status
 
 Working end-to-end and validated on the full reference database. The walker
 extracts the complete hierarchy (areas → equipment → points), FFT spectra,
 time-domain waveforms and the "Valores Globales" trend, and a mass exporter
-writes the whole database to a partitioned Parquet dataset (the full 1.8 GiB
+writes the whole database to a partitioned Parquet dataset (the full 1.73 GiB
 BUNGE database exports in ~19 s with `--parallel 4`, with sample counts
 matching AMS exactly).
 
@@ -40,11 +43,18 @@ rbm stats  points   FILE --equipment SUBSTR [--area SUBSTR]   # per-point counts
 rbm extract FILE --point NAME [--equipment SUBSTR] \
                  --type fft|waveform|trend|both --limit N --out DIR   # Parquet + PNG
 rbm export FILE --out dataset/ [--types fft,waveform,trend] \
-                [--areas …] [--parallel N]    # VibFrame (dataset.json +
+                [--areas …] [--dataset-path LEVEL]… \
+                [--parallel N]                # VibFrame (dataset.json +
                                               # machine=<asset>/... + report.html)
 rbm alarms FILE [--out dataset/ground-truth] [--name STEM] \
-                [--client C] [--plant P] [--consolidate]   # AMS's own alarms
+                [--client C] [--plant P] [--consolidate] \
+                [--skip-hash]                 # AMS's own alarms
                                               # as a DiagGT ground-truth document
+rbm informes PDFDIR [--out DIR]               # the analyst's diagnoses,
+                                              # from the inspection report PDFs
+rbm informes-weights GTDIR --overlay OVERLAY.json [--out DIR]
+                                              # re-weight an emitted DiagGT with
+                                              # a contextual judgement overlay
 rbm serve  FILE.rbm | dataset/ [--host H] [--port N] [--no-browser]  # on-demand viewer
 ```
 
@@ -62,7 +72,28 @@ with `origin="system-alarm"` — one observation per alarm whose value is
 confirmed against the point's `pdla` thresholds (991/991 coherent in the
 reference database; 973 emitted, 18 skipped for a unit mismatch). It is
 ground truth *about* the dataset, written next to it, never inside the
-`machine=` partitions.
+`machine=` partitions. `--skip-hash` leaves the `.rbm` unhashed: faster (the
+sha256 of 1.73 GiB is most of the run) at the price of weaker provenance.
+
+`rbm informes` builds the *other* DiagGT ground truth of the same spec — the
+**analyst's**, with `origin="inspection-report"` — out of a directory of
+inspection report PDFs: one `<report>.diaggt.json` per PDF plus the flat
+consolidations (`observations.parquet`/`.csv` and `findings.parquet`), with
+each diagnosis mapped to fault modes by the `GTxxx` rules. It needs the
+`informes` extra (`uv sync --extra informes`, which brings `pdfplumber`) and
+aborts if the anchor invariant of the page layout breaks.
+
+`rbm informes-weights` re-weights an already emitted ground truth: it reads the
+`*.diaggt.json` (not the PDFs — the geometry is untouched), applies a
+judgement overlay from `overlays/` and writes a second generation with
+`extraction_method="llm"`, where each observation's judgement mass is shared
+out over its findings by how the analyst's text weighs them. It aborts if the
+overlay does not match the documents.
+
+`rbm export --dataset-path` writes `dataset.json:path`, the grouping levels
+above the dataset ("Bunge Cartagena"), outermost first and repeatable. It is
+the one field that does not come out of the `.rbm`; without the option it is
+not written.
 
 `rbm serve` opens an interactive on-demand viewer and picks its backend from
 the argument:

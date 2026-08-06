@@ -29,6 +29,20 @@ t8-extract, t8-mapper)
 >   como cláusula que no es juicio.
 > - Primer productor con pesos: el extractor de informes
 >   (`ams_extract.informes`, adoptado en el paquete en el mismo workplan 09).
+>
+> **Nota (2026-08-05)**: la revisión 0.1.5 se amplía con la edición del
+> 2026-08-05 (commit `9d615aa`, workplan 11) **sin subir versión**, porque
+> tampoco toca el esquema — son reglas y vocabulario del extractor, como
+> GT050 en 0.1.1, GT900 en 0.1.3 y GT020–GT024 en 0.1.4:
+> - §3.3: **GT025**, la excentricidad de polea leída como fallo de la
+>   transmisión (grupo `BELT` con `fault_mode` nulo, porque el catálogo no
+>   tiene modo para la polea).
+> - §3.3.1: **Vetos**, sección nueva — el contexto, por cláusula, en el que una
+>   regla **no** dispara porque la frase afirma lo contrario de lo que su patrón
+>   lee. Lo estrenan `GT011v2` y `GT021v2`; con `GT001v2` son las tres lecturas
+>   versionadas en `informes-gt-extract` 0.4.0.
+> - §3.3, textos de estado: «buen estado de lubricación» entra en el
+>   vocabulario de «sano», que es la otra mitad del veto de `GT011v2`.
 
 > **Cambios en 0.1.4** (2026-07-28, retrocompatible con toda la serie 0.1.x —
 > ningún campo nuevo, ningún campo nuevo obligatorio, ninguna semántica
@@ -50,10 +64,12 @@ t8-extract, t8-mapper)
 > - Ninguno de los dos toca el esquema: las reglas GTxxx viven en el extractor
 >   y `mapping_rule` es una cadena libre del namespace GT. Los documentos que
 >   declaran cualquier `"0.1.x"` anterior siguen siendo válidos.
-> - Los modelos de `vibsynth-contracts` **no cambian** con esta revisión;
->   queda pendiente allí subir la constante `DIAGGT_SCHEMA_VERSION` de
->   `"0.1.3"` a `"0.1.4"` y la cita de la spec en el docstring del módulo —
->   edición de documentación, no de contrato.
+> - Los modelos de `vibsynth-contracts` **no cambian** con esta revisión; la
+>   constante `DIAGGT_SCHEMA_VERSION` y la cita de la spec en el docstring del
+>   módulo se actualizaron allí (edición de documentación, no de contrato).
+>   **Cumplido** (nota 2026-08-05): hoy
+>   `vibsynth_contracts.diagnosis.external` declara
+>   `DIAGGT_SCHEMA_VERSION = "0.1.5"`, subida ya por la revisión siguiente.
 >
 > **Cambios en 0.1.3** (2026-07-28, retrocompatible con 0.1.2, 0.1.1 y 0.1.0 —
 > ningún campo nuevo, ningún campo nuevo obligatorio, ninguna semántica
@@ -792,3 +808,9 @@ error.
   `recommendation_text`) es el contrato de último recurso: cualquier
   re-mapeo futuro (mejores reglas GTxxx, LLM, revisión humana) debe poder
   regenerar `findings` sin volver al PDF.
+
+**Nota (2026-08-05)**: la regla de arriba dice que añadir un campo opcional
+sube versión **menor**, pero la práctica de toda la serie 0.1.x ha movido el
+**tercer** dígito para todo — incluido `weight`, el campo opcional nuevo de
+0.1.5. La discrepancia se anota, no se resuelve aquí: reconciliarla (cambiar la
+regla o renumerar la serie) es decisión normativa del autor.

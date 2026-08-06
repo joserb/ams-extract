@@ -398,6 +398,16 @@ inventado.
 
 ## Pendiente
 
+> **Nota (2026-08-05) — las tres reglas ya están arregladas.** El primer
+> pendiente de abajo lo ejecutó el
+> [workplan 11](11-motor-calibrado-gt-corregido.md): `GT001v2` casa
+> «desbalance-», `GT011v2` y `GT021v2` estrenan `RULE_VETOES` y `GT025` recoge
+> la excentricidad de polea como fallo de transmisión (`BELT`, grupo sin modo);
+> spec en `docs/GROUND_TRUTH.md` §3.3 y §3.3.1. El overlay dejó de casar en 5
+> textos, como este plan anticipaba, y esos 5 juicios se re-juzgaron como
+> adenda 0.1.1. El diagnóstico de este apartado sigue siendo la lectura
+> correcta del problema; lo que ha caducado es el «pendiente».
+
 - **Reglas GTxxx que el corpus desmiente**, encontradas al leerlo entero y que
   este frente sólo ha podido paliar bajando pesos:
   - **GT001 no casa «desbalanceo»**, el sinónimo que el analista usa en varias

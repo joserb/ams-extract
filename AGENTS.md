@@ -23,17 +23,24 @@ ams-extract/
 │   ├── FORMAT.md          # formato .rbm (reverse engineering, por secciones §)
 │   ├── DECISIONS.md       # ADRs numerados (ADR-0001…)
 │   ├── VERIFICATION.md    # protocolo y registro de validación contra AMS
+│   ├── GROUND_TRUTH.md    # spec DiagGT (serie 0.1.x); este repo la aloja
 │   └── workplans/         # planes de implementación (ver «Work plans»)
 ├── overlays/              # juicios de peso sobre un GT emitido (ver overlays/README.md)
-├── samples/               # golds de AMS (parquet/png) usados en validación
+├── samples/               # salidas locales de `rbm extract` (parquet/png); gitignored
 ├── scripts/               # herramientas sueltas (crosswalk GT, verificación, …)
 ├── src/ams_extract/
 │   ├── records/           # parsers de records (gicm, vdpm, pdcd, vdps, vddt, pdpa…)
 │   ├── export/            # export VibFrame, report HTML, live_viewer, plots
 │   ├── informes/          # GT de diagnóstico desde informes PDF (extra `informes`)
+│   ├── reader.py          # acceso mmap al .rbm (records de 512 B, base-0)
 │   ├── tree.py            # walkers de jerarquía y muestras
-│   └── cli.py             # CLI `rbm` (info/tree/report/stats/extract/export/
-│                          #   alarms/informes/informes-weights/serve)
+│   ├── models.py          # modelos del dominio (Area/Equipment/Point + muestras)
+│   ├── point_naming.py    # location/direction leídos del nombre AMS del punto
+│   ├── cli.py             # CLI `rbm` (info/tree/report/stats/extract/export/
+│   │                      #   alarms/informes/informes-weights/serve)
+│   └── …                  # naming.py (nombres → ids de fichero), stats.py y
+│                          #   report.py (conteos de `rbm stats`/`rbm report`),
+│                          #   encoding.py, logging_setup.py, cli_dev.py (`rbm-dev`)
 └── tests/                 # pytest; integración usa RBM_TEST_FILE=<ruta .rbm>
 ```
 
@@ -72,6 +79,7 @@ re-juzgan como adenda versionada del overlay (workplan 11).
 uv sync
 uv run rbm info FILE
 uv run rbm export FILE --out DIR --types fft,waveform,trend --parallel 4
+uv run rbm export FILE --out DIR --dataset-path "Bunge Cartagena"  # dataset.json:path
 uv run rbm extract FILE --point NAME [--equipment SUBSTR] --type both --out DIR
 uv run rbm informes PDFDIR --out PDFDIR/ground-truth   # GT desde informes PDF
 uv run rbm informes-weights GTDIR --overlay overlays/…json  # pesos contextuales
@@ -82,12 +90,13 @@ uv run vibframe-validate DIR --strict   # conformidad VibFrame (CLI de contracts
 uv sync --extra informes        # pdfplumber, sólo para `rbm informes`
 RBM_TEST_FILE="…/BUNGE CARTAGENA marzo 2.0.rbm" uv run pytest   # con integración
 INFORMES_TEST_DIR="…/Informes Bunge Cartagena 2026" uv run pytest -m integration
-uv run ruff check src tests && uv run pyright src               # antes de commit
+uv run ruff check . && uv run pyright src                       # antes de commit
 ```
 
 ## Entorno y convenciones
 
-- WSL (Ubuntu) sobre Windows; Python 3.11+; gestor **`uv`** (único), build
+- WSL (Ubuntu) sobre Windows; Python 3.13+ (`requires-python = ">=3.13"`, y CI
+  corre 3.13 en Linux/macOS/Windows); gestor **`uv`** (único), build
   `hatchling`. El repo vive en el lado Windows
   (`/mnt/c/Users/joser/work/AMS 5.2-VMware/ams-extract`), junto a la VM y
   las bases `.rbm` (`../AMS databases/`).
@@ -108,6 +117,10 @@ uv run ruff check src tests && uv run pyright src               # antes de commi
   `rbm export` con `vibframe-validate` (API y CLI) y hace round-trip de los
   goldens de los tres orígenes. Las columnas requeridas de los cuatro parquet
   se declaran **non-nullable**, como en t8-extract y vibsynth (workplan 06).
+  **Rojo conocido (2026-08-05)**: `test_the_goldens_round_trip_through_our_writer[vibsynth]`
+  falla porque el contrato vendorizado no conoce `snap_t` en `TRENDS_COLUMNS`
+  y el golden vecino ya lo trae — pendiente de código descrito en el workplan
+  11 («Pendiente»). No es regresión de lo que se esté tocando.
 - **No emitir lo no validado**: cada escala/decode nuevo exige gold de AMS
   (captura o informe PLOTDATA) registrado en `VERIFICATION.md` y su ADR en
   `DECISIONS.md`. Lo que decodifica sin gold se salta con log.
@@ -121,8 +134,8 @@ uv run ruff check src tests && uv run pyright src               # antes de commi
 - Unidades de display: velocidad mm/s (×25.4 desde in/s), aceleración G's.
   El etiquetado canónico es post-proceso con `t8-mapper vibframe --write`
   (ADR-0011), no un paso del export.
-- Commits atómicos en imperativo; `pytest` + `ruff` + `pyright src` limpios
-  antes de commitear.
+- Commits atómicos en imperativo; `pytest` + `ruff check .` + `pyright src`
+  limpios antes de commitear.
 
 ## Work plans
 
@@ -157,5 +170,6 @@ VERIFICATION.md).
   de ams-extract, t8-extract, vibsynth o DataWaver. Entra aquí como
   dependencia editable y `rbm serve <dataset>` delega en él; el trabajo sobre
   el visor se hace en su repo, no aquí.
-- **t8-metrics-mapper**: etiquetado canónico de las métricas exportadas
+- **vibsynth-metrics-mapper**: etiquetado canónico de las métricas exportadas;
+  el repo se llama `vibsynth-metrics-mapper` y su CLI, `t8-mapper`
   (`t8-mapper vibframe <dataset> --write`).

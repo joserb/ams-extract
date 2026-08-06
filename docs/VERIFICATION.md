@@ -159,5 +159,16 @@ pierde nada.
 - 8 áreas grandes restantes (conteos locked en tests de integración, pero
   sin cotejo visual nombre-a-nombre): EXTRACCION, PREPARACION, REFINERIA,
   IMPULSIÓN DE MAR, PARQUE TANQUES, FULL-FAT, OBSOLETOS, OSMOSIS.
-- `pdpa`: umbrales/rangos por banda pendientes de gold (diálogo de bandas/
-  alarmas de AMS) para fijar offsets.
+- **Nota (2026-08-05)** — `pdpa`/`pdla` **ya no están pendientes de gold**: el
+  análisis del 2026-07-19 (FORMAT §5.8, ADR-0012) cerró las plantillas de banda
+  con sus rangos y los sets de umbrales, validados numéricamente contra
+  decodificaciones ya validadas del mismo fichero — el valor de cada columna
+  `vddt` reproduce la RSS de los bins crudos del espectro en `[lo, hi)`
+  (mediana < 0,1 %) y los umbrales del set 5 (1,4 / 2,2 mm/s) reproducen las
+  transiciones C/D del gold de M1H, coherente con la fila de alarmas `gdnl` de
+  arriba (991/991 contra `pdla`).
+- Lo que sigue **sin localizar** en el binario son los **otros tipos de alarma**
+  de AMS, que la columna `alarm` derivada no refleja: el nivel «Advertencia»
+  (~0,95 G's en la captura de ADR-0013) y las marcas «Bs» / «Vl» del informe
+  de tendencias de DT-0070 (ADR-0014). Necesitan gold del diálogo de bandas/
+  alarmas de AMS.

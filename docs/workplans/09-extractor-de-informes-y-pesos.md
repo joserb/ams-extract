@@ -287,10 +287,11 @@ restaurando el ground truth viejo y volviendo a validar). Nuevo en el informe:
   consumidor de `findings.parquet` será el contraste por modo de fallo, en
   `vibframe-viewer`.
 - **Los 33 findings `unmapped`** que quedan (24,1 de masa) son la lista de la
-  compra de las reglas GT025+: «suciedad/desgaste en la válvula», «deterioro
-  del acoplamiento», «bandas laterales de barras rotas», «sin evolución en el
-  último mes». Las tres primeras son fallo; la última es un texto de estado que
-  `HEALTHY_RE` no reconoce. Ampliar el vocabulario baja la masa `unmapped` sin
+  compra de las reglas **GT026+** (nota 2026-08-05: `GT025` ya está ocupada por
+  la excentricidad de polea, workplan 11): «suciedad/desgaste en la válvula»,
+  «deterioro del acoplamiento», «bandas laterales de barras rotas», «sin
+  evolución en el último mes». Las tres primeras son fallo; la última es un
+  texto de estado que `HEALTHY_RE` no reconoce. Ampliar el vocabulario baja la masa `unmapped` sin
   tocar el esquema.
 - **`weight` en los otros productores**: las alarmas `gdnl` (`system-alarm`)
   emiten un finding por observación, así que su peso sería siempre 1 y no

@@ -1,3 +1,9 @@
+---
+status: completed
+created: 2026-05-27
+updated: 2026-08-05
+---
+
 # ams-extract — estado y arquitectura
 
 > Herramienta CLI en Python para extraer datos de bases RBMware / AMS Machinery
@@ -13,8 +19,15 @@ el trabajo VibFrame posterior vive en `02-vibdataset-export.md` y
 > con un esquema de ejecución agéntica por worktrees. El proyecto ya está
 > completo en lo esencial, así que se ha reducido a su **estado y arquitectura
 > vigentes**. El formato binario reverse-engineered vive en
-> [`FORMAT.md`](FORMAT.md); las decisiones en [`DECISIONS.md`](DECISIONS.md);
-> el protocolo y registro de verificación en [`VERIFICATION.md`](VERIFICATION.md).
+> [`FORMAT.md`](../FORMAT.md); las decisiones en
+> [`DECISIONS.md`](../DECISIONS.md); el protocolo y registro de verificación en
+> [`VERIFICATION.md`](../VERIFICATION.md).
+>
+> **Nota (2026-08-05)**: este documento es de 2026-06-14 y el proyecto ha
+> seguido. Lo que dice de los visores y del inventario de comandos ha
+> caducado; las notas fechadas de abajo lo señalan en su sitio. La referencia
+> viva de la CLI es `README.md`; el trabajo posterior, los workplans 02–11 y
+> los ADRs 0009–0018.
 
 ## 1. Objetivo y caso de uso
 
@@ -43,6 +56,15 @@ Parquet por su API/loader. No es librería embebida ni escribe `.rbm`.
 | Estadísticas (`rbm stats`) | ✅ summary / machines / points (sp/wv/tn) |
 | Inventario HTML (`rbm report`) | ✅ árbol localizaciones → máquinas con conteos + fechas (primera/última) por tipo, archivo único con filtro; leído del `.rbm` |
 | Viewer on-demand (`rbm serve`) | ✅ sirve un `.rbm` directo (arranque solo jerarquía; puntos/muestras lazy; render desde el `.rbm`) o un dataset Parquet exportado; FFT/onda/tendencia bajo demanda (sin pregenerar PNG) |
+
+**Nota (2026-08-05)**: la fila del viewer describe los **dos visores propios**
+de entonces. El de datasets (`export/viewer.py`) se retiró el 2026-07-29
+(workplan 05): hoy `rbm serve <dataset>` **delega** en `vibframe-viewer`, el
+visor portable del ecosistema (Plotly en cliente, timeline y matriz de
+parámetros), y sólo `rbm serve FILE.rbm` sigue siendo backend propio
+(`export/live_viewer.py`), herramienta de depuración de este repo. Lo mismo
+vale para los párrafos de §3 y para la frase de §4 sobre los IDs de muestra
+del viewer.
 
 Calidad: `pytest` (unit + integración con `RBM_TEST_FILE`), `ruff` y
 `pyright src/` limpios. CI matrix Linux/macOS/Windows × Python 3.13.
@@ -73,6 +95,11 @@ o un **dataset exportado** (lee tablas VibFrame). En ambos casos las gráficas
 se renderizan **bajo demanda** y nunca se pregenera PNG.
 
 `sp` = espectros FFT, `wv` = waveforms, `tn` = lecturas de tendencia.
+
+**Nota (2026-08-05)**: este inventario de comandos está incompleto — faltan
+`rbm alarms` (workplan 04), `rbm informes` e `rbm informes-weights`
+(workplans 09 y 10) y la opción `rbm export --dataset-path` (workplan 11). La
+referencia viva es el bloque «Commands» del `README.md`; aquí no se duplica.
 
 ## 4. Salida de `rbm export` (contrato VibFrame)
 
@@ -120,25 +147,43 @@ Python 3.13 + `uv`; layout `src/`; acceso por **`mmap`** (no se cargan 1,8 GB
 en RAM) con lectura lazy de muestras; `structlog` JSON desde el día uno;
 política **saltar-con-log** (no abortar) salvo `--strict`; export paralelo con
 `ProcessPoolExecutor` (un equipo por proceso). Encoding cp1252 → cp850 →
-latin-1. Detalle y justificación en [`DECISIONS.md`](DECISIONS.md) (ADR-0001…0008).
+latin-1. Detalle y justificación en [`DECISIONS.md`](../DECISIONS.md)
+(ADR-0001…0008; la serie sigue hasta ADR-0018).
 
 ## 7. Trabajo restante / opcional
 
 - **Formato destino TWist**: confirmar qué campos/estructura espera su
   API/loader; puede requerir un adaptador de salida sobre los Parquet.
-- **Bandas `vddt`**: emitir las bandas con nombre (unidades mixtas: Mp Wave en
-  G's, resto en mm/s) además del overall; y tendencias de **aceleración**
-  (layout decodifica, escala del overall sin gold).
-- **`pdpa`** (config de análisis): mapear offsets exactos por banda
-  (rango de frecuencia + umbrales de alarma); ver memoria del proyecto.
+- ~~**Bandas `vddt`**: emitir las bandas con nombre (unidades mixtas: Mp Wave
+  en G's, resto en mm/s) además del overall; y tendencias de **aceleración**
+  (layout decodifica, escala del overall sin gold).~~
+- ~~**`pdpa`** (config de análisis): mapear offsets exactos por banda
+  (rango de frecuencia + umbrales de alarma); ver memoria del proyecto.~~
 - Field notes, short codes nativos, plantillas no enlazadas.
+
+**Nota (2026-08-05)**: los dos puntos **tachados** están hechos; se tachan en
+vez de reescribir la lista:
+
+- **Bandas `vddt`** — emitidas como métricas VibFrame propias (ADR-0010,
+  2026-07-18: `band_<slug>__<punto>` en `trends.parquet` con su descriptor en
+  `metrics.parquet`, Mp Wave en g como `true_peak`), y las **tendencias de
+  aceleración** (PeakVue/HF) emitidas con el overall crudo en G's tras el gold
+  de DT-0070 M1P, 147/147 (ADR-0014, 2026-07-20).
+- **`pdpa`** — layout resuelto el 2026-07-19 (FORMAT §5.8, ADR-0012,
+  `records/pdpa.py`): plantillas de banda con sus rangos, sets `pdla` con los
+  umbrales C/D, y la columna `alarm` de `trends.parquet` derivada de ellos. Lo
+  que sigue abierto no son los offsets sino los **otros tipos de alarma** de
+  AMS («Advertencia», «Bs», «Vl»), sin localizar en el binario (ADR-0013 y
+  ADR-0014).
+- El **formato destino TWist** y la última línea (field notes, short codes,
+  plantillas no enlazadas) siguen vivos.
 
 ## 8. Testing
 
 Tres capas: (1) **unit** con fixtures sintéticos (`tests/fixtures/`); (2)
 **integración** contra el `.rbm` real, marcadas `@pytest.mark.integration`,
 saltadas si no hay `RBM_TEST_FILE`; (3) **verificación visual humana** contra
-capturas de AMS, documentada en [`VERIFICATION.md`](VERIFICATION.md). El `.rbm`
+capturas de AMS, documentada en [`VERIFICATION.md`](../VERIFICATION.md). El `.rbm`
 real (datos de cliente) **no** se commitea (`.gitignore`).
 
 ## 9. Glosario

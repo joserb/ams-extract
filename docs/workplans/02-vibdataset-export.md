@@ -1,3 +1,9 @@
+---
+status: completed
+created: 2026-07-09
+updated: 2026-08-05
+---
+
 # Plan: sustituir `rbm export` por VibDataset
 
 **Fecha**: 2026-07-09 · **Estado**: completado (histórico) — ejecutado en

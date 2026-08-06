@@ -1,10 +1,20 @@
 ---
 status: completed
 created: 2026-07-29
-updated: 2026-07-29
+updated: 2026-08-05
 ---
 
 # Plan: convergencia de visores — `rbm serve <dataset>` delega en `vibframe-viewer`
+
+> **Nota (2026-08-05)**: las rutas `~/wslprojects/RESONINS/vibframe-viewer` de
+> este documento son las de entonces: el visor **se movió a
+> `~/wslprojects/vibframe-viewer` el 2026-07-31**, fuera ya de RESONINS (el
+> checkout de `t8-extract` y la carpeta `datasets/` sí siguen dentro).
+> `[tool.uv.sources]` apunta hoy a
+> `/home/joserb/wslprojects/vibframe-viewer`; el criterio —ruta **absoluta**,
+> porque este repo vive en el lado Windows— no cambia. Lo cuenta la «Nota de
+> entorno» del [workplan 07](07-definicion-de-maquina-desde-ams.md), que fue
+> donde se arregló el `pyproject.toml`.
 
 **Fecha**: 2026-07-29 · **Estado**: **COMPLETADO**. `rbm serve` sobre un
 dataset exportado delega en el visor del ecosistema (`vibframe-viewer`,

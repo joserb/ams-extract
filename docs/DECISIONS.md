@@ -3,8 +3,12 @@
 > ADRs cortos para las decisiones técnicas no triviales del proyecto.
 > Formato libre por entrada: contexto, decisión, alternativas, consecuencias.
 
-Las decisiones consolidadas en el plan original están en `docs/workplans/01-plan-general.md` §3 y §8;
-aquí se documentan las que aparecen durante la implementación.
+Las decisiones consolidadas en el plan original están en
+`docs/workplans/01-plan-general.md` §6 («Decisiones técnicas clave»), con el
+inventario de comandos en §3 y el testing en §8; aquí se documentan las que
+aparecen durante la implementación. Los punteros «§N del PLAN» de los ADRs más
+antiguos citan la numeración del plan **por fases** original, reducido a estado
+y arquitectura el 2026-06-14.
 
 ---
 
@@ -334,7 +338,9 @@ lógicos sigue siendo el puntero `gicm.0x0C` → next gicm.
   punteros válidos (slots 12-19); ese error queda corregido aquí.
 - Los short codes nativos (`AG-100`, `PM-501`, …) están ahora a un
   parser de distancia — viven en `continuation[0xE0:]` con stride 10
-  bytes. Pendiente de aprovechar para cerrar la incógnita §4.6 del PLAN.
+  bytes. Pendiente de aprovechar: hoy es la línea «short codes nativos» de
+  `docs/workplans/01-plan-general.md` §7 («Trabajo restante / opcional»),
+  antes §4.6 del plan por fases.
 - Esquema JSON bumpeado: `schema_version = 3`, `phase =
   "phase-2b-equipment-count-fix"`. Consumidores que viesen v2 detectan
   fácilmente que están leyendo un extracto incompleto y deben
@@ -521,6 +527,21 @@ de AG-100. Corregido:
   DESALINEACION, col4 HOLGURAS, col5 11-40X RPM (mm/s), col6 1-20 KHz (sin
   confirmar). Unidades mixtas → emitir las bandas queda pendiente.
 
+### Nota 2026-08-05 — los tres pendientes de esta entrada están resueltos
+
+- **Emitir las bandas** (unidades mixtas): hecho en **ADR-0010** (2026-07-18),
+  como métricas VibFrame propias (`band_<slug>__<punto>` en `trends.parquet`
+  con descriptor en `metrics.parquet`); las etiquetas dejaron de ser fijas en
+  **ADR-0012** (se resuelven contra la plantilla `pdpa` del punto).
+- **Tendencias de aceleración** («se salta de momento, escala del overall sin
+  gold»): emitidas en **ADR-0014** (2026-07-20), overall crudo en G's, con el
+  gold de DT-0070 M1P (147/147).
+- **Columna «1 - 20 KHz» sin confirmar**: emitida en **ADR-0013**
+  (2026-07-19), cruda en g, con la captura «RMS Aceleración» como gold.
+
+Las referencias «§7.4 del PLAN» apuntan al plan por fases original, hoy
+reducido (ver cabecera de este fichero).
+
 ---
 
 ## ADR-0007 — Export de tendencias (una fila por lectura) y unidades de velocidad
@@ -557,6 +578,16 @@ en pulgadas/segundo, inconsistentes con el FFT/trend (mm/s).
   FFT+wv) se validó end-to-end (ver `VERIFICATION.md`).
 - Pendiente: emitir bandas con nombre (unidades mixtas) y tendencias de
   aceleración cuando haya gold.
+
+### Nota 2026-08-05 — el pendiente está resuelto
+
+Las bandas con nombre se emiten desde **ADR-0010** (2026-07-18) y las
+tendencias de aceleración desde **ADR-0014** (2026-07-20, gold de DT-0070 M1P,
+147/147): el punto 3 de la decisión —«solo se emiten tendencias de
+velocidad»— ya no describe el comportamiento. Lo que sí sigue en pie es el
+criterio que lo justificaba (no emitir lo no validado): los 322 puntos con
+cadena `vddt` pero sin espectro FFT, cuya unidad no se puede determinar, se
+siguen saltando.
 
 ---
 
@@ -659,7 +690,9 @@ aceleración en G's, sin ×25.4), `SUBSINCRONO`, `DESEQUILIBRIO`,
 `DESALINEACION`, `HOLGURAS` y `11-40 X RPM` (velocidades ×25.4 → mm/s). Hasta
 ahora solo se emitía el overall. Además, `machine.json` escribía
 `machine.path = [área, máquina]`, y los visores jerárquicos del ecosistema
-(vibframe_viewer en t8-extract) interpretan `path` como niveles de
+(`vibframe_viewer`, entonces subpaquete de t8-extract — **nota 2026-08-05**:
+desde el 2026-07-27 es repo propio, `vibframe-viewer`, y este repo lo consume
+como dependencia editable) interpretan `path` como niveles de
 *ubicación* (location → sublocation) con la máquina como nivel propio, con lo
 que la máquina aparecía duplicada como pseudo-sububicación.
 
