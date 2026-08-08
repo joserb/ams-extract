@@ -76,7 +76,7 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
    el texto crudo de página, y contraste visual página↔JSON (PM.9121A mayo).
 
 4. **Revisión de `t8-extract`** (2026-07-27, repo en
-   `~/wslprojects/RESONINS/t8-extract`, HEAD `869abc6`) — **DiagGT es
+   `~/wslprojects/t8-extract`, HEAD `869abc6`) — **DiagGT es
    compatible**; hallazgos:
    - t8-extract no tiene ninguna representación propia de GT/diagnóstico; su
      única señal de estado es la columna `alarm` int8 0–3 nullable de

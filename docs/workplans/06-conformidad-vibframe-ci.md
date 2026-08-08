@@ -13,7 +13,7 @@ cuatro tablas parquet pasan a declararse **non-nullable**, como en t8-extract y
 vibsynth.
 
 Cierra dos pendientes del workplan 03 de t8-extract
-(`~/wslprojects/RESONINS/t8-extract/docs/workplans/03-unificacion-repos-extraccion.md`,
+(`~/wslprojects/t8-extract/docs/workplans/03-unificacion-repos-extraccion.md`,
 sección «Estado 2026-07-29 y pendientes»): «CI de conformidad en ams-extract» —
 punto 3 de su Parte 2 — y «alinear ams-extract: escribe todas las columnas
 requeridas de sus parquet como `nullable`».

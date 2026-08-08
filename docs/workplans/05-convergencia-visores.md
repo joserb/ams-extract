@@ -8,8 +8,9 @@ updated: 2026-08-05
 
 > **Nota (2026-08-05)**: las rutas `~/wslprojects/RESONINS/vibframe-viewer` de
 > este documento son las de entonces: el visor **se movió a
-> `~/wslprojects/vibframe-viewer` el 2026-07-31**, fuera ya de RESONINS (el
-> checkout de `t8-extract` y la carpeta `datasets/` sí siguen dentro).
+> `~/wslprojects/vibframe-viewer` el 2026-07-31**, fuera ya de RESONINS, y
+> `t8-extract` salió detrás el 2026-08-08 a `~/wslprojects/t8-extract`. En
+> RESONINS sólo quedan los datos (`DATA/`, `datasets/`, `informes/`).
 > `[tool.uv.sources]` apunta hoy a
 > `/home/joserb/wslprojects/vibframe-viewer`; el criterio —ruta **absoluta**,
 > porque este repo vive en el lado Windows— no cambia. Lo cuenta la «Nota de
@@ -26,7 +27,7 @@ herramienta de depuración del repo. Verificado sobre
 
 Ejecuta la **Parte 4** (y el paso 4 de la Parte 1 + la Parte 5, en lo que toca
 a este repo) del workplan 03 de t8-extract
-(`~/wslprojects/RESONINS/t8-extract/docs/workplans/03-unificacion-repos-extraccion.md`)
+(`~/wslprojects/t8-extract/docs/workplans/03-unificacion-repos-extraccion.md`)
 — el visor
 `vibframe_viewer` dejó de ser subpaquete de t8-extract el 2026-07-27 y vive en
 el repo `vibframe-viewer`.
