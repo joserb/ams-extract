@@ -13,6 +13,15 @@ t8-extract, t8-mapper)
 > entre este documento y los modelos, gana el modelo — y la discrepancia es un
 > bug de esta spec.
 >
+> **Materialización VibFrame 0.2** (2026-08-09): el esquema documental
+> DiagGT permanece en `0.1.5`; lo que cambia de forma incompatible es su
+> proyección dentro de un dataset VibFrame 0.2. Los `*.diaggt.json` siguen
+> siendo la fuente. `observations.parquet` pasa a ser la proyección completa,
+> `observations_consolidated.parquet` la selección deduplicada,
+> `findings.parquet` conserva cada finding y su orden, y
+> `materialization.json` ancla inputs y outputs con SHA-256. Los CSV y la
+> proyección separada `observations_system.parquet` son legado y no se emiten.
+>
 > **Cambios en 0.1.5** (2026-08-04, retrocompatible con toda la serie 0.1.x —
 > el campo nuevo es **opcional**, ninguna semántica anterior cambia; los
 > documentos que declaran cualquier `"0.1.x"` anterior siguen siendo válidos y
@@ -112,8 +121,10 @@ t8-extract, t8-mapper)
 > - §5: `dataset_machine_id` se lista entre las columnas del consolidado
 >   (§2.4 ya lo exigía).
 > - §3.4 (misma fecha, con el primer productor `system-alarm`): familia de
->   reglas **GT050-GT053** para bandas de alarma, y §4 recoge el consolidado
->   propio `observations_system.parquet`. Ninguna de las dos toca el esquema:
+>   reglas **GT050-GT053** para bandas de alarma. La primera materialización
+>   usó un `observations_system.parquet` propio; VibFrame 0.2 lo integra en la
+>   proyección completa y conserva `origin` para separar las familias.
+>   Ninguna de las dos decisiones toca el esquema documental:
 >   las reglas GTxxx viven en el extractor (§3.3) y `mapping_rule` es una
 >   cadena libre del namespace GT.
 
@@ -614,28 +625,21 @@ verdad de construcción de los datasets demo de vibsynth.
 ├── <documento>.pdf                      # fuente (no se modifica)
 └── ground-truth/
     ├── <documento>.diaggt.json          # un DiagGT por documento fuente
-    ├── observations.parquet             # consolidado plano (§5)
-    ├── observations.csv                 # ídem, para inspección rápida
-    ├── findings.parquet                 # consolidado de findings (§5)
+    ├── observations.parquet             # proyección completa (§5)
+    ├── observations_consolidated.parquet # selección deduplicada (§5.1)
+    ├── findings.parquet                 # findings completos y ordenados (§5.2)
+    ├── materialization.json             # política, herramienta, inputs y hashes
     ├── crosswalk.csv                    # tabla explícita TAG ↔ machine_id (§2.4)
     ├── crosswalk_ambiguities.md         # no-matches y ambigüedades, con evidencia
-    ├── observations_system.parquet      # consolidado de los DiagGT origin=system-alarm
     └── FORMATO_GROUND_TRUTH.md          # esta especificación
 ```
 
 Los documentos de distinto `origin` conviven en el mismo directorio (los
-`*.diaggt.json` del analista y el del sistema) y **no se mezclan en el mismo
-consolidado**: cada familia proyecta al suyo (`observations.parquet` para los
-informes, `observations_system.parquet` para las alarmas del sistema), porque
-las reglas de deduplicación de §5 sólo tienen sentido dentro de una familia.
-
-`synthetic-truth` consolida en **`observations.parquet`**, la familia
-principal, y no en un fichero propio: es el juicio primario de un dataset
-sintético y no convive nunca con informes de analista (nadie inspecciona una
-máquina que no existe). Es además el fichero que lee el visor, que así pinta
-las bandas de estado de un dataset sintético igual que las de uno real. Si
-algún día un dataset llevara ambas familias, la regla de §5 seguiría
-mandando: separarlas.
+`*.diaggt.json` del analista, del sistema y sintéticos) y **todos** entran en
+la misma proyección completa. No se confunden: `origin` forma parte de la
+clave de deduplicación, por lo que dos juicios de distinta naturaleza nunca
+compiten. `observations_system.parquet` era una tercera vista con semántica
+implícita y queda retirado en VibFrame 0.2.
 
 `ground-truth/` es **un único directorio**, no dos: §2.4 dice que la tabla de
 crosswalk se mantiene junto al dataset y este §4 la sitúa bajo
@@ -645,60 +649,60 @@ produce junto a los informes (donde está el PDF fuente) y se copia entero al
 dataset cuando se quiere el GT al lado del dato; `crosswalk.csv` viaja con él
 porque el mapeo es específico de ese par (informes, dataset).
 
-Integración con VibFrame (no intrusiva, igual que `report.html` de
-ams-extract queda fuera del contrato): los DiagGT pueden copiarse a un
-directorio `ground-truth/` en la raíz del dataset VibFrame — un directorio
-raíz **opcional y reconocido** por el contrato (`docs/VIBFRAME.md` de
-vibsynth-contracts), que los productores no borran al re-exportar y que los
-validadores aceptan. No se tocan las particiones `machine=` ni el
-`machine.json`; la unión se hace por `dataset_machine_id` tras el crosswalk. Si en el futuro se quiere una tabla
-dentro del contrato VibFrame, el consolidado §5 es directamente la candidata
-(`diagnoses.parquet` a nivel de dataset), y ese paso requeriría subir la
-versión menor del contrato en vibsynth-contracts.
+Integración con VibFrame: `ground-truth/` es un directorio raíz opcional y
+reconocido por el contrato (`docs/VIBFRAME.md` de vibsynth-contracts), que los
+productores no borran al re-exportar. No se tocan las particiones `machine=`
+ni `machine.json`; la unión se hace por `dataset_machine_id` tras el crosswalk.
 
-## 5. Consolidado plano (`observations.parquet`)
+## 5. Proyecciones tabulares VibFrame 0.2
 
-Una fila por (máquina, `observed_at`, modalidad), pensado para join con
-features de VibFrame (mismo espíritu que `ground_truth.csv` de fleet_demo pero
-genérico y con procedencia). Columnas: `document_id`, `inspection_date`,
-`observed_at`, `record_kind`, `external_tag`, `normalized_tag`,
-`dataset_machine_id` (proyección del crosswalk §2.4; `null` si el tag no se
-resolvió — es la columna de join con las particiones `machine=` de VibFrame),
-`external_name`, `area_code`, `area_name`, `modality`, `status`,
-`status_source_label`, `alarm`, `fault_modes` (multi-etiqueta unida por `+`,
-como fleet_demo), `fault_groups`, `diagnosis_text`, `recommendation_text`,
-`analysis_text`, `rpm1`, `power_kw`, `source_page`.
+Los `*.diaggt.json` son la fuente documental. Las tablas son materializaciones
+normativas, regenerables y verificables mediante `materialization.json`; no
+son una segunda fuente de verdad. Todas usan esquemas PyArrow explícitos:
+incluso una columna completamente nula conserva su tipo declarado.
 
-Reglas de deduplicación (los informes mensuales repiten los diagnósticos
-previos): para cada (normalized_tag, observed_at, modality) gana el registro
-`primary`; entre retrospectivos gana el del documento más reciente. Los
-`diaggt.json` conservan todo sin deduplicar — el consolidado es una vista.
+### 5.1 Proyección completa (`observations.parquet`)
 
-### 5.1 Consolidado de findings (`findings.parquet`, desde 0.1.5)
+Una fila por observación de cada documento, **sin deduplicar**. La clave es
+`(document_id, observation_id)`. Conserva `origin`, `record_kind`, la
+identidad externa y el `dataset_machine_id` proyectado por el crosswalk, las
+fechas documentales, estado, textos, contexto, `source_page` y `n_findings`.
+No contiene `fault_modes` ni `fault_groups`: ambos se resuelven mediante el
+join con `findings.parquet`, sin strings unidos por `+`.
 
-Una fila por **finding**. Existe porque aplanar los findings dentro de la fila
-de su observación obliga a colapsarlos en una cadena (`fault_modes` unido por
-«+»), y ese colapso destruye justo lo que hace evaluable un juicio: la
-multiplicidad (un mismo modo alcanzado por dos reglas sobre el mismo texto es
-el caso normal, no el raro), el orden, y los campos que no sobreviven al join —
-`mapping_rule`, `label_quality`, `weight` y el `source_text`, que es el
-contrato de último recurso—. Aquí la multiplicidad la lleva el número de filas.
+`observed_at` e `inspection_date` son fechas ISO `YYYY-MM-DD`, no instantes.
+Una fecha nombra el intervalo semiabierto de ese día en UTC; ningún writer
+inventa hora ni zona para aumentar una precisión que el documento no declara.
 
-Columnas (modeladas por el contrato en `FINDINGS_COLUMNS`, a diferencia de
-`observations.parquet`, que la spec describió desde el principio y nadie
-modeló): `document_id`, `observation_id`, `dataset_machine_id`, `observed_at`,
-`modality`, `record_kind`, `fault_mode`, `fault_group`, `label_quality`,
-`mapping_rule`, `weight` (float32), `source_text`. El join con el dataset es
-`dataset_machine_id`; con su observación, `observation_id`.
+### 5.2 Selección consolidada (`observations_consolidated.parquet`)
 
-Se proyecta del **mismo conjunto deduplicado** que `observations.parquet`, no
-de los documentos en bruto: un diagnóstico previo citado por seis informes
-mensuales es un solo juicio, y contarlo seis veces sesgaría cualquier masa
-agregada por modo de fallo. El aplanado con «+» de `observations.parquet` se
-queda como está, por compatibilidad.
+Cada fila es una fila elegida de la proyección completa, nunca una agregación.
+La política `dedup-primary-latest/1.0` usa la clave
+`(origin, normalized_tag, observed_at, modality)`: gana `primary`; entre
+retrospectivos, el documento con `inspection_date` más reciente. La columna
+`valid_to` contiene la fecha exclusiva de la siguiente observación de la
+misma serie `(origin, normalized_tag, modality)`; `null` significa vigencia
+abierta.
 
-Es **opcional**, como todo el sidecar: su ausencia no dice nada y nunca es un
-error.
+### 5.3 Proyección de findings (`findings.parquet`)
+
+Una fila por finding de la **proyección completa**, alineada mediante
+`(document_id, observation_id)`. `finding_index` es la posición 0-based en el
+documento, contigua, y conserva orden y multiplicidad. Viajan además
+`fault_mode`, `fault_group`, `label_quality`, `mapping_rule`, `weight`,
+`source_text` y `matched_text`. Un consumidor de la vista deduplicada filtra
+estos findings mediante join con `observations_consolidated.parquet`.
+
+### 5.4 Procedencia (`materialization.json`)
+
+Declara `$schema_version="0.2.0"`, `kind="gt_materialization"`, herramienta,
+instante RFC 3339 UTC, política, cada input `*.diaggt.json` con SHA-256 y
+número de observaciones, y los tres outputs con SHA-256 y filas. Se escribe
+en la misma operación que las tablas para que el validador detecte una
+proyección desfasada o mezclada.
+
+No se emiten `observations.csv`, `findings.csv`,
+`observations_system.csv` ni `observations_system.parquet` en VibFrame 0.2.
 
 ## 6. Qué NO cubre v0.1 (decisiones abiertas)
 

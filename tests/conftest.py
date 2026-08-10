@@ -6,7 +6,6 @@ import os
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pytest
@@ -14,8 +13,7 @@ import pytest
 from ams_extract.export.dataset import (
     DATASET_FILE,
     MACHINE_DOC_FILE,
-    METRICS_COLUMNS,
-    METRICS_FILE,
+    METRIC_CATALOG_FILE,
     SCHEMA_VERSION,
     SPECTRA_COLUMNS,
     SPECTRA_FILE,
@@ -23,7 +21,7 @@ from ams_extract.export.dataset import (
     TRENDS_FILE,
     WAVES_COLUMNS,
     WAVES_FILE,
-    _add_proc_mode,
+    ModeRegistry,
     _band_metric_row,
     _band_trend_rows,
     _build_machine_doc,
@@ -31,12 +29,12 @@ from ams_extract.export.dataset import (
     _context_trend_rows,
     _extractor_name,
     _metric_row,
-    _spectrum_mode_id,
     _spectrum_row,
     _trend_rows,
-    _waveform_mode_id,
     _waveform_row,
     _write_json,
+    _write_machine_json,
+    _write_metric_catalog,
     _write_parquet,
 )
 from ams_extract.models import Equipment, Point, Spectrum, Trend, TrendBand, Waveform
@@ -159,27 +157,9 @@ def build_vibframe_dataset(root: Path, *, name: str = "ds") -> Path:
     trend = _sample_trend(point)
     extracted_at = datetime(2020, 3, 1, tzinfo=UTC)
 
-    proc_modes: dict[tuple[str, str], dict[str, Any]] = {}
-    _add_proc_mode(
-        proc_modes,
-        point_id=point.short_code,
-        mode_id=_spectrum_mode_id(spectrum),
-        signal_family="velocity",
-        fmax_hz=spectrum.fmax_hz,
-        lines=spectrum.n_lines,
-    )
-    _add_proc_mode(
-        proc_modes,
-        point_id=point.short_code,
-        mode_id=_waveform_mode_id(waveform),
-        signal_family="acceleration",
-        sample_rate_hz=waveform.sample_rate_hz,
-        n_samples=waveform.n_samples,
-        nominal_n_samples=waveform.nominal_n_samples,
-    )
-
-    spectrum_row = _spectrum_row(spectrum, point)
-    waveform_row = _waveform_row(waveform, point)
+    modes = ModeRegistry()
+    spectrum_row = _spectrum_row(spectrum, point, modes.spectrum_mode(spectrum, point))
+    waveform_row = _waveform_row(waveform, point, modes.waveform_mode(waveform, point))
     trend_rows = [*_trend_rows(trend, point), *_band_trend_rows(trend.bands[0], point)]
     metric_rows = [
         _metric_row(trend, point),
@@ -209,20 +189,20 @@ def build_vibframe_dataset(root: Path, *, name: str = "ds") -> Path:
         },
     )
     machine_dir = dataset / f"machine={equipment.short_code}"
-    _write_json(
+    _write_machine_json(
         machine_dir / MACHINE_DOC_FILE,
         _build_machine_doc(
             source_path="fixture.rbm",
             extracted_at=extracted_at,
             area_long="AREA A",
             equipment=equipment,
-            proc_modes=sorted(proc_modes.values(), key=lambda m: (m["point_id"], m["id"])),
+            mode_definitions=modes.mode_definitions(),
+            mode_bindings=modes.mode_bindings(),
         ),
     )
-    _write_parquet(
+    _write_metric_catalog(
+        machine_dir / METRIC_CATALOG_FILE,
         sorted(metric_rows, key=lambda r: r["metric_id"]),
-        METRICS_COLUMNS,
-        machine_dir / METRICS_FILE,
     )
     _write_parquet([spectrum_row], SPECTRA_COLUMNS, machine_dir / SPECTRA_FILE)
     _write_parquet([waveform_row], WAVES_COLUMNS, machine_dir / WAVES_FILE)

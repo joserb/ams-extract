@@ -37,7 +37,6 @@ normal and alert.
 
 from __future__ import annotations
 
-import csv
 import hashlib
 import json
 import re
@@ -62,9 +61,6 @@ DIAGGT_KIND = "diagnosis_ground_truth"
 DIAGGT_FILE_SUFFIX = ".diaggt.json"
 GROUND_TRUTH_DIR = "ground-truth"
 """Optional root directory of a VibFrame dataset that hosts DiagGT documents."""
-
-CONSOLIDATED_STEM = "observations_system"
-"""Stem of the flat consolidation, kept apart from the analysts' ``observations``."""
 
 DOCUMENT_ID_PREFIX = "ams-gdnl"
 PROVIDER = "AMS Machinery Manager (Emerson)"
@@ -377,105 +373,27 @@ def build_alarm_ground_truth(
     return document, summary
 
 
-CONSOLIDATED_COLUMNS = (
-    "document_id",
-    "observed_at",
-    "record_kind",
-    "external_tag",
-    "normalized_tag",
-    "dataset_machine_id",
-    "external_name",
-    "area_name",
-    "modality",
-    "status",
-    "status_source_label",
-    "alarm",
-    "fault_modes",
-    "fault_groups",
-    "diagnosis_text",
-    "analysis_text",
-)
-"""Columns of the flat consolidation, a subset of the analysts' one (spec §5)."""
-
-
-def consolidated_rows(document: dict[str, Any]) -> list[dict[str, Any]]:
-    """Flatten a DiagGT document to one row per observation (spec §5)."""
-    document_id = document["provenance"]["document_id"]
-    rows: list[dict[str, Any]] = []
-    for observation in document["observations"]:
-        machine = observation["machine"]
-        findings = observation["findings"]
-        rows.append(
-            {
-                "document_id": document_id,
-                "observed_at": observation["observed_at"],
-                "record_kind": observation["record_kind"],
-                "external_tag": machine["external_tag"],
-                "normalized_tag": machine["normalized_tag"],
-                "dataset_machine_id": machine["dataset_machine_id"],
-                "external_name": machine["external_name"],
-                "area_name": machine["area_name"],
-                "modality": observation["modality"],
-                "status": observation["status"],
-                "status_source_label": observation["status_source_label"],
-                "alarm": observation["alarm"],
-                "fault_modes": "+".join(
-                    f["fault_mode"] for f in findings if f["fault_mode"]
-                ),
-                "fault_groups": "+".join(f["fault_group"] for f in findings),
-                "diagnosis_text": observation["diagnosis_text"],
-                "analysis_text": observation["analysis_text"],
-            }
-        )
-    return rows
-
-
 def write_alarm_ground_truth(
     document: dict[str, Any],
     out_dir: Path,
     *,
     stem: str,
-    consolidate: bool = False,
 ) -> list[Path]:
-    """Write ``document`` (and optionally its flat consolidation) to ``out_dir``.
+    """Write ``document`` to ``out_dir`` and return the paths written.
 
-    Returns the paths written, the ``*.diaggt.json`` first. The
-    consolidation goes to ``observations_system.parquet`` + ``.csv`` —
-    deliberately *not* ``observations.parquet``, which belongs to the
-    analyst ground truth and is never touched.
+    Only the ``*.diaggt.json`` is written here: since VibFrame 0.2 the
+    system-alarm observations consolidate into the same normative
+    projections as every other family (``observations.parquet`` and friends,
+    with the ``origin`` column keeping the judgements apart), materialized by
+    :func:`ams_extract.informes.consolidate.materialize_ground_truth` over the
+    whole ``ground-truth/`` directory. The 0.1 side files
+    ``observations_system.parquet``/``.csv`` are legacy
+    (``ground-truth.legacy-projection``/``legacy-csv``) and are no longer
+    emitted.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
-    written: list[Path] = []
     json_path = out_dir / f"{stem}{DIAGGT_FILE_SUFFIX}"
     json_path.write_text(
         json.dumps(document, ensure_ascii=False, indent=1) + "\n", encoding="utf-8"
     )
-    written.append(json_path)
-    if not consolidate:
-        return written
-
-    import pyarrow as pa
-    import pyarrow.parquet as pq
-
-    rows = consolidated_rows(document)
-    csv_path = out_dir / f"{CONSOLIDATED_STEM}.csv"
-    with csv_path.open("w", encoding="utf-8", newline="") as handle:
-        writer = csv.writer(handle)
-        writer.writerow(CONSOLIDATED_COLUMNS)
-        for row in rows:
-            writer.writerow([row[name] for name in CONSOLIDATED_COLUMNS])
-    written.append(csv_path)
-
-    table = pa.table(
-        {
-            name: pa.array(
-                [row[name] for row in rows],
-                type=pa.int8() if name == "alarm" else pa.string(),
-            )
-            for name in CONSOLIDATED_COLUMNS
-        }
-    )
-    parquet_path = out_dir / f"{CONSOLIDATED_STEM}.parquet"
-    pq.write_table(table, parquet_path, compression="zstd")
-    written.append(parquet_path)
-    return written
+    return [json_path]

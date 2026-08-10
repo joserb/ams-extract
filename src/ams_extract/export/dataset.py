@@ -39,8 +39,7 @@ from ams_extract.export.vibframe_contract import (
     GROUND_TRUTH_DIR,
     MACHINE_DOC_FILE,
     MACHINE_PARTITION_PREFIX,
-    METRICS_COLUMNS,
-    METRICS_FILE,
+    METRIC_CATALOG_FILE,
     SCHEMA_VERSION,
     SPECTRA_COLUMNS,
     SPECTRA_FILE,
@@ -49,6 +48,8 @@ from ams_extract.export.vibframe_contract import (
     WAVES_COLUMNS,
     WAVES_FILE,
     ColumnSpec,
+    mode_definition_id,
+    prune_nulls,
     schema,
 )
 from ams_extract.models import (
@@ -136,6 +137,29 @@ def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(
         json.dumps(payload, ensure_ascii=False, indent=2, default=_json_default) + "\n",
         encoding="utf-8",
+    )
+
+
+def _write_machine_json(path: Path, payload: dict[str, Any]) -> None:
+    """Write ``machine.json`` without null object properties (VibFrame 0.2).
+
+    Same behaviour as ``vibsynth_contracts.dump_machine_doc``: absence and
+    null are the same statement in the document, so nulls are pruned
+    recursively; empty lists, ``false`` and ``""`` still serialize.
+    """
+    _write_json(path, prune_nulls(payload))
+
+
+def _write_metric_catalog(path: Path, rows: Sequence[dict[str, Any]]) -> None:
+    """Write the sole normative 0.2 metric catalog representation.
+
+    The catalog is a separate JSON document because the mapper may relabel it
+    without rewriting ``machine.json``. Like the machine document it is
+    recursively null-free; there is deliberately no Parquet alias or fallback.
+    """
+    _write_json(
+        path,
+        prune_nulls({"schema_version": SCHEMA_VERSION, "metrics": list(rows)}),
     )
 
 
@@ -257,8 +281,10 @@ def _build_point_doc(point: Point) -> dict[str, Any]:
         "direction": placement.direction,
         "sensor": None,
         "speed_source": None,
+        "config_id": CONFIG_ID,
         "bearing_designations": list(point.bearing_designations),
         "nominal_speed_rpm": point.nominal_speed_rpm,
+        "frequency_refs": [],
     }
 
 
@@ -268,8 +294,19 @@ def _build_machine_doc(
     extracted_at: datetime,
     area_long: str,
     equipment: Equipment,
-    proc_modes: Sequence[dict[str, Any]],
+    mode_definitions: Sequence[dict[str, Any]],
+    mode_bindings: Sequence[dict[str, Any]],
 ) -> dict[str, Any]:
+    """VibFrame 0.2 ``MachineDoc`` payload (nulls pruned at write time).
+
+    ``machine.frequencies`` is deliberately empty: the ``.rbm`` stores no
+    resolved characteristic frequency in any unit. What it does declare —
+    the bearing designations and the nominal shaft RPM per point — travels
+    verbatim on each ``PointDoc``; resolving them into catalog entries is the
+    ecosystem enricher's job (workplan 07, decision P1-a: without a graph no
+    physical identity is asserted, not even between the H and V points of the
+    same position).
+    """
     return {
         "schema_version": SCHEMA_VERSION,
         "source": {
@@ -285,11 +322,12 @@ def _build_machine_doc(
             # Location levels only (area); the machine is its own level in
             # the location -> machine hierarchy the viewers build from path.
             "path": [area_long],
-            "fault_frequencies_order": {},
+            "frequencies": [],
             "definition": None,
         },
         "points": [_build_point_doc(point) for point in equipment.points],
-        "proc_modes": list(proc_modes),
+        "mode_definitions": list(mode_definitions),
+        "mode_bindings": list(mode_bindings),
         "config_generations": [],
         "states": [],
         "ground_truth": None,
@@ -304,7 +342,7 @@ def _proc_mode_notes(n_samples: int | None, nominal_n_samples: int | None) -> st
 
     ``n_samples`` is always the emitted array length; the AMS acquisition
     block (``vdfw.0x2C``) differs from it by design (FORMAT §5.5), so it is
-    recorded here as prose instead of overwriting the length field.
+    recorded on the binding as prose instead of overwriting the length field.
     """
     if nominal_n_samples is None or nominal_n_samples == n_samples:
         return PROC_MODE_NOTES
@@ -314,51 +352,105 @@ def _proc_mode_notes(n_samples: int | None, nominal_n_samples: int | None) -> st
     )
 
 
-def _add_proc_mode(
-    modes: dict[tuple[str, str], dict[str, Any]],
-    *,
-    point_id: str,
-    mode_id: str,
-    signal_family: str,
-    sample_rate_hz: float | None = None,
-    n_samples: int | None = None,
-    nominal_n_samples: int | None = None,
-    fmax_hz: float | None = None,
-    lines: int | None = None,
-) -> None:
-    key = (point_id, mode_id)
-    if key in modes:
-        return
-    modes[key] = {
-        "id": mode_id,
-        "point_id": point_id,
-        "signal_family": signal_family,
-        "sample_rate_hz": sample_rate_hz,
-        "n_samples": n_samples,
-        "fmin_hz": 0.0 if fmax_hz is not None else None,
-        "fmax_hz": fmax_hz,
-        "lines": lines,
-        "window": None,
-        "averages": None,
-        "overlap": None,
-        "spectrum_detector": "peak" if fmax_hz is not None else None,
-        "power": False if fmax_hz is not None else None,
-        "grid_kind": "hz_uniform",
-        "integrate_spectrum": None,
-        "integrate_waveform": None,
-        "hp_filter_freq_hz": None,
-        "hp_filter_order": None,
-        "notes": _proc_mode_notes(n_samples, nominal_n_samples),
-    }
+class ModeRegistry:
+    """Effective-shape mode definitions and point-tag bindings (workplan 08).
+
+    One ``ModeDefinition`` per distinct effective shape, one binding per
+    ``(point_id, proc_mode_id, config_id, definition_id)``. AMS blocks are
+    spectrum-only (``VEL_*``) or waveform-only (``WAVE_*``); the definition
+    carries exactly the fields the capture rows assert and omits what the
+    ``.rbm`` does not keep (window, averages, overlap…) — never a library
+    default. The same synthetic tag may bind several definitions (the AMS
+    multi-shape case, e.g. VEL_2000 at 1600/3200/6400 lines); every capture
+    row then resolves its own definition through ``mode_definition_id``.
+    """
+
+    def __init__(self) -> None:
+        # definition_id -> definition payload for machine.json
+        self._definitions: dict[str, dict[str, Any]] = {}
+        # (point_id, proc_mode_id, config_id, definition_id) -> notes
+        self._bindings: dict[tuple[str, str, str, str], str] = {}
+
+    def _register(
+        self,
+        *,
+        point_id: str,
+        proc_mode_id: str,
+        blocks: dict[str, Any],
+        notes: str,
+    ) -> str:
+        definition_id = mode_definition_id(blocks)
+        if definition_id not in self._definitions:
+            self._definitions[definition_id] = prune_nulls(
+                {"definition_id": definition_id, **blocks}
+            )
+        self._bindings.setdefault(
+            (point_id, proc_mode_id, CONFIG_ID, definition_id), notes
+        )
+        return definition_id
+
+    def spectrum_mode(self, spectrum: Spectrum, point: Point) -> str:
+        blocks = {
+            "spectrum": {
+                "signal_family": _signal_family(spectrum.units),
+                "fmin_hz": 0.0,
+                "fmax_hz": float(spectrum.fmax_hz),
+                "lines": int(spectrum.n_lines),
+                "detector": "peak",
+                "power": False,
+                "grid_kind": "hz_uniform",
+            }
+        }
+        return self._register(
+            point_id=point.short_code,
+            proc_mode_id=_spectrum_mode_id(spectrum),
+            blocks=blocks,
+            notes=PROC_MODE_NOTES,
+        )
+
+    def waveform_mode(self, waveform: Waveform, point: Point) -> str:
+        blocks = {
+            "waveform": {
+                "signal_family": _signal_family(waveform.units),
+                "sample_rate_hz": float(waveform.sample_rate_hz),
+                "n_samples": int(waveform.n_samples),
+            }
+        }
+        return self._register(
+            point_id=point.short_code,
+            proc_mode_id=_waveform_mode_id(waveform),
+            blocks=blocks,
+            notes=_proc_mode_notes(waveform.n_samples, waveform.nominal_n_samples),
+        )
+
+    def mode_definitions(self) -> list[dict[str, Any]]:
+        return [self._definitions[key] for key in sorted(self._definitions)]
+
+    def mode_bindings(self) -> list[dict[str, Any]]:
+        return [
+            {
+                "point_id": point_id,
+                "proc_mode_id": proc_mode_id,
+                "definition_id": definition_id,
+                "config_id": config_id,
+                "notes": notes,
+            }
+            for (point_id, proc_mode_id, config_id, definition_id), notes in sorted(
+                self._bindings.items()
+            )
+        ]
 
 
-def _spectrum_row(spectrum: Spectrum, point: Point) -> dict[str, Any]:
+def _spectrum_row(
+    spectrum: Spectrum, point: Point, definition_id: str | None = None
+) -> dict[str, Any]:
     signal_family = _signal_family(spectrum.units)
     return {
         "t": _timestamp_us(spectrum.timestamp_utc),
         "snap_t": None,
         "point_id": point.short_code,
         "proc_mode_id": _spectrum_mode_id(spectrum),
+        "mode_definition_id": definition_id,
         "fmin_hz": 0.0,
         "fmax_hz": spectrum.fmax_hz,
         "lines": spectrum.n_lines,
@@ -374,11 +466,13 @@ def _spectrum_row(spectrum: Spectrum, point: Point) -> dict[str, Any]:
     }
 
 
-def _waveform_row(waveform: Waveform, point: Point) -> dict[str, Any]:
+def _waveform_row(
+    waveform: Waveform, point: Point, definition_id: str | None = None
+) -> dict[str, Any]:
     # VibFrame requires n_samples == len(data): the time axis is derived
     # from t + i / sample_rate_hz, so any other value breaks the wave
     # (vibframe-validate `waves.data-length`). Waveform.n_samples already
-    # is the emitted length; the AMS nominal block lives in the proc mode
+    # is the emitted length; the AMS nominal block lives in the binding
     # notes (FORMAT §5.5, ADR-0017).
     rpm = float(waveform.rpm)
     return {
@@ -386,6 +480,7 @@ def _waveform_row(waveform: Waveform, point: Point) -> dict[str, Any]:
         "snap_t": None,
         "point_id": point.short_code,
         "proc_mode_id": _waveform_mode_id(waveform),
+        "mode_definition_id": definition_id,
         "sample_rate_hz": waveform.sample_rate_hz,
         "n_samples": waveform.n_samples,
         "unit": _canonical_unit(waveform.units),
@@ -594,7 +689,7 @@ def _process_equipment(
         wave_rows: list[dict[str, Any]] = []
         trend_rows: list[dict[str, Any]] = []
         metric_rows: dict[str, dict[str, Any]] = {}
-        proc_modes: dict[tuple[str, str], dict[str, Any]] = {}
+        modes = ModeRegistry()
         # (t_us, rpm, carga_pct) of every capture: machine-level context.
         context_captures: list[tuple[int, float, float]] = []
         param_sets = ParamSetIndex.load(reader) if TREND in types else None
@@ -602,31 +697,16 @@ def _process_equipment(
         for point in equipment.points:
             if FFT in types:
                 for spectrum in walk_spectra(reader, point):
-                    row = _spectrum_row(spectrum, point)
+                    definition_id = modes.spectrum_mode(spectrum, point)
+                    row = _spectrum_row(spectrum, point, definition_id)
                     spectra_rows.append(row)
                     context_captures.append((row["t"], spectrum.rpm, spectrum.carga_pct))
-                    _add_proc_mode(
-                        proc_modes,
-                        point_id=point.short_code,
-                        mode_id=_spectrum_mode_id(spectrum),
-                        signal_family=_signal_family(spectrum.units),
-                        fmax_hz=spectrum.fmax_hz,
-                        lines=spectrum.n_lines,
-                    )
             if WAVEFORM in types:
                 for waveform in walk_waveforms(reader, point):
-                    row = _waveform_row(waveform, point)
+                    definition_id = modes.waveform_mode(waveform, point)
+                    row = _waveform_row(waveform, point, definition_id)
                     wave_rows.append(row)
                     context_captures.append((row["t"], float(waveform.rpm), waveform.carga_pct))
-                    _add_proc_mode(
-                        proc_modes,
-                        point_id=point.short_code,
-                        mode_id=_waveform_mode_id(waveform),
-                        signal_family=_signal_family(waveform.units),
-                        sample_rate_hz=waveform.sample_rate_hz,
-                        n_samples=waveform.n_samples,
-                        nominal_n_samples=waveform.nominal_n_samples,
-                    )
             if TREND in types:
                 for trend in walk_trends(reader, point, param_sets):
                     rows = _trend_rows(trend, point)
@@ -650,20 +730,20 @@ def _process_equipment(
                 metric_rows[metric_id] = _context_metric_row(metric_id, equipment.short_code)
 
         machine_dir = _machine_dir(out_dir, equipment)
-        _write_json(
+        _write_machine_json(
             machine_dir / MACHINE_DOC_FILE,
             _build_machine_doc(
                 source_path=source_path,
                 extracted_at=extracted_at,
                 area_long=area_long,
                 equipment=equipment,
-                proc_modes=sorted(proc_modes.values(), key=lambda m: (m["point_id"], m["id"])),
+                mode_definitions=modes.mode_definitions(),
+                mode_bindings=modes.mode_bindings(),
             ),
         )
-        _write_parquet(
+        _write_metric_catalog(
+            machine_dir / METRIC_CATALOG_FILE,
             sorted(metric_rows.values(), key=lambda r: r["metric_id"]),
-            METRICS_COLUMNS,
-            machine_dir / METRICS_FILE,
         )
         _write_parquet(spectra_rows, SPECTRA_COLUMNS, machine_dir / SPECTRA_FILE)
         _write_parquet(wave_rows, WAVES_COLUMNS, machine_dir / WAVES_FILE)

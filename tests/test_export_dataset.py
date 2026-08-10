@@ -12,7 +12,8 @@ from typer.testing import CliRunner
 
 from ams_extract.cli import app as rbm_app
 from ams_extract.export.dataset import (
-    _add_proc_mode,
+    PROC_MODE_NOTES,
+    ModeRegistry,
     _band_metric_row,
     _band_trend_rows,
     _build_machine_doc,
@@ -63,7 +64,8 @@ class TestExportDataset:
             extracted_at=datetime(2020, 1, 1, tzinfo=UTC),
             area_long="AREA",
             equipment=equipment,
-            proc_modes=[],
+            mode_definitions=[],
+            mode_bindings=[],
         )
 
         assert spectrum_row["unit"] == waveform_row["unit"] == "g"
@@ -85,7 +87,8 @@ class TestExportDataset:
             extracted_at=datetime(2020, 1, 1, tzinfo=UTC),
             area_long="AREA",
             equipment=equipment,
-            proc_modes=[],
+            mode_definitions=[],
+            mode_bindings=[],
         )
 
         assert [(p["location"], p["direction"]) for p in machine_doc["points"]] == [
@@ -124,7 +127,8 @@ class TestExportDataset:
             extracted_at=datetime(2020, 1, 1, tzinfo=UTC),
             area_long="AREA",
             equipment=equipment,
-            proc_modes=[],
+            mode_definitions=[],
+            mode_bindings=[],
         )
 
         docs = machine_doc["points"]
@@ -163,31 +167,77 @@ class TestExportDataset:
 
         assert row["n_samples"] == len(row["data"]) == 488
 
-    def test_wave_proc_mode_keeps_the_length_and_notes_the_nominal(self) -> None:
-        modes: dict[tuple[str, str], dict[str, object]] = {}
-        _add_proc_mode(
-            modes,
-            point_id="MOTOR",
-            mode_id="WAVE_ACC_2560",
-            signal_family="acceleration",
-            sample_rate_hz=2_560.0,
+    def test_mode_registry_defines_by_effective_shape_and_notes_the_nominal(self) -> None:
+        point = Point(record_num=1, long_name="MOTOR", short_code="MOTOR")
+        waveform = Waveform(
+            record_num=3,
+            point_record_num=point.record_num,
+            timestamp_utc=datetime(2020, 1, 1, tzinfo=UTC),
             n_samples=488,
+            sample_rate_hz=2_560.0,
+            rpm=1_455.0,
+            units="G's",
+            carga_pct=0.0,
+            samples=np.zeros(488, dtype=np.float32),
             nominal_n_samples=512,
         )
-        _add_proc_mode(
-            modes,
-            point_id="MOTOR",
-            mode_id="VEL_1000",
-            signal_family="velocity",
+        spectrum = Spectrum(
+            record_num=2,
+            point_record_num=point.record_num,
+            timestamp_utc=datetime(2020, 1, 1, tzinfo=UTC),
             fmax_hz=1_000.0,
-            lines=1_600,
+            n_lines=1_600,
+            units="mm/s",
+            rpm=1_455.0,
+            carga_pct=0.0,
+            amplitude=np.zeros(1_600, dtype=np.float32),
         )
 
-        wave_mode = modes[("MOTOR", "WAVE_ACC_2560")]
-        assert wave_mode["n_samples"] == 488
-        assert "512" in str(wave_mode["notes"]) and "488" in str(wave_mode["notes"])
-        # Spectrum modes carry no sample count and keep the plain note.
-        assert "acquisition block" not in str(modes[("MOTOR", "VEL_1000")]["notes"])
+        modes = ModeRegistry()
+        wave_id = modes.waveform_mode(waveform, point)
+        spec_id = modes.spectrum_mode(spectrum, point)
+
+        definitions = {d["definition_id"]: d for d in modes.mode_definitions()}
+        assert wave_id.startswith("md-") and spec_id.startswith("md-")
+        # AMS blocks are waveform-only or spectrum-only; the emitted length is
+        # the definition's, and the nominal AMS block lives in the binding note.
+        assert definitions[wave_id]["waveform"]["n_samples"] == 488
+        assert "spectrum" not in definitions[wave_id]
+        assert definitions[spec_id]["spectrum"]["lines"] == 1_600
+        assert "waveform" not in definitions[spec_id]
+        bindings = {b["proc_mode_id"]: b for b in modes.mode_bindings()}
+        wave_binding = bindings["WAVE_ACC_2560"]
+        assert wave_binding["definition_id"] == wave_id
+        assert "512" in wave_binding["notes"] and "488" in wave_binding["notes"]
+        assert bindings["VEL_1000"]["notes"] == PROC_MODE_NOTES
+
+    def test_mode_registry_splits_the_same_tag_by_effective_shape(self) -> None:
+        # The AMS multi-shape case (workplan 08 §6-d): the synthetic tag stays
+        # verbatim and every shape gets its own definition and binding.
+        point = Point(record_num=1, long_name="MOTOR", short_code="MOTOR")
+
+        def _spectrum(lines: int) -> Spectrum:
+            return Spectrum(
+                record_num=2,
+                point_record_num=point.record_num,
+                timestamp_utc=datetime(2020, 1, 1, tzinfo=UTC),
+                fmax_hz=2_000.0,
+                n_lines=lines,
+                units="mm/s",
+                rpm=1_455.0,
+                carga_pct=0.0,
+                amplitude=np.zeros(lines, dtype=np.float32),
+            )
+
+        modes = ModeRegistry()
+        ids = {modes.spectrum_mode(_spectrum(lines), point) for lines in (1_600, 3_200, 6_400)}
+        assert len(ids) == 3
+        assert modes.spectrum_mode(_spectrum(1_600), point) in ids  # dedup by shape
+        bindings = modes.mode_bindings()
+        assert len(bindings) == 3
+        assert {b["proc_mode_id"] for b in bindings} == {"VEL_2000"}
+        assert {b["definition_id"] for b in bindings} == ids
+        assert len(modes.mode_definitions()) == 3
 
     def test_machine_doc_validates_against_optional_vibframe_contract(self) -> None:
         contracts = pytest.importorskip("vibsynth_contracts.dataset")
@@ -204,7 +254,8 @@ class TestExportDataset:
             extracted_at=datetime(2020, 1, 1, tzinfo=UTC),
             area_long="AREA",
             equipment=equipment,
-            proc_modes=[],
+            mode_definitions=[],
+            mode_bindings=[],
         )
 
         doc = contracts.MachineDoc.model_validate(document)
@@ -229,7 +280,7 @@ class TestExportDataset:
         assert report.exists()
 
         document = json.loads(dataset_json.read_text(encoding="utf-8"))
-        assert document["schema_version"] == "0.1.0"
+        assert document["schema_version"] == "0.2.0"
         assert document["generator"].startswith("ams-extract")
         # Nobody said where the dataset hangs, so nothing is claimed: an
         # absent `path` and `path: []` say different things.

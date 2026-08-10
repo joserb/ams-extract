@@ -1,13 +1,42 @@
-"""Consolidados planos del ground truth de informes (spec §5).
+"""Materializador de las proyecciones normativas DiagGT 0.2 (spec §§4-5).
 
-``observations.parquet``/``.csv``: una fila por (máquina, ``observed_at``,
-modalidad), pensada para el join con las features de VibFrame. Los
-``*.diaggt.json`` conservan todo sin deduplicar — el consolidado es una vista.
+Los ``*.diaggt.json`` son la fuente documental; este módulo proyecta de ellos
+las tres tablas normativas del sidecar ``ground-truth/`` de VibFrame 0.2 y su
+manifiesto de procedencia, todo en la misma operación:
+
+- ``observations.parquet`` — proyección **completa**, una fila por observación
+  de cada documento, sin deduplicar y de todas las familias (``origin`` separa
+  el informe de analista de la alarma de sistema; ya no existe un
+  ``observations_system.parquet`` aparte).
+- ``observations_consolidated.parquet`` — la selección deduplicada bajo la
+  política ``dedup-primary-latest/1.0`` (clave
+  ``(origin, normalized_tag, observed_at, modality)``: gana ``primary``; entre
+  retrospectivos, el del documento más reciente) más la vigencia explícita
+  ``valid_to`` (fecha ISO exclusiva; null = abierta). Cada fila consolidada ES
+  una fila de la proyección completa: selección, nunca agregación (el colapso
+  ``"+".join`` de 0.1 desaparece).
+- ``findings.parquet`` — proyección completa alineada 1:1 con
+  ``observations.parquet`` vía ``observation_id``, con ``finding_index``
+  contiguo 0..n-1 y ``matched_text``. Quien puntúe masa se queda con los
+  findings cuyas observaciones ganaron: join con el consolidado.
+- ``materialization.json`` — herramienta, política, inputs (sha256 y nº de
+  observaciones por documento) y outputs (sha256 y filas), conforme a
+  ``GTMaterialization``.
+
+Cero CSV: ``observations.csv``, ``findings.csv`` y ``observations_system.csv``
+no son parte del formato 0.2 (``ground-truth.legacy-csv``).
+
+Los esquemas parquet son **explícitos**, construidos desde las ``ColumnSpec``
+vendorizadas (ADR-0009: sin importar ``vibsynth_contracts`` en runtime),
+incluso para columnas toda-null — nunca inferencia pandas → tipo ``null``.
+Las fechas documentales viajan como strings ISO ``YYYY-MM-DD``, sin
+promoverse a instantes.
 
 El ``dataset_machine_id`` no lo resuelve este módulo: lo **proyecta** desde
 ``crosswalk.csv``, la tabla explícita que la spec §2.4 declara fuente del
 mapeo y que produce ``scripts/crosswalk_gt.py`` contra un dataset concreto.
-Sin esa tabla la columna sale a ``null`` y el consolidado sigue siendo válido.
+Sin esa tabla la columna sale a ``null`` y las proyecciones siguen siendo
+válidas.
 """
 
 # pyright: reportUnknownMemberType=false
@@ -15,68 +44,48 @@ Sin esa tabla la columna sale a ``null`` y el consolidado sigue siendo válido.
 from __future__ import annotations
 
 import csv
+import hashlib
+import json
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError, version
+from itertools import pairwise
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
+
+from ams_extract.export.vibframe_contract import (
+    CONSOLIDATION_POLICY,
+    DIAGGT_FILE_SUFFIX,
+    FINDINGS_COLUMNS,
+    FINDINGS_FILE,
+    GT_MATERIALIZATION_FILE,
+    GT_MATERIALIZATION_KIND,
+    GT_MATERIALIZATION_SCHEMA_VERSION,
+    OBSERVATIONS_COLUMNS,
+    OBSERVATIONS_CONSOLIDATED_COLUMNS,
+    OBSERVATIONS_CONSOLIDATED_FILE,
+    OBSERVATIONS_FILE,
+    ColumnSpec,
+    schema,
+)
 
 CROSSWALK_FILE = "crosswalk.csv"
-OBSERVATIONS_STEM = "observations"
 
-OBSERVATION_COLUMNS: tuple[str, ...] = (
-    "document_id",
-    "inspection_date",
-    "observed_at",
-    "record_kind",
-    "external_tag",
-    "normalized_tag",
-    "dataset_machine_id",
-    "external_name",
-    "area_code",
-    "area_name",
-    "modality",
-    "status",
-    "status_source_label",
-    "alarm",
-    "fault_modes",
-    "fault_groups",
-    "diagnosis_text",
-    "recommendation_text",
-    "analysis_text",
-    "rpm1",
-    "power_kw",
-    "source_page",
-)
-"""Columnas de ``observations.parquet`` (spec §5), en su orden."""
+OBSERVATION_COLUMNS: tuple[str, ...] = tuple(c.name for c in OBSERVATIONS_COLUMNS)
+"""Nombres de columna de ``observations.parquet`` (0.2), en su orden."""
 
-FINDING_COLUMNS: tuple[str, ...] = (
-    "document_id",
-    "observation_id",
-    "dataset_machine_id",
-    "observed_at",
-    "modality",
-    "record_kind",
-    "fault_mode",
-    "fault_group",
-    "label_quality",
-    "mapping_rule",
-    "weight",
-    "source_text",
-)
-"""Columnas de ``findings.parquet``, réplica de ``FINDINGS_COLUMNS``.
+FINDING_COLUMNS: tuple[str, ...] = tuple(c.name for c in FINDINGS_COLUMNS)
+"""Nombres de columna de ``findings.parquet`` (0.2), en su orden."""
 
-El contrato las modela (``vibsynth_contracts.diagnosis.external``, 0.1.5) y
-aquí se replican como el resto del layout, sin importarlo en runtime
-(ADR-0009). La tabla existe aparte de ``observations.parquet`` porque aplanar
-los findings dentro de la fila de su observación obliga a colapsarlos en una
-cadena, y ese colapso se lleva por delante la multiplicidad, el ``weight``, la
-``mapping_rule`` y el ``source_text``.
-"""
+_DEDUPE_KEY = ("origin", "normalized_tag", "observed_at", "modality")
+_VALIDITY_KEY = ("origin", "normalized_tag", "modality")
 
-FINDINGS_STEM = "findings"
 
-_INT_COLUMNS = frozenset({"alarm", "source_page"})
-_FLOAT_COLUMNS = frozenset({"rpm1", "power_kw"})
-
-_DEDUPE_KEY = ("normalized_tag", "observed_at", "modality")
+def _tool_name() -> str:
+    try:
+        return f"ams-extract {version('ams-extract')}"
+    except PackageNotFoundError:
+        return "ams-extract 0.0.0"
 
 
 def read_crosswalk(gt_dir: Path) -> dict[str, str]:
@@ -104,37 +113,36 @@ def _observation_row(
     provenance = document["provenance"]
     machine = observation["machine"]
     findings = observation["findings"]
-    modes = sorted({f["fault_mode"] for f in findings if f["fault_mode"]})
-    groups = sorted(
-        {f["fault_group"] for f in findings if f["fault_group"] not in (None, "UNMAPPED")}
-    )
+    context = cast(dict[str, Any], observation.get("operating_context") or {})
     return {
         "document_id": provenance["document_id"],
-        "inspection_date": provenance["inspection_date"],
-        "observed_at": observation["observed_at"],
+        "observation_id": observation["observation_id"],
+        "origin": provenance["origin"],
         "record_kind": observation["record_kind"],
-        "external_tag": machine["external_tag"],
         "normalized_tag": machine["normalized_tag"],
         "dataset_machine_id": machine["dataset_machine_id"]
         or crosswalk.get(machine["normalized_tag"]),
+        "external_tag": machine["external_tag"],
         "external_name": machine["external_name"],
         "area_code": machine["area_code"],
         "area_name": machine["area_name"],
         "modality": observation["modality"],
+        "observed_at": observation["observed_at"],
+        "inspection_date": provenance["inspection_date"],
         "status": observation["status"],
         "status_source_label": observation["status_source_label"],
         "alarm": observation["alarm"],
-        "fault_modes": "+".join(modes) if modes else None,
-        "fault_groups": "+".join(groups) if groups else None,
+        "global_status_label": observation.get("global_status_label"),
         "diagnosis_text": observation["diagnosis_text"],
-        "recommendation_text": observation["recommendation_text"],
         "analysis_text": observation["analysis_text"],
-        "rpm1": (observation["operating_context"] or {}).get("rpm1"),
-        "power_kw": (observation["operating_context"] or {}).get("power_kw"),
-        "source_page": observation["source_page"],
-        # claves internas: no son columnas del consolidado, pero sostienen la
-        # proyección a findings.parquet sobre el mismo conjunto deduplicado
-        "_observation_id": observation["observation_id"],
+        "recommendation_text": observation["recommendation_text"],
+        "rpm1": context.get("rpm1"),
+        "rpm2": context.get("rpm2"),
+        "power_kw": context.get("power_kw"),
+        "source_page": observation.get("source_page"),
+        "n_findings": len(findings),
+        # clave interna: no es columna, sostiene la proyección de findings
+        # alineada 1:1 con la completa.
         "_findings": findings,
     }
 
@@ -142,48 +150,75 @@ def _observation_row(
 def observation_rows(
     documents: list[dict[str, Any]], crosswalk: dict[str, str] | None = None
 ) -> list[dict[str, Any]]:
-    """Filas del consolidado, deduplicadas y ordenadas (spec §5).
+    """Proyección COMPLETA: una fila por observación de cada documento.
 
-    Los informes mensuales repiten los diagnósticos previos: para cada
-    (``normalized_tag``, ``observed_at``, ``modality``) gana el registro
-    ``primary``; entre retrospectivos gana el del documento más reciente. El
-    desempate va por ``inspection_date`` (ISO) porque el ``document_id``
-    («P25/81115-250526») lleva la fecha en DDMMAA y su orden lexicográfico no
-    es cronológico.
+    Sin deduplicar — los retrospectivos repetidos por seis informes mensuales
+    son seis filas, como en los JSON. El orden es el documental: documentos en
+    el orden recibido, observaciones en su orden de origen.
     """
     lookup = crosswalk or {}
-    rows = [
+    return [
         _observation_row(document, observation, lookup)
         for document in documents
         for observation in document["observations"]
     ]
-    rows.sort(
-        key=lambda row: (
-            row["record_kind"] == "primary",
-            row["inspection_date"] or "",
-            row["document_id"],
-        )
+
+
+def consolidated_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Selección deduplicada (política ``dedup-primary-latest/1.0``) + vigencia.
+
+    Para cada clave ``(origin, normalized_tag, observed_at, modality)`` gana el
+    registro ``primary``; entre retrospectivos gana el del documento más
+    reciente (desempate por ``inspection_date`` ISO, porque el ``document_id``
+    lleva la fecha en DDMMAA y su orden lexicográfico no es cronológico). Cada
+    fila seleccionada ES una fila de la proyección completa; se añade solo
+    ``valid_to``: el ``observed_at`` de la siguiente observación consolidada
+    del mismo ``(origin, normalized_tag, modality)``, fecha ISO exclusiva,
+    null = vigencia abierta.
+    """
+    ordered = sorted(
+        range(len(rows)),
+        key=lambda i: (
+            rows[i]["record_kind"] == "primary",
+            rows[i]["inspection_date"] or "",
+            rows[i]["document_id"],
+        ),
     )
     best: dict[tuple[Any, ...], dict[str, Any]] = {}
-    for row in rows:
+    for i in ordered:
+        row = rows[i]
         best[tuple(row[name] for name in _DEDUPE_KEY)] = row
-    return sorted(best.values(), key=lambda row: tuple(row[name] for name in _DEDUPE_KEY))
+    selected = [
+        dict(best[key]) for key in sorted(best, key=lambda k: tuple(str(v) for v in k))
+    ]
+    by_series: dict[tuple[Any, ...], list[dict[str, Any]]] = {}
+    for row in selected:
+        by_series.setdefault(tuple(row[name] for name in _VALIDITY_KEY), []).append(row)
+    for series in by_series.values():
+        series.sort(key=lambda row: row["observed_at"])
+        for current, following in pairwise(series):
+            current["valid_to"] = following["observed_at"]
+        series[-1]["valid_to"] = None
+    return selected
 
 
 def finding_rows(observations: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Una fila por finding de las observaciones **ya deduplicadas**.
+    """Proyección completa de findings, alineada 1:1 con ``observations``.
 
-    Se deriva del consolidado de observaciones y no de los documentos en bruto
-    a propósito: un diagnóstico previo citado por los seis informes mensuales
-    contaría seis veces al agregar masa por modo de fallo.
+    Se proyecta del conjunto **completo** (no del deduplicado, a diferencia de
+    0.1): la deduplicación es una selección de observaciones y vive en un solo
+    sitio; un consumidor que puntúe masa filtra por join con
+    ``observations_consolidated.parquet``. ``finding_index`` materializa el
+    orden del texto del analista, contiguo 0..n-1 dentro de su observación.
     """
     rows: list[dict[str, Any]] = []
     for observation in observations:
-        for finding in observation["_findings"]:
+        for index, finding in enumerate(observation["_findings"]):
             rows.append(
                 {
                     "document_id": observation["document_id"],
-                    "observation_id": observation["_observation_id"],
+                    "observation_id": observation["observation_id"],
+                    "finding_index": index,
                     "dataset_machine_id": observation["dataset_machine_id"],
                     "observed_at": observation["observed_at"],
                     "modality": observation["modality"],
@@ -194,62 +229,154 @@ def finding_rows(observations: list[dict[str, Any]]) -> list[dict[str, Any]]:
                     "mapping_rule": finding["mapping_rule"],
                     "weight": finding.get("weight"),
                     "source_text": finding["source_text"],
+                    "matched_text": finding.get("matched_text"),
                 }
             )
     return rows
 
 
-def _csv_value(value: Any) -> Any:
-    return "" if value is None else value
+def write_parquet(
+    rows: list[dict[str, Any]], path: Path, columns: tuple[ColumnSpec, ...]
+) -> Path:
+    """Escribe ``rows`` como parquet zstd con el esquema explícito del contrato.
 
-
-def write_csv(rows: list[dict[str, Any]], path: Path, columns: tuple[str, ...]) -> None:
-    """Escribe ``rows`` como CSV con ``columns`` de cabecera."""
-    with path.open("w", encoding="utf-8", newline="") as handle:
-        # LF, no el CRLF del dialecto excel: el consolidado se lee en Linux y
-        # es el salto de línea con el que nació.
-        writer = csv.writer(handle, lineterminator="\n")
-        writer.writerow(columns)
-        for row in rows:
-            writer.writerow([_csv_value(row[name]) for name in columns])
-
-
-def write_parquet(rows: list[dict[str, Any]], path: Path, columns: tuple[str, ...]) -> None:
-    """Escribe ``rows`` como parquet zstd con el tipo natural de cada columna."""
+    El esquema sale de las ``ColumnSpec`` (tipos fijados, obligatorias
+    non-nullable), nunca de inferencia: una columna toda-null se escribe con
+    su tipo declarado, jamás como tipo ``null``.
+    """
     import pyarrow as pa
     import pyarrow.parquet as pq
 
-    def column_type(name: str) -> pa.DataType:
-        if name == "alarm":
-            return pa.int8()
-        if name in _INT_COLUMNS:
-            return pa.int32()
-        if name == "weight":
-            return pa.float32()  # el tipo que declara el contrato
-        if name in _FLOAT_COLUMNS:
-            return pa.float64()
-        return pa.string()
-
-    table = pa.table(
-        {
-            name: pa.array([row[name] for row in rows], type=column_type(name))
-            for name in columns
-        }
-    )
-    pq.write_table(table, path, compression="zstd")
-
-
-def write_observations(rows: list[dict[str, Any]], gt_dir: Path) -> list[Path]:
-    """Escribe ``observations.parquet`` y ``observations.csv``."""
-    parquet_path = gt_dir / f"{OBSERVATIONS_STEM}.parquet"
-    csv_path = gt_dir / f"{OBSERVATIONS_STEM}.csv"
-    write_parquet(rows, parquet_path, OBSERVATION_COLUMNS)
-    write_csv(rows, csv_path, OBSERVATION_COLUMNS)
-    return [parquet_path, csv_path]
-
-
-def write_findings(rows: list[dict[str, Any]], gt_dir: Path) -> Path:
-    """Escribe ``findings.parquet``. Sin CSV: el contrato sólo nombra el parquet."""
-    path = gt_dir / f"{FINDINGS_STEM}.parquet"
-    write_parquet(rows, path, FINDING_COLUMNS)
+    pa_schema = schema(columns)
+    arrays = {
+        field.name: pa.array((row.get(field.name) for row in rows), type=field.type)
+        for field in pa_schema
+    }
+    pq.write_table(pa.table(arrays, schema=pa_schema), path, compression="zstd")
     return path
+
+
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class MaterializationSummary:
+    """Qué proyectó una pasada de :func:`materialize_ground_truth`."""
+
+    documents: int
+    observations: int
+    consolidated: int
+    findings: int
+    written: tuple[Path, ...]
+
+
+def materialize_ground_truth(
+    gt_dir: Path,
+    *,
+    crosswalk: dict[str, str] | None = None,
+    now: datetime | None = None,
+) -> MaterializationSummary:
+    """Proyecta TODOS los ``*.diaggt.json`` de ``gt_dir`` y ancla su procedencia.
+
+    Escribe las tres proyecciones normativas y ``materialization.json`` en la
+    misma operación (regla §4.5.4 del workplan 09): los inputs se hashean tal
+    como están en disco y los outputs tal como acaban de escribirse, de modo
+    que ``vibframe-validate`` pueda detectar proyecciones desfasadas.
+
+    Todas las familias documentales presentes entran en la proyección completa
+    (``origin`` las separa); la clave de dedup del consolidado lleva ``origin``
+    para que una alarma de sistema y un informe de analista nunca compitan
+    como duplicados.
+    """
+    documents = sorted(gt_dir.glob(f"*{DIAGGT_FILE_SUFFIX}"))
+    if not documents:
+        raise ValueError(f"no *{DIAGGT_FILE_SUFFIX} documents in {gt_dir}")
+    lookup = crosswalk if crosswalk is not None else read_crosswalk(gt_dir)
+
+    inputs: list[dict[str, Any]] = []
+    parsed: list[dict[str, Any]] = []
+    for path in documents:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        parsed.append(document)
+        inputs.append(
+            {
+                "file": path.name,
+                "sha256": _sha256(path),
+                "observations": len(document["observations"]),
+            }
+        )
+
+    complete = observation_rows(parsed, lookup)
+    consolidated = consolidated_rows(complete)
+    findings = finding_rows(complete)
+
+    observations_path = write_parquet(
+        complete, gt_dir / OBSERVATIONS_FILE, OBSERVATIONS_COLUMNS
+    )
+    consolidated_path = write_parquet(
+        consolidated, gt_dir / OBSERVATIONS_CONSOLIDATED_FILE, OBSERVATIONS_CONSOLIDATED_COLUMNS
+    )
+    findings_path = write_parquet(findings, gt_dir / FINDINGS_FILE, FINDINGS_COLUMNS)
+
+    created_at = (now or datetime.now(tz=UTC)).astimezone(UTC)
+    manifest = {
+        "$schema_version": GT_MATERIALIZATION_SCHEMA_VERSION,
+        "kind": GT_MATERIALIZATION_KIND,
+        "tool": _tool_name(),
+        "created_at": created_at.isoformat().replace("+00:00", "Z"),
+        "consolidation_policy": CONSOLIDATION_POLICY,
+        "inputs": inputs,
+        "outputs": [
+            {
+                "file": observations_path.name,
+                "sha256": _sha256(observations_path),
+                "rows": len(complete),
+            },
+            {
+                "file": consolidated_path.name,
+                "sha256": _sha256(consolidated_path),
+                "rows": len(consolidated),
+            },
+            {
+                "file": findings_path.name,
+                "sha256": _sha256(findings_path),
+                "rows": len(findings),
+            },
+        ],
+    }
+    manifest_path = gt_dir / GT_MATERIALIZATION_FILE
+    manifest_path.write_text(
+        json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
+    )
+
+    _remove_legacy_projections(gt_dir)
+    return MaterializationSummary(
+        documents=len(documents),
+        observations=len(complete),
+        consolidated=len(consolidated),
+        findings=len(findings),
+        written=(observations_path, consolidated_path, findings_path, manifest_path),
+    )
+
+
+_LEGACY_PROJECTIONS = (
+    "observations.csv",
+    "findings.csv",
+    "observations_system.csv",
+    "observations_system.parquet",
+)
+
+
+def _remove_legacy_projections(gt_dir: Path) -> None:
+    """Retira las vistas 0.1 al re-materializar (spec §4.5.5 del workplan 09).
+
+    Los CSV nunca tuvieron lector y ``observations_system.parquet`` queda
+    integrado en la proyección completa vía ``origin``; dejarlos junto a las
+    proyecciones 0.2 sería exactamente la mezcla que
+    ``ground-truth.legacy-csv``/``ground-truth.legacy-projection`` señalan.
+    """
+    for name in _LEGACY_PROJECTIONS:
+        path = gt_dir / name
+        if path.exists():
+            path.unlink()

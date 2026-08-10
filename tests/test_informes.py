@@ -21,11 +21,11 @@ import pytest
 from ams_extract.informes.consolidate import (
     FINDING_COLUMNS,
     OBSERVATION_COLUMNS,
+    consolidated_rows,
     finding_rows,
+    materialize_ground_truth,
     observation_rows,
     read_crosswalk,
-    write_findings,
-    write_observations,
 )
 from ams_extract.informes.rules import (
     FINDING_RULES,
@@ -401,75 +401,39 @@ def _observation(**overrides: Any) -> dict[str, Any]:
     return observation
 
 
-class TestConsolidation:
-    def test_row_carries_the_flat_multilabel_and_the_context(self) -> None:
+class TestCompleteProjection:
+    def test_row_carries_identity_origin_and_context(self) -> None:
         rows = observation_rows([_document([_observation()])])
         assert len(rows) == 1
         row = rows[0]
         assert set(OBSERVATION_COLUMNS) <= set(row)
-        assert row["fault_modes"] == "IMBALANCE"
-        assert row["fault_groups"] == "IMBALANCE"
+        assert row["observation_id"] == "P2581115260126:AG100:vibration"
+        assert row["origin"] == "inspection-report"
         assert row["alarm"] == 2
         assert row["rpm1"] == 1485.0
+        assert row["n_findings"] == 1
         assert row["dataset_machine_id"] is None
+        # The "+"-joined fault columns of 0.1 are gone: multiplicity lives in
+        # findings.parquet by row count, n_findings is the cheap marker.
+        assert "fault_modes" not in OBSERVATION_COLUMNS
+        assert "fault_groups" not in OBSERVATION_COLUMNS
 
-    def test_unmapped_never_reaches_the_flat_fault_groups(self) -> None:
-        rows = observation_rows(
-            [
-                _document(
-                    [
-                        _observation(
-                            diagnosis_text="Ruido raro",
-                            findings=map_findings("Ruido raro"),
-                        )
-                    ]
-                )
-            ]
-        )
-        assert rows[0]["fault_groups"] is None
-        assert rows[0]["fault_modes"] is None
-
-    def test_primary_wins_over_a_retrospective_of_the_same_key(self) -> None:
-        retrospective = _observation(
-            observation_id="X:AG100:vibration:2026-01-26",
+    def test_the_complete_projection_never_deduplicates(self) -> None:
+        text = "Desequilibrio del ventilador"
+        quoted = _observation(
             record_kind="retrospective",
             status="UNKNOWN",
-            diagnosis_text="Máquina parada",
-            findings=[],
+            alarm=None,
+            diagnosis_text=text,
+            findings=map_findings(text),
             operating_context=None,
         )
-        rows = observation_rows([_document([retrospective, _observation()])])
-        assert len(rows) == 1
-        assert rows[0]["record_kind"] == "primary"
-
-    def test_between_retrospectives_the_latest_report_wins(self) -> None:
-        old = _document(
-            [
-                _observation(
-                    record_kind="retrospective",
-                    diagnosis_text="Desequilibrio del ventilador",
-                    status="UNKNOWN",
-                )
-            ],
-            document_id="P25/81115-260126",
-            inspection_date="2026-01-26",
-        )
-        new = _document(
-            [
-                _observation(
-                    record_kind="retrospective",
-                    diagnosis_text="Máquina parada",
-                    findings=[],
-                    status="STOPPED",
-                )
-            ],
-            document_id="P25/81115-250526",
-            inspection_date="2026-05-25",
-        )
-        rows = observation_rows([old, new])
-        assert len(rows) == 1
-        assert rows[0]["document_id"] == "P25/81115-250526"
-        assert rows[0]["status"] == "STOPPED"
+        documents = [
+            _document([quoted], document_id="P25/81115-260126", inspection_date="2026-01-26"),
+            _document([quoted], document_id="P25/81115-250526", inspection_date="2026-05-25"),
+        ]
+        rows = observation_rows(documents)
+        assert len(rows) == 2  # six monthly quotes would be six rows
 
     def test_crosswalk_is_projected_onto_the_join_column(self, tmp_path: Path) -> None:
         (tmp_path / "crosswalk.csv").write_text(
@@ -486,22 +450,91 @@ class TestConsolidation:
     def test_a_missing_crosswalk_is_not_an_error(self, tmp_path: Path) -> None:
         assert read_crosswalk(tmp_path) == {}
 
-    def test_writes_parquet_and_csv_with_the_spec_columns(self, tmp_path: Path) -> None:
-        import pyarrow.parquet as pq
 
-        rows = observation_rows([_document([_observation()])])
-        written = write_observations(rows, tmp_path)
-        assert [p.name for p in written] == ["observations.parquet", "observations.csv"]
-        table = pq.read_table(written[0])
-        assert tuple(table.column_names) == OBSERVATION_COLUMNS
-        assert table.num_rows == 1
-        assert str(table.schema.field("alarm").type) == "int8"
-        header = written[1].read_text(encoding="utf-8").splitlines()[0]
-        assert header == ",".join(OBSERVATION_COLUMNS)
+class TestConsolidatedSelection:
+    def test_primary_wins_over_a_retrospective_of_the_same_key(self) -> None:
+        retrospective = _observation(
+            observation_id="X:AG100:vibration:2026-01-26",
+            record_kind="retrospective",
+            status="UNKNOWN",
+            alarm=None,
+            diagnosis_text="Máquina parada",
+            findings=[],
+            operating_context=None,
+        )
+        complete = observation_rows([_document([retrospective, _observation()])])
+        rows = consolidated_rows(complete)
+        assert len(complete) == 2  # the complete projection keeps both
+        assert len(rows) == 1
+        assert rows[0]["record_kind"] == "primary"
+        # Selection, not aggregation: the winner IS a row of the complete set.
+        assert rows[0]["observation_id"] == "P2581115260126:AG100:vibration"
+
+    def test_between_retrospectives_the_latest_report_wins(self) -> None:
+        old = _document(
+            [
+                _observation(
+                    record_kind="retrospective",
+                    diagnosis_text="Desequilibrio del ventilador",
+                    status="UNKNOWN",
+                    alarm=None,
+                )
+            ],
+            document_id="P25/81115-260126",
+            inspection_date="2026-01-26",
+        )
+        new = _document(
+            [
+                _observation(
+                    record_kind="retrospective",
+                    diagnosis_text="Máquina parada",
+                    findings=[],
+                    status="STOPPED",
+                    alarm=None,
+                )
+            ],
+            document_id="P25/81115-250526",
+            inspection_date="2026-05-25",
+        )
+        rows = consolidated_rows(observation_rows([old, new]))
+        assert len(rows) == 1
+        assert rows[0]["document_id"] == "P25/81115-250526"
+        assert rows[0]["status"] == "STOPPED"
+
+    def test_valid_to_is_the_next_observation_of_the_series(self) -> None:
+        months = [
+            _document(
+                [_observation(observed_at=date, observation_id=f"o:{date}")],
+                document_id=f"D-{date}",
+                inspection_date=date,
+            )
+            for date in ("2026-01-26", "2026-02-23", "2026-04-27")
+        ]
+        rows = consolidated_rows(observation_rows(months))
+        by_date = {row["observed_at"]: row for row in rows}
+        # Exclusive ISO date of the next consolidated observation of the same
+        # (origin, normalized_tag, modality); null = open validity. Never an
+        # invented instant, never a 30-day cutoff.
+        assert by_date["2026-01-26"]["valid_to"] == "2026-02-23"
+        assert by_date["2026-02-23"]["valid_to"] == "2026-04-27"
+        assert by_date["2026-04-27"]["valid_to"] is None
+
+    def test_origins_never_compete_as_duplicates(self) -> None:
+        analyst = _document([_observation()])
+        system = _document(
+            [_observation(observation_id="sys:AG100", status="ALERT", alarm=2)],
+            origin="system-alarm",
+            document_id="ams-gdnl:BUNGE",
+            inspection_date=None,
+        )
+        rows = consolidated_rows(observation_rows([analyst, system]))
+        # Same (tag, date, modality) but different origin: both survive.
+        assert len(rows) == 2
+        assert {row["origin"] for row in rows} == {"inspection-report", "system-alarm"}
 
 
-class TestFindingsConsolidation:
-    def test_one_row_per_finding_with_its_weight_and_keys(self) -> None:
+class TestFindingsProjection:
+    def test_one_row_per_finding_with_index_weight_and_keys(self) -> None:
         text = "-Desequilibrio del ventilador. -Debilidad estructural."
         rows = observation_rows(
             [_document([_observation(diagnosis_text=text, findings=map_findings(text))])],
@@ -510,11 +543,13 @@ class TestFindingsConsolidation:
         findings = finding_rows(rows)
         assert len(findings) == 2
         assert set(findings[0]) == set(FINDING_COLUMNS)
+        assert [f["finding_index"] for f in findings] == [0, 1]
         assert [f["mapping_rule"] for f in findings] == ["GT001v2", "GT005"]
         assert [f["weight"] for f in findings] == [0.5, 0.5]
         assert all(f["observation_id"] == "P2581115260126:AG100:vibration" for f in findings)
         assert all(f["dataset_machine_id"] == "MECLADOR_AGITADOR_AG_100" for f in findings)
         assert all(f["source_text"] == text for f in findings)
+        assert all(f["matched_text"] for f in findings)
 
     def test_a_healthy_observation_contributes_no_row(self) -> None:
         rows = observation_rows(
@@ -522,9 +557,10 @@ class TestFindingsConsolidation:
         )
         assert finding_rows(rows) == []
 
-    def test_the_dedupe_of_the_observations_is_inherited(self) -> None:
-        # The same retrospective quoted by two monthly reports is one judgement,
-        # so its findings must not be counted twice.
+    def test_findings_project_from_the_complete_set(self) -> None:
+        # 0.2 change of population: findings align 1:1 with observations.parquet.
+        # A consumer that scores mass keeps only the winners by joining with
+        # observations_consolidated.parquet — the dedup lives in one place.
         text = "Desequilibrio del ventilador"
         quoted = _observation(
             record_kind="retrospective",
@@ -538,21 +574,113 @@ class TestFindingsConsolidation:
             _document([quoted], document_id="P25/81115-260126", inspection_date="2026-01-26"),
             _document([quoted], document_id="P25/81115-250526", inspection_date="2026-05-25"),
         ]
-        assert len(finding_rows(observation_rows(documents))) == 1
+        complete = observation_rows(documents)
+        findings = finding_rows(complete)
+        assert len(findings) == 2
+        consolidated = consolidated_rows(complete)
+        winners = {(row["document_id"], row["observation_id"]) for row in consolidated}
+        assert len(winners) == 1
+        surviving = [
+            f for f in findings if (f["document_id"], f["observation_id"]) in winners
+        ]
+        assert len(surviving) == 1
 
-    def test_writes_the_parquet_the_contract_models(self, tmp_path: Path) -> None:
+
+class TestMaterialization:
+    def _write_documents(self, gt_dir: Path, documents: list[dict[str, Any]]) -> None:
+        gt_dir.mkdir(parents=True, exist_ok=True)
+        for i, document in enumerate(documents):
+            path = gt_dir / f"doc-{i}.diaggt.json"
+            path.write_text(json.dumps(document, ensure_ascii=False), encoding="utf-8")
+
+    def test_writes_the_three_projections_and_the_manifest(self, tmp_path: Path) -> None:
         import pyarrow.parquet as pq
 
         text = "-Desequilibrio. -Suciedad en la válvula."
-        rows = observation_rows(
-            [_document([_observation(diagnosis_text=text, findings=map_findings(text))])]
+        self._write_documents(
+            tmp_path, [_document([_observation(diagnosis_text=text, findings=map_findings(text))])]
         )
-        path = write_findings(finding_rows(rows), tmp_path)
-        assert path.name == "findings.parquet"
-        table = pq.read_table(path)
-        assert tuple(table.column_names) == FINDING_COLUMNS
-        assert str(table.schema.field("weight").type) == "float"
-        assert table.column("fault_group").to_pylist() == ["IMBALANCE", "UNMAPPED"]
+        summary = materialize_ground_truth(tmp_path)
+        assert [p.name for p in summary.written] == [
+            "observations.parquet",
+            "observations_consolidated.parquet",
+            "findings.parquet",
+            "materialization.json",
+        ]
+        observations = pq.read_table(summary.written[0])
+        assert tuple(observations.column_names) == OBSERVATION_COLUMNS
+        assert str(observations.schema.field("alarm").type) == "int8"
+        assert str(observations.schema.field("source_page").type) == "int32"
+        assert str(observations.schema.field("rpm1").type) == "float"
+        assert str(observations.schema.field("n_findings").type) == "int32"
+        consolidated = pq.read_table(summary.written[1])
+        assert tuple(consolidated.column_names) == (*OBSERVATION_COLUMNS, "valid_to")
+        findings = pq.read_table(summary.written[2])
+        assert tuple(findings.column_names) == FINDING_COLUMNS
+        assert str(findings.schema.field("weight").type) == "float"
+        assert str(findings.schema.field("finding_index").type) == "int32"
+        assert findings.column("fault_group").to_pylist() == ["IMBALANCE", "UNMAPPED"]
+
+    def test_all_null_columns_keep_their_declared_type(self, tmp_path: Path) -> None:
+        # The lethal 0.1 drift: pandas inference degraded all-null columns to
+        # type `null` (6 physical schemas in the corpus). The explicit schema
+        # writes the declared type even when the writer only saw nulls.
+        import pyarrow.parquet as pq
+
+        observation = _observation(
+            operating_context=None, source_page=None, recommendation_text=None
+        )
+        self._write_documents(tmp_path, [_document([observation])])
+        summary = materialize_ground_truth(tmp_path)
+        table = pq.read_table(summary.written[0])
+        assert str(table.schema.field("rpm1").type) == "float"
+        assert str(table.schema.field("source_page").type) == "int32"
+        assert table.column("source_page").null_count == 1
+
+    def test_the_manifest_anchors_inputs_and_outputs(self, tmp_path: Path) -> None:
+        import hashlib
+
+        self._write_documents(tmp_path, [_document([_observation()])])
+        summary = materialize_ground_truth(tmp_path)
+        manifest = json.loads((tmp_path / "materialization.json").read_text(encoding="utf-8"))
+        assert manifest["$schema_version"] == "0.2.0"
+        assert manifest["kind"] == "gt_materialization"
+        assert manifest["tool"].startswith("ams-extract")
+        assert manifest["consolidation_policy"] == "dedup-primary-latest/1.0"
+        assert [i["file"] for i in manifest["inputs"]] == ["doc-0.diaggt.json"]
+        assert manifest["inputs"][0]["observations"] == 1
+        by_name = {o["file"]: o for o in manifest["outputs"]}
+        assert set(by_name) == {
+            "observations.parquet",
+            "observations_consolidated.parquet",
+            "findings.parquet",
+        }
+        for output in by_name.values():
+            digest = hashlib.sha256((tmp_path / output["file"]).read_bytes()).hexdigest()
+            assert output["sha256"] == digest
+        assert by_name["observations.parquet"]["rows"] == summary.observations
+
+    def test_no_csv_is_written_and_legacy_views_are_retired(self, tmp_path: Path) -> None:
+        self._write_documents(tmp_path, [_document([_observation()])])
+        for legacy in (
+            "observations.csv",
+            "findings.csv",
+            "observations_system.csv",
+            "observations_system.parquet",
+        ):
+            (tmp_path / legacy).write_text("legacy", encoding="utf-8")
+        materialize_ground_truth(tmp_path)
+        assert [p.name for p in tmp_path.glob("*.csv")] == []
+        assert not (tmp_path / "observations_system.parquet").exists()
+
+    def test_the_manifest_validates_against_the_contract_model(self, tmp_path: Path) -> None:
+        external = pytest.importorskip("vibsynth_contracts.diagnosis.external")
+        self._write_documents(tmp_path, [_document([_observation()])])
+        materialize_ground_truth(tmp_path)
+        manifest = external.GTMaterialization.model_validate_json(
+            (tmp_path / "materialization.json").read_bytes()
+        )
+        assert manifest.consolidation_policy == external.CONSOLIDATION_POLICY
 
 
 class TestContractConformance:
@@ -570,6 +698,21 @@ class TestContractConformance:
         external = pytest.importorskip("vibsynth_contracts.diagnosis.external")
         assert tuple(c.name for c in external.FINDINGS_COLUMNS) == FINDING_COLUMNS
         assert {c.name: c.dtype for c in external.FINDINGS_COLUMNS}["weight"] == "float32"
+
+    def test_the_observations_table_is_the_one_the_contract_models(self) -> None:
+        external = pytest.importorskip("vibsynth_contracts.diagnosis.external")
+        assert tuple(c.name for c in external.OBSERVATIONS_COLUMNS) == OBSERVATION_COLUMNS
+        theirs = {c.name: (c.dtype, c.required) for c in external.OBSERVATIONS_COLUMNS}
+        from ams_extract.export.vibframe_contract import (
+            OBSERVATIONS_COLUMNS as VENDORED,
+        )
+
+        ours = {c.name: (c.dtype, c.required) for c in VENDORED}
+        assert ours == theirs
+        consolidated = tuple(
+            c.name for c in external.OBSERVATIONS_CONSOLIDATED_COLUMNS
+        )
+        assert consolidated == (*OBSERVATION_COLUMNS, "valid_to")
 
     def test_the_schema_version_is_the_one_the_models_declare(self) -> None:
         external = pytest.importorskip("vibsynth_contracts.diagnosis.external")
@@ -609,7 +752,15 @@ def test_the_geometry_reproduces_the_published_document(pdf_name: str) -> None:
     from ams_extract.informes.parse import ExtractionReport, build_document
 
     pdf_dir = _informes_dir()
-    golden_path = pdf_dir / "ground-truth" / f"{Path(pdf_name).stem}.diaggt.json"
+    # The root generation is the contextual LLM-weighted publication. Geometry
+    # and deterministic rule output are anchored by the archived 0.4.0
+    # generation, which is the direct output of ``build_document``.
+    golden_path = (
+        pdf_dir
+        / "ground-truth"
+        / "deterministic-0.4.0"
+        / f"{Path(pdf_name).stem}.diaggt.json"
+    )
     if not golden_path.exists():
         pytest.skip(f"no published DiagGT next to {pdf_name}")
 

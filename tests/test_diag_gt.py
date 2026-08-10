@@ -14,14 +14,11 @@ from pathlib import Path
 import pytest
 
 from ams_extract.export.diag_gt import (
-    CONSOLIDATED_COLUMNS,
-    CONSOLIDATED_STEM,
     DIAGGT_FILE_SUFFIX,
     DIAGGT_SCHEMA_VERSION,
     EXTRACTION_METHOD,
     _findings,
     _observation,
-    consolidated_rows,
     machine_tag,
     normalize_tag,
     write_alarm_ground_truth,
@@ -186,30 +183,38 @@ class TestDocument:
         assert emitted.alarm == external.STATUS_ALARM["ALERT"]
         assert emitted.dataset_machine_id == "MECLADOR_AGITADOR_AG_100"
 
-    def test_writes_json_and_optional_consolidation(self, tmp_path: Path) -> None:
+    def test_writes_only_the_document(self, tmp_path: Path) -> None:
+        # Since 0.2 the system-alarm family consolidates into the same
+        # normative projections as everyone else (origin column keeps the
+        # judgements apart); no observations_system.* side files are emitted.
         observation = _observation(AREA, EQUIPMENT, POINT, _note(), "ams-gdnl:BUNGE")
         assert observation is not None
         document = _document([observation])
-        written = write_alarm_ground_truth(
-            document, tmp_path, stem="BUNGE", consolidate=True
-        )
-        assert written[0] == tmp_path / f"BUNGE{DIAGGT_FILE_SUFFIX}"
-        assert [p.name for p in written[1:]] == [
-            f"{CONSOLIDATED_STEM}.csv",
-            f"{CONSOLIDATED_STEM}.parquet",
-        ]
-        # The analysts' consolidation is never touched.
-        assert not (tmp_path / "observations.parquet").exists()
+        written = write_alarm_ground_truth(document, tmp_path, stem="BUNGE")
+        assert written == [tmp_path / f"BUNGE{DIAGGT_FILE_SUFFIX}"]
+        assert not (tmp_path / "observations_system.parquet").exists()
+        assert not (tmp_path / "observations_system.csv").exists()
         reloaded = json.loads(written[0].read_text(encoding="utf-8"))
         assert reloaded["provenance"]["origin"] == "system-alarm"
         assert len(reloaded["observations"]) == 1
 
-    def test_consolidated_rows_carry_the_join_key(self) -> None:
+    def test_the_document_materializes_through_the_shared_projections(
+        self, tmp_path: Path
+    ) -> None:
+        import pyarrow.parquet as pq
+
+        from ams_extract.informes.consolidate import materialize_ground_truth
+
         observation = _observation(AREA, EQUIPMENT, POINT, _note(), "ams-gdnl:BUNGE")
         assert observation is not None
-        rows = consolidated_rows(_document([observation]))
-        assert len(rows) == 1
-        assert set(rows[0]) == set(CONSOLIDATED_COLUMNS)
-        assert rows[0]["dataset_machine_id"] == "MECLADOR_AGITADOR_AG_100"
-        assert rows[0]["alarm"] == 2
-        assert rows[0]["fault_groups"] == "UNMAPPED"
+        write_alarm_ground_truth(_document([observation]), tmp_path, stem="BUNGE")
+        summary = materialize_ground_truth(tmp_path)
+        assert summary.observations == 1
+        table = pq.read_table(tmp_path / "observations.parquet")
+        row = table.to_pylist()[0]
+        assert row["origin"] == "system-alarm"
+        assert row["dataset_machine_id"] == "MECLADOR_AGITADOR_AG_100"
+        assert row["alarm"] == 2
+        assert row["n_findings"] == 1
+        findings = pq.read_table(tmp_path / "findings.parquet").to_pylist()
+        assert [f["fault_group"] for f in findings] == ["UNMAPPED"]

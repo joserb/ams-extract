@@ -30,7 +30,11 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import pytest
 from typer.testing import CliRunner
-from vibsynth_contracts.dataset import DatasetInfo, MachineDoc
+from vibsynth_contracts.dataset import (
+    DatasetInfo,
+    MachineDoc,
+    MetricCatalogDoc,
+)
 from vibsynth_contracts.validate import validate_dataset
 
 from ams_extract.cli import app as rbm_app
@@ -38,8 +42,7 @@ from ams_extract.export.dataset import _write_parquet
 from ams_extract.export.vibframe_contract import (
     DATASET_FILE,
     MACHINE_DOC_FILE,
-    METRICS_COLUMNS,
-    METRICS_FILE,
+    METRIC_CATALOG_FILE,
     SPECTRA_COLUMNS,
     SPECTRA_FILE,
     TRENDS_COLUMNS,
@@ -54,7 +57,6 @@ runner = CliRunner()
 
 GOLDENS = Path(str(files("vibsynth_contracts") / "goldens"))
 TABLES: tuple[tuple[str, tuple[ColumnSpec, ...]], ...] = (
-    (METRICS_FILE, METRICS_COLUMNS),
     (TRENDS_FILE, TRENDS_COLUMNS),
     (SPECTRA_FILE, SPECTRA_COLUMNS),
     (WAVES_FILE, WAVES_COLUMNS),
@@ -70,6 +72,22 @@ def _assert_clean(dataset: Path) -> None:
     assert report.parquet_checked, "pyarrow missing: the validator skipped the parquet"
     assert report.errors == [], [issue.format() for issue in report.errors]
     assert report.warnings == [], [issue.format() for issue in report.warnings]
+
+
+def _assert_golden_conformant(golden: Path) -> None:
+    """Validate real 0.2 goldens, retaining only documented AMS source warnings."""
+    report = validate_dataset(golden)
+    assert report.parquet_checked, "pyarrow missing: the validator skipped the parquet"
+    assert report.errors == [], [issue.format() for issue in report.errors]
+    expected_warning_codes = (
+        ["definition.noncanonical-node-type", "definition.noncanonical-node-type"]
+        if golden.name == "ams-rbm"
+        else []
+    )
+    actual_warning_codes = sorted(issue.code for issue in report.warnings)
+    assert actual_warning_codes == expected_warning_codes, [
+        issue.format() for issue in report.warnings
+    ]
 
 
 # -------------------------------------------------------- our export passes
@@ -120,9 +138,8 @@ def test_there_is_a_golden_for_our_origin() -> None:
 
 @pytest.mark.parametrize("golden", _golden_dirs(), ids=lambda p: p.name)
 def test_the_goldens_are_conformant(golden: Path) -> None:
-    report = validate_dataset(golden)
-    assert report.errors == [], [issue.format() for issue in report.errors]
-    assert report.warnings == [], [issue.format() for issue in report.warnings]
+    """Goldens are real 0.2 datasets; no test-only migration is permitted."""
+    _assert_golden_conformant(golden)
 
 
 # ------------------------------------------------------- goldens: round-trip
@@ -134,12 +151,8 @@ def test_the_goldens_round_trip_through_our_writer(golden: Path, tmp_path: Path)
 
     All three origins on purpose: the parquet schema this repo derives from
     ``*_COLUMNS`` has to serve any producer, not just ours. Names, types and
-    values are compared; the declared nullability is not, because the
-    ``ams-rbm`` golden predates the alignment (see the test below) and the
-    contract talks about the value, not about how the field is declared.
-    Rewriting through a schema whose required columns are non-nullable is
-    itself the check that no golden carries a null where the contract
-    forbids one.
+    values are compared exactly; rewriting through our schema additionally
+    proves that no golden carries a null in a required field.
     """
     seen = 0
     for partition in sorted(golden.glob("machine=*")):
@@ -156,26 +169,21 @@ def test_the_goldens_round_trip_through_our_writer(golden: Path, tmp_path: Path)
                     rewritten.column(column).to_pylist() == original.column(column).to_pylist()
                 ), f"{partition.name}/{name}:{column}"
             seen += 1
-    assert seen == len(TABLES) * 2  # two machines per golden, four tables
+    assert seen == len(TABLES) * len(list(golden.glob("machine=*")))
 
 
-def test_our_golden_carries_our_columns_and_types() -> None:
-    """The ``ams-rbm`` golden came out of this exporter, so its columns and
-    types must be the ones we still write today.
-
-    Nullability is deliberately out: the golden was cut before this repo
-    declared its required columns non-nullable (workplan 06) and the goldens
-    live in ``vibsynth-contracts``, so it stays all-nullable until that repo
-    re-cuts it. A conformant reader cannot tell the difference — no required
-    column of the golden holds a null, which is what the round-trip above
-    proves.
-    """
-    for partition in sorted((GOLDENS / "ams-rbm").glob("machine=*")):
-        for name, columns in TABLES:
-            golden_schema = pq.ParquetFile(partition / name).schema_arrow
-            want = schema(columns)
-            assert golden_schema.names == want.names, f"{partition.name}/{name}"
-            assert golden_schema.types == want.types, f"{partition.name}/{name}"
+@pytest.mark.parametrize("golden", _golden_dirs(), ids=lambda p: p.name)
+def test_the_metric_catalogs_round_trip_through_the_model(golden: Path) -> None:
+    """Each real golden carries the single JSON metric-catalog representation."""
+    for partition in sorted(golden.glob("machine=*")):
+        path = partition / METRIC_CATALOG_FILE
+        catalog = MetricCatalogDoc.model_validate_json(path.read_text(encoding="utf-8"))
+        assert catalog.schema_version == "0.2.0"
+        assert not (partition / "metrics.parquet").exists()
+        assert not (partition / "metric_catalog.parquet").exists()
+        # AMS goldens may legitimately have no resolved FrequencyDef until the
+        # separate +enrich stage runs; this conformance test must not invent
+        # a frequency merely to make a non-empty assertion.
 
 
 @pytest.mark.parametrize("golden", _golden_dirs(), ids=lambda p: p.name)

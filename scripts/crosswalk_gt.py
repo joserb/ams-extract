@@ -6,20 +6,24 @@ Uso:
 
 Entradas:
     <dir_dataset_vibframe>/machine=<machine_id>/machine.json   (particiones VibFrame)
-    <dir_ground_truth>/observations.parquet                    (consolidado DiagGT)
+    <dir_ground_truth>/*.diaggt.json                           (documentos DiagGT)
 
 Salidas (en <dir_ground_truth>):
     crosswalk.csv               — tabla explícita tag ↔ machine_id, una fila por
                                   `normalized_tag`, con regla aplicada y candidatos
     crosswalk_ambiguities.md    — ambigüedades, no-matches y máquinas del dataset
                                   sin ground truth, con la resolución propuesta
-    observations.parquet/.csv   — regenerados con la columna `dataset_machine_id`
+    observations.parquet, observations_consolidated.parquet, findings.parquet,
+    materialization.json        — proyecciones 0.2 re-materializadas con la
+                                  columna `dataset_machine_id` proyectada
+                                  (esquema explícito del contrato; sin CSV)
 
 El post-proceso es **no destructivo** (spec DiagGT §2.4): los `*.diaggt.json` no
 se tocan — el crosswalk vive en `crosswalk.csv` (tabla explícita) y se proyecta
-sobre el consolidado, que es la vista pensada para el join con VibFrame.
-Ejecutar siempre DESPUÉS de `extract_informes_gt.py` (que regenera el
-consolidado sin la columna).
+sobre las proyecciones, que son la vista pensada para el join con VibFrame. La
+re-materialización la hace `ams_extract.informes.consolidate`, el mismo
+materializador del paquete, de modo que las proyecciones y su
+`materialization.json` nunca divergen de esquema por culpa de este script.
 
 Reglas de matching (CWxxx, versionadas como las GTxxx del extractor). El
 candidato debe cumplir la regla base de la spec (`normalized_tag` ⊂
@@ -216,7 +220,7 @@ def write_ambiguities(path: Path, cw: pd.DataFrame, machines: pd.DataFrame,
         f"Generado por `crosswalk_gt.py` ({CROSSWALK_VERSION}) contra el dataset "
         f"`{dataset_name}` ({len(machines)} particiones `machine=`).",
         "",
-        f"- `normalized_tag` únicos en `observations.parquet`: **{n_tags}**",
+        f"- `normalized_tag` únicos en los `*.diaggt.json` por resolver: **{n_tags}**",
         f"- con `dataset_machine_id` resuelto: **{n_ok}** "
         f"({n_ok / n_tags * 100:.1f} %)",
         f"- sin resolver (esta tabla): **{n_tags - n_ok}**",
@@ -333,10 +337,41 @@ Mismo patrón, sin GT asociado, en `AGITADOR`/`AGITADOR_1..3` y
 
 # ---------------------------------------------------------------------------
 
+def read_gt_tags(gt_dir: Path) -> pd.DataFrame:
+    """Tags únicos de TODOS los `*.diaggt.json` del directorio.
+
+    De los documentos fuente, no de una proyección previa: el crosswalk no
+    depende de que las proyecciones existan ni de su generación. Los
+    documentos con `dataset_machine_id` ya resuelto por su productor (las
+    alarmas del sistema) también aportan su tag — el crosswalk no lo pisa,
+    porque el materializador sólo proyecta la tabla sobre los tags cuya
+    columna venga a null en el documento.
+    """
+    rows: list[dict[str, object]] = []
+    for path in sorted(gt_dir.glob("*.diaggt.json")):
+        document = json.loads(path.read_text(encoding="utf-8"))
+        for observation in document["observations"]:
+            machine = observation["machine"]
+            if machine["dataset_machine_id"]:
+                continue  # ya resuelto en origen: nada que crosswalkear
+            rows.append({
+                "normalized_tag": machine["normalized_tag"],
+                "external_tag": machine["external_tag"],
+                "external_name": machine["external_name"],
+                "area_code": machine["area_code"],
+                "area_name": machine["area_name"],
+            })
+    if not rows:
+        return pd.DataFrame(columns=["normalized_tag", "external_tag", "external_name",
+                                     "area_code", "area_name"])
+    return (pd.DataFrame(rows)
+            .drop_duplicates("normalized_tag").sort_values("normalized_tag"))
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Crosswalk DiagGT ↔ VibFrame")
     ap.add_argument("dataset_dir", type=Path, help="dataset VibFrame (con machine=*)")
-    ap.add_argument("gt_dir", type=Path, help="directorio ground-truth con observations.parquet")
+    ap.add_argument("gt_dir", type=Path, help="directorio ground-truth con *.diaggt.json")
     ap.add_argument("--dry-run", action="store_true",
                     help="no escribe nada, sólo informa de la cobertura")
     args = ap.parse_args()
@@ -344,26 +379,17 @@ def main() -> None:
     machines = read_dataset(args.dataset_dir)
     if machines.empty:
         raise SystemExit(f"sin particiones machine= en {args.dataset_dir}")
-    obs_path = args.gt_dir / "observations.parquet"
-    obs = pd.read_parquet(obs_path)
-    if "dataset_machine_id" in obs.columns:
-        obs = obs.drop(columns="dataset_machine_id")  # re-ejecución idempotente
-
-    tags = (obs[["normalized_tag", "external_tag", "external_name",
-                 "area_code", "area_name"]]
-            .drop_duplicates("normalized_tag").sort_values("normalized_tag"))
+    tags = read_gt_tags(args.gt_dir)
+    if tags.empty:
+        raise SystemExit(f"sin *.diaggt.json con tags por resolver en {args.gt_dir}")
     cw = build_crosswalk(tags, machines)
 
     mapping = dict(cw.dropna(subset=["dataset_machine_id"])
                      .set_index("normalized_tag")["dataset_machine_id"])
-    col = obs["normalized_tag"].map(mapping)
-    obs.insert(obs.columns.get_loc("normalized_tag") + 1, "dataset_machine_id", col)
 
     n_tags, n_ok = len(cw), int(cw["dataset_machine_id"].notna().sum())
     n_amb = int((cw["resolution"].isin(["ambiguous", "reverse_collision"])).sum())
     n_none = int((cw["resolution"] == "unmatched").sum())
-    n_rows_ok = int(obs["dataset_machine_id"].notna().sum())
-    n_ds_hit = obs["dataset_machine_id"].nunique()
 
     # control de sanidad: el área del informe debe coincidir con machine.path
     minfo = machines.set_index("machine_id")
@@ -378,10 +404,7 @@ def main() -> None:
     print(f"  match único        : {n_ok} ({n_ok / n_tags * 100:.1f} %)")
     print(f"  ambiguos/colisión  : {n_amb}")
     print(f"  sin match          : {n_none}")
-    print(f"observaciones        : {len(obs)}")
-    print(f"  con machine_id     : {n_rows_ok} ({n_rows_ok / len(obs) * 100:.1f} %)")
     print(f"máquinas del dataset : {len(machines)}")
-    print(f"  con ≥1 observación : {n_ds_hit} ({n_ds_hit / len(machines) * 100:.1f} %)")
     print(f"discrepancias de área: {len(bad_area)}")
     for row in bad_area:
         print(f"  [warn] {row}")
@@ -393,10 +416,19 @@ def main() -> None:
     cw.to_csv(args.gt_dir / "crosswalk.csv", index=False)
     write_ambiguities(args.gt_dir / "crosswalk_ambiguities.md", cw, machines,
                       args.dataset_dir, args.dataset_dir.name)
-    obs.to_parquet(obs_path, index=False)
-    obs.to_csv(args.gt_dir / "observations.csv", index=False)
+
+    # Re-materializa las proyecciones 0.2 con el materializador del paquete —
+    # nunca con pandas: el esquema explícito del contrato es suyo.
+    import sys
+
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+    from ams_extract.informes.consolidate import materialize_ground_truth
+
+    summary = materialize_ground_truth(args.gt_dir, crosswalk=mapping)
+    print(f"observaciones        : {summary.observations} "
+          f"({summary.consolidated} consolidadas, {summary.findings} findings)")
     print("escrito: crosswalk.csv, crosswalk_ambiguities.md, "
-          "observations.parquet, observations.csv")
+          + ", ".join(p.name for p in summary.written))
 
 
 if __name__ == "__main__":

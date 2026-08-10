@@ -51,7 +51,9 @@ def test_export_depuradora_layout(real_rbm: Path, tmp_path: Path) -> None:
     assert machine_dirs, "no machine asset directories emitted"
     sample_machine = machine_dirs[0]
     assert (sample_machine / "machine.json").exists()
-    assert (sample_machine / "metrics.parquet").exists()
+    assert (sample_machine / "metric_catalog.json").exists()
+    assert not (sample_machine / "metrics.parquet").exists()
+    assert not (sample_machine / "metric_catalog.parquet").exists()
     assert (sample_machine / "spectra.parquet").exists()
     assert (sample_machine / "waves.parquet").exists()
     assert (sample_machine / "trends.parquet").exists()
@@ -96,7 +98,7 @@ def test_export_machine_doc_carries_the_shaft_config(real_rbm: Path, tmp_path: P
     assert all(p["nominal_speed_rpm"] == 1455.0 for p in doc["points"])
     # ams-extract declares what the .rbm holds; it resolves no definition, so
     # it writes neither a definition nor a provenance for one.
-    assert doc["machine"]["definition"] is None
+    assert "definition" not in doc["machine"]  # null-free 0.2 serialization
     assert "definition_provenance" not in doc["machine"]
 
 
@@ -137,16 +139,18 @@ def test_export_emits_machine_level_context_metrics(real_rbm: Path, tmp_path: Pa
     _export_depuradora(real_rbm, out)
 
     machine_dir = _find_machine_dir(out, "AG-100")
-    metric_rows = pq.read_table(machine_dir / "metrics.parquet").to_pylist()
+    metric_rows = json.loads(
+        (machine_dir / "metric_catalog.json").read_text(encoding="utf-8")
+    )["metrics"]
     metrics = {m["metric_id"]: m for m in metric_rows}
 
     for metric_id, unit in (("speed", "Hz"), ("load", "%")):
         metric = metrics[metric_id]
-        assert metric["point_id"] is None
+        assert "point_id" not in metric  # null-free metric_catalog.json
         assert metric["statistic"] == "value"
         assert metric["signal_family"] == "non_vibration"
         assert metric["unit"] == unit
-        assert metric["canonical_metric"] is None  # labelled post-hoc (ADR-0011)
+        assert "canonical_metric" not in metric  # labelled post-hoc (ADR-0011)
 
     trend_rows = pq.read_table(machine_dir / "trends.parquet").to_pylist()
     speeds = [r["value"] for r in trend_rows if r["metric_id"] == "speed"]
@@ -173,7 +177,9 @@ def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
     doc = json.loads((machine_dir / "machine.json").read_text(encoding="utf-8"))
     point = next(p for p in doc["points"] if p["name"] == "MOTOR LOA HORIZONTAL")
 
-    metrics = pq.read_table(machine_dir / "metrics.parquet").to_pylist()
+    metrics = json.loads(
+        (machine_dir / "metric_catalog.json").read_text(encoding="utf-8")
+    )["metrics"]
     point_metrics = [m for m in metrics if m["point_id"] == point["id"]]
     metric = next(m for m in point_metrics if m["name"] == "overall_velocity_rms")
     assert metric["unit"] == "mm/s"
@@ -218,7 +224,7 @@ def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
     assert band_metrics["HOLGURAS"]["band_high_order"] == pytest.approx(10.5)
     assert band_metrics["11-40 X RPM"]["band_low_order"] == pytest.approx(10.5)
     assert band_metrics["11-40 X RPM"]["band_high_order"] == pytest.approx(40.5)
-    assert band_metrics["SUBSINCRONO"]["band_low_hz"] is None
+    assert "band_low_hz" not in band_metrics["SUBSINCRONO"]
 
     sub_rows = sorted(
         (r for r in trend_rows if r["metric_id"] == band_metrics["SUBSINCRONO"]["metric_id"]),

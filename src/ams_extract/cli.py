@@ -504,7 +504,11 @@ def alarms(
         bool,
         typer.Option(
             "--consolidate",
-            help="Also write observations_system.parquet/.csv (flat view).",
+            help=(
+                "Also rematerialize the normative 0.2 projections of OUT "
+                "(observations/consolidated/findings + materialization.json) "
+                "from every *.diaggt.json present."
+            ),
         ),
     ] = False,
     skip_hash: Annotated[
@@ -535,9 +539,7 @@ def alarms(
     except RbmFileError as exc:
         raise _abort(str(exc)) from exc
 
-    written = write_alarm_ground_truth(
-        document, out, stem=name or file.stem, consolidate=consolidate
-    )
+    written = write_alarm_ground_truth(document, out, stem=name or file.stem)
     skipped = summary.skipped_unit_mismatch + summary.skipped_incoherent
     _console.print(
         f"wrote [bold]{summary.emitted}[/bold] system-alarm observations "
@@ -549,8 +551,17 @@ def alarms(
         + (f"  ([yellow]{skipped} skipped[/yellow])" if skipped else "")
         + f"\n  observed: {summary.first_observed} .. {summary.last_observed}"
     )
-    for path in written[1:]:
-        _console.print(f"  also wrote {path}")
+    if consolidate:
+        from ams_extract.informes.consolidate import materialize_ground_truth
+
+        materialized = materialize_ground_truth(out)
+        _console.print(
+            f"  materialized {materialized.observations} observations "
+            f"({materialized.consolidated} consolidated) and "
+            f"{materialized.findings} findings from "
+            f"{materialized.documents} document(s) -> "
+            f"{', '.join(p.name for p in materialized.written)}"
+        )
 
 
 @app.command("informes")
@@ -568,8 +579,9 @@ def informes(
 ) -> None:
     """Extract the analyst's diagnoses from inspection report PDFs as DiagGT.
 
-    Writes one ``<report>.diaggt.json`` per PDF plus the flat consolidations
-    (spec §5) with ``origin="inspection-report"``. Needs the ``informes``
+    Writes one ``<report>.diaggt.json`` per PDF plus the normative 0.2
+    projections (observations/consolidated/findings + materialization.json,
+    spec §§4-5) with ``origin="inspection-report"``. Needs the ``informes``
     extra (``uv sync --extra informes``), which brings ``pdfplumber``.
 
     Aborts if the anchor invariant breaks — the count of dated
@@ -590,13 +602,7 @@ def informes(
             "(uv sync --extra informes)"
         ) from exc
 
-    from ams_extract.informes.consolidate import (
-        finding_rows,
-        observation_rows,
-        read_crosswalk,
-        write_findings,
-        write_observations,
-    )
+    from ams_extract.informes.consolidate import materialize_ground_truth, read_crosswalk
 
     out.mkdir(parents=True, exist_ok=True)
     report = ExtractionReport()
@@ -631,19 +637,15 @@ def informes(
         )
 
     crosswalk = read_crosswalk(out)
-    rows = observation_rows(documents, crosswalk)
-    written = write_observations(rows, out)
-    findings = finding_rows(rows)
-    written.append(write_findings(findings, out))
-    resolved = sum(1 for row in rows if row["dataset_machine_id"])
-    weighted = sum(1 for row in rows if row["_findings"])
+    materialized = materialize_ground_truth(out, crosswalk=crosswalk)
     _console.print(
-        f"consolidated {len(rows)} observations and {len(findings)} findings "
-        f"({weighted} observations carry at least one) -> "
-        f"{', '.join(p.name for p in written)}"
+        f"materialized {materialized.observations} observations "
+        f"({materialized.consolidated} consolidated) and "
+        f"{materialized.findings} findings from "
+        f"{materialized.documents} document(s) -> "
+        f"{', '.join(p.name for p in materialized.written)}"
         + (
-            f"\n  {resolved} rows with dataset_machine_id "
-            f"from {len(crosswalk)} crosswalk entries"
+            f"\n  crosswalk: {len(crosswalk)} entries projected onto dataset_machine_id"
             if crosswalk
             else "\n  no crosswalk.csv: dataset_machine_id left null"
         )
@@ -670,19 +672,14 @@ def informes_weights(
     Reads the ``*.diaggt.json`` of ``GT_DIR`` — not the PDFs: the geometry is
     not touched, only how each observation's judgement is shared out — applies
     the overlay and writes the second generation with
-    ``extraction_method="llm"``, plus the flat consolidations (workplan 10).
+    ``extraction_method="llm"``, plus the normative 0.2 projections
+    (workplan 10).
 
     Aborts if the overlay does not match the documents: an observation whose
     findings the overlay does not score, or scores with other labels, means the
     overlay is stale, and half an overlay is not a distribution.
     """
-    from ams_extract.informes.consolidate import (
-        finding_rows,
-        observation_rows,
-        read_crosswalk,
-        write_findings,
-        write_observations,
-    )
+    from ams_extract.informes.consolidate import materialize_ground_truth, read_crosswalk
     from ams_extract.informes.overlay import ApplyReport, OverlayError, apply_overlay, load_overlay
 
     if not gt_dir.is_dir():
@@ -731,13 +728,12 @@ def informes_weights(
         )
 
     crosswalk = read_crosswalk(destination)
-    rows = observation_rows(documents, crosswalk)
-    written = write_observations(rows, destination)
-    findings = finding_rows(rows)
-    written.append(write_findings(findings, destination))
+    materialized = materialize_ground_truth(destination, crosswalk=crosswalk)
     _console.print(
-        f"consolidated {len(rows)} observations and {len(findings)} findings -> "
-        f"{', '.join(p.name for p in written)}"
+        f"materialized {materialized.observations} observations "
+        f"({materialized.consolidated} consolidated) and "
+        f"{materialized.findings} findings -> "
+        f"{', '.join(p.name for p in materialized.written)}"
     )
 
 
