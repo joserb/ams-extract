@@ -48,7 +48,6 @@ import hashlib
 import json
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from importlib.metadata import PackageNotFoundError, version
 from itertools import pairwise
 from pathlib import Path
 from typing import Any, cast
@@ -68,6 +67,7 @@ from ams_extract.export.vibframe_contract import (
     ColumnSpec,
     schema,
 )
+from ams_extract.provenance import producer_name
 
 CROSSWALK_FILE = "crosswalk.csv"
 
@@ -82,10 +82,7 @@ _VALIDITY_KEY = ("origin", "normalized_tag", "modality")
 
 
 def _tool_name() -> str:
-    try:
-        return f"ams-extract {version('ams-extract')}"
-    except PackageNotFoundError:
-        return "ams-extract 0.0.0"
+    return producer_name()
 
 
 def read_crosswalk(gt_dir: Path) -> dict[str, str]:

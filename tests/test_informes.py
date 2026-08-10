@@ -18,6 +18,7 @@ from typing import Any
 
 import pytest
 
+from ams_extract import __version__
 from ams_extract.informes.consolidate import (
     FINDING_COLUMNS,
     OBSERVATION_COLUMNS,
@@ -645,7 +646,7 @@ class TestMaterialization:
         manifest = json.loads((tmp_path / "materialization.json").read_text(encoding="utf-8"))
         assert manifest["$schema_version"] == "0.2.0"
         assert manifest["kind"] == "gt_materialization"
-        assert manifest["tool"].startswith("ams-extract")
+        assert manifest["tool"] == f"ams-extract {__version__}"
         assert manifest["consolidation_policy"] == "dedup-primary-latest/1.0"
         assert [i["file"] for i in manifest["inputs"]] == ["doc-0.diaggt.json"]
         assert manifest["inputs"][0]["observations"] == 1

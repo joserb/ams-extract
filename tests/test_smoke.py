@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from importlib.metadata import version
+
 from typer.testing import CliRunner
 
 import ams_extract
@@ -14,6 +16,7 @@ runner = CliRunner()
 def test_package_has_version() -> None:
     assert isinstance(ams_extract.__version__, str)
     assert ams_extract.__version__
+    assert ams_extract.__version__ == version("ams-extract")
 
 
 def test_rbm_help_lists_user_subcommands() -> None:

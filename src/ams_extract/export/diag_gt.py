@@ -43,13 +43,13 @@ import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
 import structlog
 
 from ams_extract.models import AlarmNote, Area, Equipment, Point
+from ams_extract.provenance import producer_name
 from ams_extract.reader import RbmReader
 from ams_extract.records.pdpa import ParamSetIndex
 from ams_extract.tree import walk_alarm_note, walk_hierarchy
@@ -154,10 +154,7 @@ def file_sha256(path: Path) -> str:
 
 
 def _extractor_name() -> str:
-    try:
-        return f"ams-extract {version('ams-extract')}"
-    except PackageNotFoundError:
-        return "ams-extract 0.0.0"
+    return producer_name()
 
 
 def _findings(note: AlarmNote) -> list[dict[str, Any]]:

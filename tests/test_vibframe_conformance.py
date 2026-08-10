@@ -75,19 +75,11 @@ def _assert_clean(dataset: Path) -> None:
 
 
 def _assert_golden_conformant(golden: Path) -> None:
-    """Validate real 0.2 goldens, retaining only documented AMS source warnings."""
+    """Validate the real, canonical 0.2 goldens without source exceptions."""
     report = validate_dataset(golden)
     assert report.parquet_checked, "pyarrow missing: the validator skipped the parquet"
     assert report.errors == [], [issue.format() for issue in report.errors]
-    expected_warning_codes = (
-        ["definition.noncanonical-node-type", "definition.noncanonical-node-type"]
-        if golden.name == "ams-rbm"
-        else []
-    )
-    actual_warning_codes = sorted(issue.code for issue in report.warnings)
-    assert actual_warning_codes == expected_warning_codes, [
-        issue.format() for issue in report.warnings
-    ]
+    assert report.warnings == [], [issue.format() for issue in report.warnings]
 
 
 # -------------------------------------------------------- our export passes

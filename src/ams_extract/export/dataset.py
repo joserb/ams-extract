@@ -16,7 +16,6 @@ from collections.abc import Iterable, Sequence
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any, cast
 
@@ -62,6 +61,7 @@ from ams_extract.models import (
     Waveform,
 )
 from ams_extract.point_naming import parse_point_name
+from ams_extract.provenance import producer_name
 from ams_extract.reader import RbmReader
 from ams_extract.records.pdpa import ParamSetIndex
 from ams_extract.report import collect_inventory
@@ -208,10 +208,7 @@ class ExportSummary:
 
 
 def _extractor_name() -> str:
-    try:
-        return f"ams-extract {version('ams-extract')}"
-    except PackageNotFoundError:
-        return "ams-extract 0.0.0"
+    return producer_name()
 
 
 def _timestamp_us(ts: datetime) -> int:
