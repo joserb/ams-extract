@@ -6,6 +6,11 @@ updated: 2026-08-05
 
 # Plan: hogar del extractor de informes y línea base de pesos por finding
 
+> **Nota 2026-08-10** — histórico escrito contra **VibFrame 0.1**: las vistas
+> consolidadas son hoy las cuatro proyecciones normativas 0.2 (sin CSV) y el
+> `crosswalk.csv` es artefacto de herramienta, no formato; ver ADR-0019 y el
+> workplan 12.
+
 **Frente B.2** del plan «GT experto cuantificable». Dos cosas que van juntas
 porque la segunda no cabe en un script suelto: **dar hogar** al extractor de
 informes dentro de `ams_extract` (con tests de regresión) y **cuantificar** el

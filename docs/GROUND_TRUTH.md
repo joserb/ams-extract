@@ -317,13 +317,23 @@ positivos, y los niveles CW001/CW002 son los que los desempatan.
 
 #### Dónde vive el mapeo
 
-El mapeo resuelto vive en una **tabla explícita `crosswalk.csv`** (§4), una
-fila por `normalized_tag` con el `dataset_machine_id`, la regla y el nivel que
-lo decidieron y los candidatos evaluados. Esa tabla es la **fuente** del
-mapeo: admite entradas manuales para lo que el algoritmo no resuelve, y es
-donde se audita cada decisión. El consolidado (§5) es su **proyección**: lleva
-`dataset_machine_id` como columna para poder unir con VibFrame sin releer los
-JSON.
+La **fuente normativa del vínculo** son las proyecciones 0.2 (§5): la columna
+`dataset_machine_id`, materializada con su procedencia en
+`materialization.json`, es lo que un consumidor lee para unir un juicio con
+una partición `machine=`. Si el productor ya conoce el `machine_id` (el GT de
+alarmas de AMS, por ejemplo) la columna sale resuelta de origen y no hace
+falta nada más; si no lo conoce, sale a `null` y las proyecciones siguen
+siendo válidas.
+
+Cómo se rellena esa columna cuando hay que deducirla es cosa de la
+herramienta, no del formato. En este repo lo hace `scripts/crosswalk_gt.py`,
+que emite el **artefacto de trazabilidad `crosswalk.csv`** (§4) — una fila por
+`normalized_tag` con el `dataset_machine_id` propuesto, la regla y el nivel
+que lo decidieron y los candidatos evaluados — y rematerializa las
+proyecciones proyectándolo. Ese CSV existe para poder auditar y corregir a
+mano cada decisión del algoritmo, y **no es miembro del formato**: otro
+productor puede resolver el mapeo como quiera (o conocerlo de antemano) sin
+escribir tabla ninguna.
 
 Los `*.diaggt.json` **no se tocan** en el crosswalk: son salida pura del
 extractor (con su `extracted_at` y el hash del PDF), y `dataset_machine_id`
@@ -629,10 +639,22 @@ verdad de construcción de los datasets demo de vibsynth.
     ├── observations_consolidated.parquet # selección deduplicada (§5.1)
     ├── findings.parquet                 # findings completos y ordenados (§5.2)
     ├── materialization.json             # política, herramienta, inputs y hashes
-    ├── crosswalk.csv                    # tabla explícita TAG ↔ machine_id (§2.4)
-    ├── crosswalk_ambiguities.md         # no-matches y ambigüedades, con evidencia
+    ├── crosswalk.csv                    # (no normativo) artefacto de herramienta
+    ├── crosswalk_ambiguities.md         # (no normativo) artefacto de herramienta
     └── FORMATO_GROUND_TRUTH.md          # esta especificación
 ```
+
+Normativas son las cuatro primeras entradas: los `*.diaggt.json` y las tres
+proyecciones con su `materialization.json`. **`crosswalk.csv` y
+`crosswalk_ambiguities.md` no son miembros del formato**: son **artefactos de
+herramienta** que emite `scripts/crosswalk_gt.py` (ams-extract) para dejar
+auditable el mapeo TAG ↔ `machine_id` — la regla CWxxx que ganó, los
+candidatos evaluados, las ambigüedades y las máquinas sin ground truth. Se
+quedan aquí por comodidad (el sidecar `ground-truth/` tolera entradas no
+reconocidas y ningún validador se queja de ellas), pero el formato no los
+define, ningún consumidor debe requerirlos y un `ground-truth/` sin ellos es
+igual de conforme. Lo normativo del vínculo es la columna
+`dataset_machine_id` de las proyecciones (§5); sin crosswalk sale a `null`.
 
 Los documentos de distinto `origin` conviven en el mismo directorio (los
 `*.diaggt.json` del analista, del sistema y sintéticos) y **todos** entran en
@@ -646,8 +668,10 @@ crosswalk se mantiene junto al dataset y este §4 la sitúa bajo
 `<informes>/ground-truth/`, y no hay contradicción porque **`ground-truth/` es
 precisamente el directorio copiable a la raíz del dataset VibFrame**. Se
 produce junto a los informes (donde está el PDF fuente) y se copia entero al
-dataset cuando se quiere el GT al lado del dato; `crosswalk.csv` viaja con él
-porque el mapeo es específico de ese par (informes, dataset).
+dataset cuando se quiere el GT al lado del dato; el `crosswalk.csv` de la
+herramienta viaja con él porque el mapeo es específico de ese par (informes,
+dataset), pero es equipaje, no carga: copiar el directorio sin él no rompe
+nada.
 
 Integración con VibFrame: `ground-truth/` es un directorio raíz opcional y
 reconocido por el contrato (`docs/VIBFRAME.md` de vibsynth-contracts), que los

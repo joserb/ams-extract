@@ -6,6 +6,10 @@ updated: 2026-08-05
 
 # Plan: reglas GT corregidas, rodamientos inferidos y el `path` del export
 
+> **Nota 2026-08-10** — histórico escrito contra **VibFrame 0.1**: su pendiente
+> de `snap_t` en el contrato vendorizado quedó resuelto por la migración a 0.2,
+> que además prohíbe `fault_frequencies_order`; ver ADR-0019 y el workplan 12.
+
 **Frente O1-A** de la tanda «motor calibrado, GT corregido, corpus al día».
 Cuatro entregas que comparten una idea: lo que el frente anterior sólo pudo
 *paliar* —bajando pesos, restaurando a mano, dejando designaciones sin

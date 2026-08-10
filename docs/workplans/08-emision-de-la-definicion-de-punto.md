@@ -6,6 +6,11 @@ updated: 2026-08-04
 
 # Plan: emitir al dataset lo que AMS declara del eje del punto
 
+> **Nota 2026-08-10** — histórico escrito contra **VibFrame 0.1**: la decisión de
+> no resolver frecuencias sigue en pie, pero `fault_frequencies_order` está
+> prohibido en 0.2 (catálogo único `machine.frequencies`); ver ADR-0019 y el
+> workplan 12.
+
 **Fecha**: 2026-08-04 · **Estado**: **COMPLETADO**. `rbm export` emite ya
 `PointDoc.bearing_designations` y `PointDoc.nominal_speed_rpm` en cada
 `machine.json`, verbatim del `.rbm`. Sin `definition_provenance`: este repo

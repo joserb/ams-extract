@@ -23,7 +23,8 @@ ams-extract/
 │   ├── FORMAT.md          # formato .rbm (reverse engineering, por secciones §)
 │   ├── DECISIONS.md       # ADRs numerados (ADR-0001…)
 │   ├── VERIFICATION.md    # protocolo y registro de validación contra AMS
-│   ├── GROUND_TRUTH.md    # spec DiagGT (serie 0.1.x); este repo la aloja
+│   ├── GROUND_TRUTH.md    # spec DiagGT (serie 0.1.x) + proyecciones normativas
+│   │                      #   0.2 del sidecar; este repo la aloja
 │   └── workplans/         # planes de implementación (ver «Work plans»)
 ├── overlays/              # juicios de peso sobre un GT emitido (ver overlays/README.md)
 ├── samples/               # salidas locales de `rbm extract` (parquet/png); gitignored
@@ -110,17 +111,29 @@ uv run ruff check . && uv run pyright src                       # antes de commi
   absoluta** (`/home/joserb/wslprojects/vibframe-viewer`) — la
   relativa cruzaría siete niveles hasta la raíz. Mismo criterio que t8-extract,
   que apunta con absoluta a los repos del lado Windows.
-- **Conformidad VibFrame**: el contrato que usa el runtime está vendorizado
-  (`export/vibframe_contract.py`, con el commit de origen anotado);
-  `vibsynth-contracts` es dependencia **solo de tests/CI** y nunca se importa
-  desde `src/`. `tests/test_vibframe_conformance.py` valida lo que escribe
-  `rbm export` con `vibframe-validate` (API y CLI) y hace round-trip de los
-  goldens de los tres orígenes. Las columnas requeridas de los cuatro parquet
-  se declaran **non-nullable**, como en t8-extract y vibsynth (workplan 06).
-  **Rojo conocido (2026-08-05)**: `test_the_goldens_round_trip_through_our_writer[vibsynth]`
-  falla porque el contrato vendorizado no conoce `snap_t` en `TRENDS_COLUMNS`
-  y el golden vecino ya lo trae — pendiente de código descrito en el workplan
-  11 («Pendiente»). No es regresión de lo que se esté tocando.
+- **Conformidad VibFrame (0.2)**: el repo escribe **VibFrame 0.2**. El contrato
+  que usa el runtime está vendorizado (`export/vibframe_contract.py`) y
+  **pineado**: `SCHEMA_VERSION = "0.2.0"` y, en su docstring, el estado de
+  origen congelado del que se copió (`ea50b0f3e567`, la coordinada 0.2 de
+  `vibsynth-contracts` del 2026-08-09). Ese pin es la unidad de actualización:
+  si contracts se mueve, se re-vendoriza y se cambia el sello, no se parchea a
+  trozos. `vibsynth-contracts` es dependencia **solo de tests/CI** y nunca se
+  importa desde `src/`. `tests/test_vibframe_conformance.py` valida lo que
+  escribe `rbm export` con `vibframe-validate` (API y CLI) y hace round-trip de
+  los goldens de los tres orígenes.
+- **Lo que 0.2 cambia aquí**: los descriptores de métrica **no** son una tabla —
+  `metrics.parquet` está prohibido y en su lugar cada partición lleva
+  `metric_catalog.json`, JSON **null-free** (`prune_nulls` del contrato
+  vendorizado, que también se aplica a `machine.json`: los campos nulos se
+  omiten recursivamente en vez de escribirse a `null`). Las columnas requeridas
+  de los **tres** parquet (`spectra`, `waves`, `trends`) más las del catálogo
+  JSON se declaran **non-nullable**, como en t8-extract y vibsynth (workplan
+  06). `proc_modes` lo sustituyen `mode_definitions` + `mode_bindings`, y
+  `fault_frequencies_order` el catálogo `machine.frequencies`.
+  El «rojo conocido» de `snap_t` (2026-08-05) **está resuelto**: el contrato
+  vendorizado 0.2 declara `snap_t` en `TRENDS_COLUMNS`/`SPECTRA_COLUMNS`/
+  `WAVES_COLUMNS` y `test_the_goldens_round_trip_through_our_writer[vibsynth]`
+  pasa (verificado 2026-08-10).
 - **No emitir lo no validado**: cada escala/decode nuevo exige gold de AMS
   (captura o informe PLOTDATA) registrado en `VERIFICATION.md` y su ADR en
   `DECISIONS.md`. Lo que decodifica sin gold se salta con log.

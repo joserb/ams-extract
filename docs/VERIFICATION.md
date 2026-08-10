@@ -9,6 +9,20 @@ validados contra el gold de AMS; alarmas almacenadas (`gdnl`) cruzadas contra
 los umbrales `pdla` (991/991). **Export completo validado end-to-end**
 (274.478 muestras, conteo exacto, 2026-05-31). Registro concreto en §5.
 
+**Nota (2026-08-10) — qué versión del formato validan estas filas.** Todo lo
+registrado abajo hasta esta fecha se midió sobre datasets **VibFrame 0.1**: es
+la validación del *decode* (escalas, unidades, conteos, timestamps, umbrales)
+y sigue siendo válida como tal, porque nada de eso cambió. Lo que cambió es el
+**envoltorio**: el 2026-08-10 el código migró a **VibFrame 0.2** (commit
+`5781773`, ADR-0019) y con él el layout de salida (`metric_catalog.json` en
+vez de `metrics.parquet`, `mode_definitions`/`mode_bindings`, JSON null-free,
+cuatro proyecciones normativas en `ground-truth/` y cero CSV). La
+**re-validación end-to-end 0.2 está pendiente**: exige regenerar los
+artefactos desplegados fuera del repo (`bunge_dataset/bunge_cartagena_ams/` y
+`Informes Bunge Cartagena 2026/ground-truth/`), que hoy siguen siendo
+emisiones 0.1. Hasta que eso ocurra, los números de conformidad de las filas
+de `vibframe-validate` son la foto 0.1.
+
 ## 1. Objetivo
 
 Confirmar, con humano en el bucle, que la **forma, magnitud y ejes** de los
@@ -142,6 +156,13 @@ coincide con la unidad del texto (15 `1 - 20 KHz` de PM-0CI/1-3, 3
 |---|---|---|
 | 2026-05-31 | BUNGE completo, `--parallel 4` | **18,6 s**; 15 áreas, 311/347 equipos con datos, **0 fallos**; **137.270 FFT + 137.208 waveform = 274.478** (cuadra exacto con AMS); 622 Parquet, 1,3 GB; carga Hive OK |
 | 2026-07-27 | Área CONTRA INCENDIOS (4 equipos, `--types fft,waveform,trend`), conformidad `vibframe-validate` | **antes** (dataset publicado, copia): FAIL, 4/4 máquinas con `waves.data-length`; **después** (ADR-0017): **PASS 4/4**, 0 errores / 0 avisos con `--sample-rows 100000` (todas las filas). 34 s de reloj incl. arranque (0,2 s de export) |
+
+### Migración a VibFrame 0.2 (`5781773`)
+
+| Fecha | Alcance | Resultado |
+|---|---|---|
+| 2026-08-10 | Código del export y del materializador GT migrados a VibFrame 0.2 (commit `5781773` «Export VibFrame 0.2 datasets», ADR-0019) | **Verificado sólo en suite**: `tests/test_vibframe_conformance.py` valida con `vibframe-validate` (API y CLI) lo que escribe `rbm export` sobre fixtures, y hace round-trip de los tres goldens 0.2 (`ams-rbm`, `t8-backup`, `vibsynth`) — incluido `test_the_goldens_round_trip_through_our_writer[vibsynth]`, el rojo de `snap_t` del 2026-08-05, hoy en verde. **No hay validación 0.2 sobre la base real**: sin `RBM_TEST_FILE` los tests de integración se saltan y el re-export de BUNGE no se ha ejecutado |
+| 2026-08-10 | Re-validación end-to-end 0.2 del despliegue Bunge | **PENDIENTE**. `bunge_dataset/bunge_cartagena_ams/` y `Informes Bunge Cartagena 2026/ground-truth/` siguen siendo emisiones **0.1** (`metrics.parquet`, `observations.csv`, `observations_system.parquet`, snapshot `FORMATO_GROUND_TRUTH.md` v0.1.0). Hasta regenerarlos con el extractor 0.2 no hay número nuevo que registrar: las filas de `vibframe-validate` de arriba son la foto 0.1 |
 
 ### Máquinas sin muestras (GT 2026-07-20)
 

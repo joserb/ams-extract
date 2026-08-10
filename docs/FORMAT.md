@@ -464,8 +464,11 @@ Consecuencias, implementadas en ADR-0017:
 
 - `Waveform.n_samples` es **`len(samples)`** (la longitud emitida); el
   nominal se conserva aparte en `Waveform.nominal_n_samples` y viaja al
-  `machine.json` como prosa en las notas del `proc_mode`. El campo
-  `waves.n_samples` de VibFrame es por contrato la longitud del array.
+  `machine.json` como prosa en las notas del **mode binding** del punto
+  (`mode_bindings[].notes`, que desde VibFrame 0.2 sustituye al `proc_mode`
+  plano; `_proc_mode_notes` en `export/dataset.py` conserva el nombre viejo).
+  El campo `waves.n_samples` de VibFrame es por contrato la longitud del
+  array.
 - **Pendiente (dato, no metadato)**: recortar el array emitido al payload
   (`nominal − 150`) para no publicar la cola de ceros. Se documenta pero
   **no se aplica**: cambia los datos y exige su propio gold de AMS (la

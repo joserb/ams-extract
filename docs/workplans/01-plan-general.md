@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-05-27
-updated: 2026-08-05
+updated: 2026-08-10
 ---
 
 # ams-extract — estado y arquitectura
@@ -103,33 +103,51 @@ referencia viva es el bloque «Commands» del `README.md`; aquí no se duplica.
 
 ## 4. Salida de `rbm export` (contrato VibFrame)
 
-Decisión vigente: `rbm export` escribe VibFrame, un formato parquet+JSON
-importado conceptualmente de `vibsynth-contracts.dataset` pero copiado
-localmente para no depender del monorepo `vibsynth` en runtime.
+> **Actualizado el 2026-08-10 (VibFrame 0.2, ADR-0019).** Este bloque es la
+> única parte de un plan `completed` que se reescribe en vez de anotarse: el
+> README enlaza este documento como referencia viva del contrato de salida, y
+> dejarlo describiendo `metrics.parquet` y `proc_modes` —ambos **prohibidos**
+> en 0.2— sería publicar un contrato que el código ya no cumple. El resto del
+> plan se conserva como registro histórico.
+
+Decisión vigente: `rbm export` escribe **VibFrame 0.2**, un formato
+parquet+JSON importado conceptualmente de `vibsynth-contracts.dataset` pero
+copiado localmente para no depender del monorepo `vibsynth` en runtime.
 
 ```
 dataset/
 ├── dataset.json                         # metadata del dataset
 ├── report.html                          # inventario HTML extra; base de rbm serve
 └── machine=<ASSET_ID>/                  # un directorio por asset AMS
-    ├── machine.json                     # metadata del asset, puntos y modos
-    ├── metrics.parquet                  # descriptores de métricas escalares
+    ├── machine.json                     # metadata del asset, puntos,
+    │                                    #   mode_definitions + mode_bindings
+    │                                    #   y el catálogo machine.frequencies
+    ├── metric_catalog.json              # descriptores de métricas escalares
+    │                                    #   (JSON null-free, no una tabla)
     ├── spectra.parquet                  # FFT: eje derivado de fmin/fmax/lines
     ├── waves.parquet                    # waveforms: eje derivado de sample_rate_hz
     └── trends.parquet                   # tendencias escalares
 ```
 
-**Esquema por tipo**:
+**Esquema por tipo** (columnas requeridas; las opcionales, en el contrato
+vendorizado `export/vibframe_contract.py`):
 
 - **FFT** (`spectra.parquet`): `t`, `point_id`, `proc_mode_id`, `fmin_hz`,
   `fmax_hz`, `lines`, `unit`, `signal_family`, `config_id`,
-  `data: list<float32>`.
+  `data: list<float32>`; más `mode_definition_id`, que resuelve la firma de
+  adquisición contra `machine.json:mode_definitions`.
 - **Waveform** (`waves.parquet`): `t`, `point_id`, `proc_mode_id`,
   `sample_rate_hz`, `n_samples`, `unit`, `signal_family`, `speed_hz`,
-  `config_id`, `data: list<float32>`.
+  `config_id`, `data: list<float32>`; más `mode_definition_id`.
 - **Trend** (`trends.parquet`): una fila por lectura — `t`, `metric_id`,
   `value`, `alarm`, `config_id`; el `metric_id` se resuelve contra
-  `metrics.parquet` y se emite único por punto (`overall_velocity_rms__<point_id>`).
+  `metric_catalog.json` y se emite único por punto
+  (`overall_velocity_rms__<point_id>`).
+
+Las notas de adquisición que no caben en un campo tipado (el bloque nominal de
+AMS, ADR-0017) viajan como prosa en el **mode binding** del punto, no en un
+modo global: `proc_modes` desapareció en 0.2 y lo sustituyen la pareja
+`mode_definitions` (la firma) + `mode_bindings` (su aplicación a un punto).
 
 El formato anterior (`manifest.parquet` + `samples/`) queda obsoleto. Los IDs
 de muestra del viewer se generan en memoria al cargar el VibFrame.
@@ -166,7 +184,8 @@ vez de reescribir la lista:
 
 - **Bandas `vddt`** — emitidas como métricas VibFrame propias (ADR-0010,
   2026-07-18: `band_<slug>__<punto>` en `trends.parquet` con su descriptor en
-  `metrics.parquet`, Mp Wave en g como `true_peak`), y las **tendencias de
+  `metrics.parquet` — desde 2026-08-10, en `metric_catalog.json`
+  (ADR-0019) —, Mp Wave en g como `true_peak`), y las **tendencias de
   aceleración** (PeakVue/HF) emitidas con el overall crudo en G's tras el gold
   de DT-0070 M1P, 147/147 (ADR-0014, 2026-07-20).
 - **`pdpa`** — layout resuelto el 2026-07-19 (FORMAT §5.8, ADR-0012,

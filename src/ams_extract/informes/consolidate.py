@@ -33,10 +33,12 @@ Las fechas documentales viajan como strings ISO ``YYYY-MM-DD``, sin
 promoverse a instantes.
 
 El ``dataset_machine_id`` no lo resuelve este módulo: lo **proyecta** desde
-``crosswalk.csv``, la tabla explícita que la spec §2.4 declara fuente del
-mapeo y que produce ``scripts/crosswalk_gt.py`` contra un dataset concreto.
-Sin esa tabla la columna sale a ``null`` y las proyecciones siguen siendo
-válidas.
+``crosswalk.csv``, un **artefacto de herramienta** —no un miembro del formato:
+la spec no lo define y el sidecar sólo lo tolera como entrada no reconocida—
+que produce ``scripts/crosswalk_gt.py`` contra un dataset concreto para dejar
+auditable el mapeo. La fuente normativa del vínculo es la columna que se
+materializa aquí, no ese CSV. Sin él la columna sale a ``null`` y las
+proyecciones siguen siendo válidas.
 """
 
 # pyright: reportUnknownMemberType=false

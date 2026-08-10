@@ -424,11 +424,11 @@ def export(
         typer.Option("--parallel", help="Worker processes; 1 means serial."),
     ] = 1,
 ) -> None:
-    """Dump the full database to the VibFrame layout.
+    """Dump the full database to the VibFrame 0.2 layout.
 
     Writes ``dataset.json``, ``report.html`` and one ``machine=<asset_id>``
-    directory per AMS equipment, with ``machine.json`` plus spectra, waves,
-    trends and metrics Parquet tables.
+    directory per AMS equipment, with ``machine.json``, the null-free
+    ``metric_catalog.json`` and the spectra, waves and trends Parquet tables.
 
     ``--dataset-path`` is the one thing here that does not come out of the
     ``.rbm``: where the dataset hangs in the fleet ("Bunge Cartagena") is

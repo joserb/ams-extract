@@ -6,6 +6,10 @@ updated: 2026-07-20
 
 # Plan: alinear `rbm export` con VibFrame v0.1 y cerrar los huecos del export
 
+> **Nota 2026-08-10** — histórico escrito contra **VibFrame 0.1**, incluido su
+> título: el formato vigente es 0.2 (catálogo JSON, `mode_definitions`/
+> `mode_bindings`, `snap_t` ya en el contrato); ver ADR-0019 y el workplan 12.
+
 **Fecha**: 2026-07-10 (actualizado 2026-07-20) · **Estado**: en curso —
 conformidad base cerrada (`f17bb9c`), bandas vddt + `path=[área]` emitidas
 (`2c5e1fe`, ADR-0010), etiquetado canónico vía mapper operativo (§4,

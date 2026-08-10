@@ -6,6 +6,11 @@ updated: 2026-08-04
 
 # Plan: definición de máquina desde AMS (fase C del marco ML)
 
+> **Nota 2026-08-10** — histórico escrito contra **VibFrame 0.1**: `proc_modes`
+> lo sustituyen `mode_definitions`/`mode_bindings` y `fault_frequencies_order`
+> está prohibido (catálogo único `machine.frequencies`); ver ADR-0019 y el
+> workplan 12.
+
 **Fecha**: 2026-08-04 · **Estado**: **COMPLETADO**. `PointDoc.location` y
 `PointDoc.direction` salen ya poblados del export, derivados del nombre del
 punto; `vdpm.0x07E` (designación de rodamiento) y `vdpm.0x164` (RPM nominal)

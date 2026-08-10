@@ -636,7 +636,12 @@ jerarquía/muestras que el export.
 ## ADR-0009 — `rbm export` escribe VibFrame sin dependencia de vibsynth
 
 - **Fecha**: 2026-07-09
-- **Estado**: aceptada
+- **Estado**: aceptada — **superseded by ADR-0019 (parcial, 2026-08-10)**: la
+  decisión de vendorizar el contrato sigue en pie; lo que cambia es *qué*
+  contrato se vendoriza (VibFrame 0.2, pineado a `ea50b0f3e567`). En
+  particular, la última consecuencia («enriquecer
+  `machine.json`/`metrics.parquet`») nombra un fichero que 0.2 prohíbe: hoy es
+  `metric_catalog.json`.
 
 ### Contexto
 
@@ -679,7 +684,10 @@ producir ese formato, pero no debe depender en runtime del monorepo
 ## ADR-0010 — Bandas `vddt` como métricas VibFrame y `machine.path` solo con niveles de ubicación
 
 - **Fecha**: 2026-07-18
-- **Estado**: aceptada
+- **Estado**: aceptada — **superseded by ADR-0019 (parcial, 2026-08-10)**: las
+  bandas se siguen emitiendo con los mismos descriptores y el mismo `path`,
+  pero su descriptor ya no va a `metrics.parquet` (§1 y §2 de la decisión):
+  desde VibFrame 0.2 vive en `metric_catalog.json`.
 
 ### Contexto
 
@@ -732,7 +740,10 @@ que la máquina aparecía duplicada como pseudo-sububicación.
 ## ADR-0011 — Etiquetado canónico como post-proceso con `t8-mapper vibframe --write`
 
 - **Fecha**: 2026-07-19
-- **Estado**: aceptada
+- **Estado**: aceptada — **superseded by ADR-0019 (parcial, 2026-08-10)**: el
+  post-proceso sigue siendo el mismo comando, pero la firma estructural que
+  reconstruye y el sitio donde escribe las etiquetas ya no son
+  `metrics.parquet` (§1) sino `metric_catalog.json`.
 
 ### Contexto
 
@@ -952,7 +963,11 @@ plot — la derivación de alarma de ADR-0012 aplica sin cambios.
 ## ADR-0015 — Contexto de operación: métricas reservadas `speed`/`load` a nivel de máquina
 
 - **Fecha**: 2026-07-20
-- **Estado**: aceptada
+- **Estado**: aceptada — **superseded by ADR-0019 (parcial, 2026-08-10)**: las
+  reservadas `speed`/`load` se emiten igual y con los mismos campos, pero su
+  «descriptor machine-level en `metrics.parquet`» (§2) es hoy una entrada de
+  `metric_catalog.json`, donde además los campos nulos se omiten en vez de
+  escribirse a `null`.
 
 ### Contexto
 
@@ -1007,7 +1022,14 @@ CARGA. No hay estado de máquina en el `.rbm` → no hay `state` que emitir.
 ## ADR-0016 — DiagGT: modelos normativos en `vibsynth-contracts`, spec de referencia aquí
 
 - **Fecha**: 2026-07-27
-- **Estado**: aceptada
+- **Estado**: aceptada — **superseded by ADR-0019 (parcial, 2026-08-10)**: el
+  reparto (modelos en contracts, spec aquí) sigue vigente y DiagGT documental
+  sigue en la serie 0.1.x, pero §2 y §4 quedan matizados: el sidecar tiene hoy
+  **cuatro proyecciones normativas 0.2** (`observations.parquet`,
+  `observations_consolidated.parquet`, `findings.parquet`,
+  `materialization.json`) y `crosswalk.csv`/`crosswalk_ambiguities.md` se
+  reclasifican como **artefactos de herramienta**, no miembros del formato: la
+  fuente normativa del vínculo TAG ↔ máquina es la materialización.
 
 ### Contexto
 
@@ -1205,3 +1227,126 @@ reserva `"system-alarm"` para esto (§2.2, v0.1.1).
 - La nota es una foto: si AMS reanaliza, la alarma anterior desaparece
   del fichero. El documento no es reproducible desde un `.rbm` posterior,
   de ahí que el hash del fichero sea parte de la procedencia.
+
+### Corrección 2026-08-10 — el §6 de esta decisión ya no describe al código
+
+El punto **6 («Consolidado aparte y opcional»)** quedó invalidado por la
+migración a VibFrame 0.2 (ADR-0019). Se conserva su texto como registro de lo
+que se decidió en 2026-07-27; lo que hace el código hoy es lo contrario:
+
+- `--consolidate` **no** escribe `observations_system.parquet`/`.csv`. Llama a
+  `ams_extract.informes.consolidate.materialize_ground_truth` sobre todo el
+  directorio `ground-truth/` (`cli.py`, rama `--consolidate` de `rbm alarms`),
+  que rematerializa las cuatro proyecciones normativas 0.2.
+- Por tanto **sí se toca `observations.parquet`**, y deja de ser «el
+  consolidado del analista»: en 0.2 es la proyección **completa** de *todas*
+  las familias, con la columna `origin` separando al analista del sistema, y
+  el consolidado deduplicado es un fichero distinto,
+  `observations_consolidated.parquet`.
+- Las vistas 0.1 se retiran activamente: `_remove_legacy_projections`
+  (`informes/consolidate.py`) borra `observations.csv`, `findings.csv`,
+  `observations_system.csv` y `observations_system.parquet` al
+  rematerializar, y hay tests que lo exigen (`tests/test_diag_gt.py`,
+  `tests/test_informes.py`).
+
+El resto del ADR-0018 (§§1-5 y 7) sigue vigente.
+
+## ADR-0019 — Migración a VibFrame 0.2
+
+- **Fecha**: 2026-08-10
+- **Estado**: aceptada
+- **Supersede (parcialmente)**: ADR-0009, ADR-0010, ADR-0011, ADR-0015,
+  ADR-0016 y el §6 de ADR-0018 (ver la corrección fechada allí).
+
+### Contexto
+
+VibFrame saltó de 0.1 a 0.2 con un cambio **incompatible**, coordinado a la vez
+en los cinco repos del ecosistema (`vibsynth`, `vibsynth-contracts`,
+`vibsynth-metrics-mapper`, `t8-extract`, `vibframe-viewer` y este). No es una
+extensión: 0.2 **prohíbe** piezas que 0.1 exigía, y no hay alias ni fallback —
+un lector 0.2 no lee un dataset 0.1 y viceversa.
+
+Lo que el salto arregla es la mezcla de registros que 0.1 arrastraba: un
+catálogo de descriptores publicado como tabla parquet (con toda su plantilla de
+columnas nulas), un vocabulario de modos de proceso plano (`proc_modes`) que no
+distinguía la *definición* de la adquisición de su *aplicación* a un punto, y
+una lista ordinal (`fault_frequencies_order`) haciendo de catálogo de
+frecuencias. En el sidecar `ground-truth/`, tres vistas tabulares de semántica
+implícita y sin manifiesto de procedencia.
+
+El código de este repo migró en el commit `5781773` («Export VibFrame 0.2
+datasets»); este ADR fija la decisión y la documentación la sigue en la misma
+ola.
+
+### Decisión
+
+1. **`metric_catalog.json` sustituye a `metrics.parquet`.** Los descriptores de
+   métrica de cada partición `machine=` se publican como un documento JSON
+   (`{"schema_version", "metrics": [...]}`), no como tabla. `metrics.parquet`
+   queda **prohibido**: no se escribe, no se lee y no hay fallback. Un catálogo
+   es un documento de metadatos de decenas o cientos de filas con muchos campos
+   opcionales; forzarlo a parquet obligaba a materializar columnas
+   completamente nulas y a inventar tipos para ellas.
+2. **JSON null-free.** `metric_catalog.json` y `machine.json` se escriben
+   omitiendo recursivamente los campos nulos (`prune_nulls` del contrato
+   vendorizado). «Ausente» y «declarado nulo» dejan de ser dos formas de decir
+   lo mismo: lo que no se sabe no se escribe.
+3. **`mode_definitions` + `mode_bindings` sustituyen a `proc_modes`.** Se
+   separa la *definición* de un modo de adquisición (su firma: Fmax, líneas,
+   ventana, sample rate…) de su *vínculo* con un punto concreto. Las filas de
+   `spectra`/`waves` referencian su definición por `mode_definition_id`, y las
+   notas de procedencia (p. ej. el bloque nominal de AMS de ADR-0017) cuelgan
+   del binding, no de un modo global.
+4. **`MachineInfo.frequencies` es el catálogo único de frecuencias.**
+   `fault_frequencies_order` queda prohibido. Este repo lo emite vacío y no
+   cambia de postura: AMS declara designaciones de rodamiento y RPM nominal, y
+   resolverlas a frecuencias es del enriquecedor del ecosistema, no del
+   extractor (ADR de la definición de máquina, workplans 07 y 08).
+5. **Sidecar `ground-truth/`: cuatro proyecciones normativas 0.2.**
+   `observations.parquet` (proyección **completa**, todas las familias, con
+   `origin` separándolas), `observations_consolidated.parquet` (la selección
+   deduplicada bajo `dedup-primary-latest/1.0`, con `valid_to`),
+   `findings.parquet` (alineada 1:1 por `observation_id`) y
+   `materialization.json` (herramienta, política, inputs y hashes). Los
+   `*.diaggt.json` siguen siendo la fuente documental y su esquema sigue en su
+   propia serie **0.1.x**: lo que sube a 0.2 son las proyecciones, no el
+   documento.
+6. **Retirada de los CSV y de la vista de sistema.** `observations.csv`,
+   `findings.csv`, `observations_system.csv` y `observations_system.parquet`
+   salen del formato y se **borran** al rematerializar
+   (`_remove_legacy_projections`). Los CSV nunca tuvieron lector; la vista de
+   sistema queda integrada en la proyección completa vía `origin`.
+7. **`crosswalk.csv` y `crosswalk_ambiguities.md` son artefactos de
+   herramienta, no miembros del formato.** Los emite `scripts/crosswalk_gt.py`
+   para dejar auditable el mapeo TAG ↔ `machine_id` (regla CWxxx aplicada,
+   candidatos evaluados, ambigüedades). Se quedan físicamente donde están —
+   dentro de `ground-truth/`, que tolera entradas no reconocidas — pero el
+   formato **no los define**: la fuente normativa del vínculo es la columna
+   `dataset_machine_id` de la materialización 0.2. Un dataset sin crosswalk es
+   conforme; la columna sale a `null`.
+8. **Contrato vendorizado pineado.** `export/vibframe_contract.py` declara
+   `SCHEMA_VERSION = "0.2.0"` y anota en su docstring el estado de origen
+   congelado del que se copió (`ea50b0f3e567`, la coordinada 0.2 de
+   `vibsynth-contracts` del 2026-08-09). Se mantiene la decisión de ADR-0009
+   (sin dependencia runtime de vibsynth); lo que se actualiza es el sello.
+
+### Consecuencias
+
+- **Los datasets 0.1 no se pueden leer y hay que regenerarlos.** Todo lo
+  exportado antes de `5781773` es ilegible para el pipeline 0.2. Los artefactos
+  desplegados fuera del repo (`bunge_dataset/bunge_cartagena_ams/` y
+  `Informes Bunge Cartagena 2026/ground-truth/`) siguen siendo emisiones 0.1 y
+  quedan **pendientes** de regenerar; hasta entonces, los números
+  end-to-end de `VERIFICATION.md` son la foto 0.1 (ver su entrada de
+  2026-08-10).
+- Un consumidor que leía descriptores con `pl.read_parquet(".../metrics.parquet")`
+  pasa a `json.loads(".../metric_catalog.json")["metrics"]`. Como el JSON es
+  null-free, el consumidor no puede asumir que una clave esté presente: su
+  ausencia es el valor desconocido.
+- El «rojo conocido» de `snap_t` (AGENTS.md, 2026-08-05) desaparece: el
+  contrato 0.2 declara la columna y el round-trip del golden `vibsynth` pasa.
+- La documentación del repo se actualiza en la misma ola
+  (`docs/workplans/12-migracion-vibframe-0.2.md`): README, AGENTS.md,
+  GROUND_TRUTH.md §2.4/§4, FORMAT.md §5.5, el §4 del plan general y el
+  docstring de `scripts/crosswalk_gt.py`. Los ADR y las filas de
+  `VERIFICATION.md` no se reescriben: se anotan encima.

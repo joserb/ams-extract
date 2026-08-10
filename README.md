@@ -19,6 +19,14 @@ writes the whole database to a partitioned Parquet dataset (the full 1.73 GiB
 BUNGE database exports in ~19 s with `--parallel 4`, with sample counts
 matching AMS exactly).
 
+The exported layout is **VibFrame 0.2** (`schema_version` `0.2.0`): three
+parquet tables per machine partition plus `metric_catalog.json` — the metric
+descriptors are a null-free JSON catalog, not a fourth parquet — with
+`mode_definitions`/`mode_bindings` in `machine.json` and the fault-frequency
+catalog under `machine.frequencies`. The `ground-truth/` sidecar carries the
+four normative 0.2 projections. The spec is `docs/VIBFRAME.md` (and the id
+conventions, `docs/VECTORS-0.2.md`) in `vibsynth-contracts`.
+
 - **Velocity FFT** is reconstructed in full and calibrated to **mm/s**
   (validated against AMS on 3 machines, ±5–10%).
 - **Acceleration FFT** (PeakVue + high-frequency points) is calibrated to **G's**
@@ -44,8 +52,10 @@ rbm extract FILE --point NAME [--equipment SUBSTR] \
                  --type fft|waveform|trend|both --limit N --out DIR   # Parquet + PNG
 rbm export FILE --out dataset/ [--types fft,waveform,trend] \
                 [--areas …] [--dataset-path LEVEL]… \
-                [--parallel N]                # VibFrame (dataset.json +
-                                              # machine=<asset>/... + report.html)
+                [--parallel N]                # VibFrame 0.2 (dataset.json +
+                                              # machine=<asset>/{machine.json,
+                                              #   metric_catalog.json, spectra,
+                                              #   waves, trends} + report.html)
 rbm alarms FILE [--out dataset/ground-truth] [--name STEM] \
                 [--client C] [--plant P] [--consolidate] \
                 [--skip-hash]                 # AMS's own alarms
@@ -77,9 +87,13 @@ sha256 of 1.73 GiB is most of the run) at the price of weaker provenance.
 
 `rbm informes` builds the *other* DiagGT ground truth of the same spec — the
 **analyst's**, with `origin="inspection-report"` — out of a directory of
-inspection report PDFs: one `<report>.diaggt.json` per PDF plus the flat
-consolidations (`observations.parquet`/`.csv` and `findings.parquet`), with
-each diagnosis mapped to fault modes by the `GTxxx` rules. It needs the
+inspection report PDFs: one `<report>.diaggt.json` per PDF plus the normative
+VibFrame 0.2 projections of the sidecar — `observations.parquet` (complete),
+`observations_consolidated.parquet` (the deduplicated selection),
+`findings.parquet` and the `materialization.json` manifest — with
+each diagnosis mapped to fault modes by the `GTxxx` rules. There is no CSV:
+`observations.csv` and friends left the format in 0.2 and a re-materialization
+deletes them. It needs the
 `informes` extra (`uv sync --extra informes`, which brings `pdfplumber`) and
 aborts if the anchor invariant of the page layout breaks.
 
@@ -148,10 +162,17 @@ uv run rbm tree "path/to/database.rbm" --out tree.json
 Load the exported VibFrame with any Parquet reader, e.g. Polars:
 
 ```python
+import json
 import polars as pl
 spectra = pl.scan_parquet("dataset/machine=*/spectra.parquet")
 waves = pl.scan_parquet("dataset/machine=*/waves.parquet")
 trends = pl.scan_parquet("dataset/machine=*/trends.parquet")
+
+# The metric descriptors that `trends.metric_id` resolves against are NOT a
+# parquet table: since VibFrame 0.2 they are `metric_catalog.json`, one
+# null-free JSON document per machine partition.
+catalog = json.loads(open("dataset/machine=AG-100/metric_catalog.json").read())
+metrics = pl.DataFrame(catalog["metrics"])
 ```
 
 ## Quality gates

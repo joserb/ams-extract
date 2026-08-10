@@ -6,6 +6,11 @@ updated: 2026-07-28
 
 # Plan: ground truth de diagnóstico externo (DiagGT) desde los informes Preditec
 
+> **Nota 2026-08-10** — histórico: el documento DiagGT sigue en la serie 0.1.x,
+> pero sus proyecciones son hoy las cuatro normativas de **VibFrame 0.2** (sin
+> CSV) y `crosswalk.csv` es artefacto de herramienta, no formato; ver ADR-0019
+> y el workplan 12.
+
 **Fecha**: 2026-07-28 · **Estado**: **COMPLETADO**. Formato DiagGT
 especificado (v0.1.4) con modelos normativos en `vibsynth-contracts`
 (ADR-0016) y validador `vibframe-validate` con goldens por origen; los 6

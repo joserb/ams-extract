@@ -9,18 +9,27 @@ Entradas:
     <dir_ground_truth>/*.diaggt.json                           (documentos DiagGT)
 
 Salidas (en <dir_ground_truth>):
-    crosswalk.csv               — tabla explícita tag ↔ machine_id, una fila por
-                                  `normalized_tag`, con regla aplicada y candidatos
+
+  Artefactos de esta herramienta — NO son miembros del formato VibFrame ni del
+  sidecar DiagGT; el formato no los define y ningún consumidor debe requerirlos.
+  Viven aquí sólo porque `ground-truth/` tolera entradas no reconocidas:
+    crosswalk.csv               — trazabilidad del mapeo tag ↔ machine_id, una
+                                  fila por `normalized_tag`, con regla aplicada
+                                  y candidatos, curable a mano
     crosswalk_ambiguities.md    — ambigüedades, no-matches y máquinas del dataset
                                   sin ground truth, con la resolución propuesta
+
+  Artefactos normativos (proyecciones DiagGT 0.2, spec §§4-5):
     observations.parquet, observations_consolidated.parquet, findings.parquet,
-    materialization.json        — proyecciones 0.2 re-materializadas con la
-                                  columna `dataset_machine_id` proyectada
+    materialization.json        — re-materializados con la columna
+                                  `dataset_machine_id` proyectada
                                   (esquema explícito del contrato; sin CSV)
 
 El post-proceso es **no destructivo** (spec DiagGT §2.4): los `*.diaggt.json` no
-se tocan — el crosswalk vive en `crosswalk.csv` (tabla explícita) y se proyecta
-sobre las proyecciones, que son la vista pensada para el join con VibFrame. La
+se tocan. La **fuente normativa del vínculo** tag ↔ máquina es la columna
+`dataset_machine_id` de las proyecciones, avalada por `materialization.json`;
+el `crosswalk.csv` es el rastro auditable de cómo esta herramienta la dedujo, y
+un `ground-truth/` sin él es igual de conforme (la columna sale a `null`). La
 re-materialización la hace `ams_extract.informes.consolidate`, el mismo
 materializador del paquete, de modo que las proyecciones y su
 `materialization.json` nunca divergen de esquema por culpa de este script.
@@ -51,9 +60,11 @@ dependencia del paquete:
 
     uv run --with pandas python scripts/crosswalk_gt.py <dataset> <ground-truth>
 
-El extractor integrado *proyecta* el `crosswalk.csv` resultante sobre sus
-consolidados, así que basta con re-ejecutar este script cuando cambie el
-dataset o la lista de tags, no en cada emisión.
+El extractor integrado *proyecta* el `crosswalk.csv` resultante sobre las
+proyecciones normativas, así que basta con re-ejecutar este script cuando
+cambie el dataset o la lista de tags, no en cada emisión. Y como el CSV es
+artefacto de herramienta y no formato, se puede borrar, rehacer contra otro
+dataset o sustituir por un mapeo curado a mano sin invalidar nada.
 """
 
 from __future__ import annotations

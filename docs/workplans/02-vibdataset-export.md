@@ -6,6 +6,10 @@ updated: 2026-08-05
 
 # Plan: sustituir `rbm export` por VibDataset
 
+> **Nota 2026-08-10** — histórico escrito contra **VibFrame 0.1**: lo que aquí
+> se llama `metrics.parquet` es hoy `metric_catalog.json`; ver ADR-0019 y el
+> workplan 12.
+
 **Fecha**: 2026-07-09 · **Estado**: completado (histórico) — ejecutado en
 `cf4b240`; el formato se llama ahora **VibFrame** y su conformidad continúa
 en `03-vibframe-conformidad.md`.
