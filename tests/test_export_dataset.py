@@ -13,12 +13,14 @@ from typer.testing import CliRunner
 from ams_extract.cli import app as rbm_app
 from ams_extract.export.dataset import (
     PROC_MODE_NOTES,
+    MetricCatalogCollisionError,
     ModeRegistry,
     _band_metric_row,
     _band_trend_rows,
     _build_machine_doc,
     _context_metric_row,
     _context_trend_rows,
+    _insert_metric_row,
     _metric_row,
     _spectrum_row,
     _trend_rows,
@@ -427,6 +429,76 @@ class TestBandExport:
         band = _make_band("HOLGURAS", "mm/s", alert=1.4, danger=2.2, alarms=(2,))
         rows = _band_trend_rows(band, self.point)
         assert rows[0]["alarm"] == 2
+
+
+class TestMetricCatalogConsolidation:
+    point = Point(record_num=1, long_name="MOTOR LOA HORIZONTAL", short_code="M1H")
+
+    def test_rejects_same_slug_with_different_band_calculation(self) -> None:
+        # The raw tag, its slug and mapper label all collide, but the bands
+        # are different calculations and must never silently overwrite each
+        # other.
+        first = _band_metric_row(
+            _make_band("SUBSINCRONO", "mm/s", low_order=0.0, high_order=0.7),
+            self.point,
+        )
+        second = _band_metric_row(
+            _make_band("SUBSINCRONO", "mm/s", low_order=0.7, high_order=1.0),
+            self.point,
+        )
+        second["canonical_metric"] = first["canonical_metric"] = "same-tag"
+
+        rows: dict[tuple[str, str], dict[str, object]] = {}
+        _insert_metric_row(rows, first)
+
+        with pytest.raises(
+            MetricCatalogCollisionError,
+            match=r"band_low_order.*band_high_order",
+        ) as exc_info:
+            _insert_metric_row(rows, second)
+
+        message = str(exc_info.value)
+        assert "band_subsincrono__M1H" in message
+        assert "config_id=''" in message
+        assert rows[(first["metric_id"], first["config_id"])] is first
+
+    def test_deduplicates_identical_calculation_despite_label_and_mapper_changes(self) -> None:
+        first = _band_metric_row(
+            _make_band("Sub-síncrono", "mm/s", low_order=0.0, high_order=0.7),
+            self.point,
+        )
+        duplicate = _band_metric_row(
+            _make_band("Sub síncrono", "mm/s", low_order=0.0, high_order=0.7),
+            self.point,
+        )
+        duplicate.update(
+            name="different source tag",
+            path="different:human:path",
+            canonical_metric="velocity_band",
+            proxy_quality="direct",
+            mapping_rule="TEST",
+        )
+        # These three fields are set-like in MetricDescriptor. Reordering them
+        # (including repeated values) cannot create a second calculation.
+        first.update(
+            harmonic_orders=[1, 2, 2],
+            additional_frequency_refs=["gear", "shaft", "gear"],
+            flags=["reversed", "multi_band", "reversed"],
+        )
+        duplicate.update(
+            harmonic_orders=[2, 1, 2],
+            additional_frequency_refs=["gear", "gear", "shaft"],
+            flags=["multi_band", "reversed", "reversed"],
+        )
+        # Missing means the MetricDescriptor default, not a different
+        # calculation from the explicit false emitted by AMS today.
+        duplicate.pop("integrate")
+
+        rows: dict[tuple[str, str], dict[str, object]] = {}
+        _insert_metric_row(rows, first)
+        _insert_metric_row(rows, duplicate)
+
+        assert list(rows.values()) == [first]
 
 
 def _make_trend(units: str) -> Trend:

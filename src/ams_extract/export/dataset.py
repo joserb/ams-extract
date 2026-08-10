@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pyarrow as pa
 import pyarrow.parquet as pq
@@ -82,6 +82,101 @@ TREND_METRIC_NAME_ACCELERATION = "overall_acceleration_rms"
 CONTEXT_METRIC_SPEED = "speed"
 CONTEXT_METRIC_LOAD = "load"
 CONTEXT_METRIC_UNITS = {CONTEXT_METRIC_SPEED: "Hz", CONTEXT_METRIC_LOAD: "%"}
+
+# ``metric_id`` and ``config_id`` are the 0.2 identity of a trend series.
+# Everything below is its provenance/calculation signature.  Human labels and
+# mapper output deliberately stay out: changing either must not turn the same
+# AMS calculation into a distinct descriptor.
+_METRIC_CALCULATION_FIELDS = (
+    "point_id",
+    "proc_mode_id",
+    "mode_definition_id",
+    "statistic",
+    "signal_family",
+    "detector",
+    "unit",
+    "integrate",
+    "band_type",
+    "band_low_hz",
+    "band_high_hz",
+    "band_low_order",
+    "band_high_order",
+    "frequency_role",
+    "frequency_ref",
+    "harmonic_orders",
+    "n_sidebands",
+    "modulator",
+    "modulator_ref",
+    "additional_frequency_refs",
+    "flags",
+)
+_SET_LIKE_METRIC_FIELDS = frozenset(
+    {"harmonic_orders", "additional_frequency_refs", "flags"}
+)
+
+
+class MetricCatalogCollisionError(ValueError):
+    """Two calculations claim the same VibFrame trend-series identity."""
+
+
+def _signature_value(field: str, value: Any) -> object:
+    """Turn a calculation field into its semantic comparison value."""
+    if isinstance(value, list):
+        items = tuple(cast(list[object], value))
+        if field in _SET_LIKE_METRIC_FIELDS:
+            # These contract fields are set-like, but duplicate values remain
+            # observable input and therefore must not be discarded.
+            return tuple(sorted(items, key=lambda item: (type(item).__name__, repr(item))))
+        return items
+    return value
+
+
+def _metric_calculation_signature(row: dict[str, Any]) -> dict[str, object]:
+    """Return the non-identity fields that define a metric calculation."""
+    return {
+        field: _signature_value(
+            field,
+            # ``MetricDescriptor`` defaults a missing integrate to false.
+            row.get(field, False if field == "integrate" else None),
+        )
+        for field in _METRIC_CALCULATION_FIELDS
+    }
+
+
+def _insert_metric_row(
+    metric_rows: dict[tuple[str, str], dict[str, Any]], row: dict[str, Any]
+) -> None:
+    """Consolidate one descriptor or fail before a conflicting dict overwrite.
+
+    The writer keeps exactly one descriptor per 0.2 series identity.  Equal
+    calculations are duplicate source records and collapse; different
+    calculations are an extraction bug and are reported with their differing
+    fields instead of silently selecting whichever record was walked last.
+    """
+    key = (str(row["metric_id"]), str(row["config_id"]))
+    previous = metric_rows.get(key)
+    if previous is None:
+        metric_rows[key] = row
+        return
+
+    previous_signature = _metric_calculation_signature(previous)
+    candidate_signature = _metric_calculation_signature(row)
+    differing = [
+        field
+        for field in _METRIC_CALCULATION_FIELDS
+        if previous_signature[field] != candidate_signature[field]
+    ]
+    if not differing:
+        return
+
+    detail = ", ".join(
+        f"{field}: {previous.get(field)!r} != {row.get(field)!r}" for field in differing
+    )
+    raise MetricCatalogCollisionError(
+        "Conflicting metric descriptor for "
+        f"(metric_id={key[0]!r}, config_id={key[1]!r}); "
+        f"calculation fields differ: {detail}"
+    )
 
 
 @dataclass(frozen=True)
@@ -560,9 +655,12 @@ def _band_metric_row(band: TrendBand, point: Point) -> dict[str, Any]:
         "band_low_order": band.low_order,
         "band_high_order": band.high_order,
         "frequency_role": None,
+        "frequency_ref": None,
         "harmonic_orders": None,
         "n_sidebands": None,
         "modulator": None,
+        "modulator_ref": None,
+        "additional_frequency_refs": None,
         "flags": [],
         "canonical_metric": None,
         "proxy_quality": None,
@@ -590,9 +688,12 @@ def _metric_row(trend: Trend, point: Point) -> dict[str, Any]:
         "band_low_order": None,
         "band_high_order": None,
         "frequency_role": None,
+        "frequency_ref": None,
         "harmonic_orders": None,
         "n_sidebands": None,
         "modulator": None,
+        "modulator_ref": None,
+        "additional_frequency_refs": None,
         "flags": [],
         "canonical_metric": None,
         "proxy_quality": None,
@@ -663,9 +764,12 @@ def _context_metric_row(metric_id: str, machine_id: str) -> dict[str, Any]:
         "band_low_order": None,
         "band_high_order": None,
         "frequency_role": None,
+        "frequency_ref": None,
         "harmonic_orders": None,
         "n_sidebands": None,
         "modulator": None,
+        "modulator_ref": None,
+        "additional_frequency_refs": None,
         "flags": [],
         "canonical_metric": None,
         "proxy_quality": None,
@@ -688,7 +792,7 @@ def _process_equipment(
         spectra_rows: list[dict[str, Any]] = []
         wave_rows: list[dict[str, Any]] = []
         trend_rows: list[dict[str, Any]] = []
-        metric_rows: dict[str, dict[str, Any]] = {}
+        metric_rows: dict[tuple[str, str], dict[str, Any]] = {}
         modes = ModeRegistry()
         # (t_us, rpm, carga_pct) of every capture: machine-level context.
         context_captures: list[tuple[int, float, float]] = []
@@ -712,22 +816,20 @@ def _process_equipment(
                     rows = _trend_rows(trend, point)
                     if rows:
                         trend_rows.extend(rows)
-                        metric_rows[_trend_metric_id(trend, point)] = _metric_row(
-                            trend, point
-                        )
+                        _insert_metric_row(metric_rows, _metric_row(trend, point))
                     for band in trend.bands:
                         band_rows = _band_trend_rows(band, point)
                         if band_rows:
                             trend_rows.extend(band_rows)
-                            metric_rows[_band_metric_id(point, band)] = _band_metric_row(
-                                band, point
-                            )
+                            _insert_metric_row(metric_rows, _band_metric_row(band, point))
 
         context_rows = _context_trend_rows(context_captures)
         if context_rows:
             trend_rows.extend(context_rows)
             for metric_id in sorted({r["metric_id"] for r in context_rows}):
-                metric_rows[metric_id] = _context_metric_row(metric_id, equipment.short_code)
+                _insert_metric_row(
+                    metric_rows, _context_metric_row(metric_id, equipment.short_code)
+                )
 
         machine_dir = _machine_dir(out_dir, equipment)
         _write_machine_json(
@@ -743,7 +845,7 @@ def _process_equipment(
         )
         _write_metric_catalog(
             machine_dir / METRIC_CATALOG_FILE,
-            sorted(metric_rows.values(), key=lambda r: r["metric_id"]),
+            sorted(metric_rows.values(), key=lambda r: (r["metric_id"], r["config_id"])),
         )
         _write_parquet(spectra_rows, SPECTRA_COLUMNS, machine_dir / SPECTRA_FILE)
         _write_parquet(wave_rows, WAVES_COLUMNS, machine_dir / WAVES_FILE)
