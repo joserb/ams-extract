@@ -48,9 +48,9 @@ capturas de AMS.
    - FFT: Fmax, n_lines, units, RPM, CARGA, y la "Lista de Picos"
      (frecuencia Hz + amplitud en unidad de display).
    - Waveform: sample_rate, n_samples, units, Pc(+) y Pk(-). Ojo: el
-     `n_samples` que muestra AMS es el **bloque nominal** (512, 4096…); lo
-     emitido es la longitud almacenada (488, 4148…), que es lo que debe
-     casar con `len(samples)` (FORMAT §5.5, ADR-0017).
+     `n_samples` que muestra AMS es la longitud completa (512, 4096…) y debe
+     casar con `len(samples)`: 150 muestras salen de `vdfw` y el resto de
+     `vcfw` (FORMAT §5.5, ADR-0020).
 2. **Extraer con la herramienta**:
    ```bash
    RBM_TEST_FILE="…/BUNGE CARTAGENA marzo 2.0.rbm" \
@@ -113,7 +113,9 @@ capturas de AMS.
 | 2026-05-29 | AG-100 M1H | 2020-02-19 | Pc(+) | 0.483 G | 0.483 G | ✓ <0.3% (calibrado `vdfw.0x28`) |
 | 2026-05-29 | AG-100 M1H | 2020-02-19 | Pk(-) | -0.510 G | -0.510 G | ✓ |
 | 2026-05-31 | CONTRA INCENDIOS PM-0CI/1 M LOA H | — | unidades | mm/s | mm/s | ✓ velocidad ×25.4 (regresión del leak in/s) |
-| 2026-07-27 | BUNGE completo (137.208 waveforms) | todos | longitud almacenada | n_samples nominal (256…16384) | `244 · ceil((nominal − 150) / 244)` | ✓ 137.208/137.208, sin excepciones (FORMAT §5.5, ADR-0017) — verificación estructural sobre el binario, no gold de AMS |
+| 2026-07-27 | BUNGE completo (137.208 waveforms) | todos | longitud de cadena `vcfw` | n_samples nominal (256…16384) | `244 · ceil((nominal − 150) / 244)` | ✓ 137.208/137.208; dato correcto, interpretación histórica sustituida por ADR-0020: medía la continuación, no la waveform completa |
+| 2026-08-12 | BUNGE completo (137.208 waveforms) | todos | reconstrucción `vdfw` + `vcfw` | n_samples nominal (256…16384) | `concat(vdfw[0xD4:], vcfw)[:n_samples]` | ✓ 137.208/137.208 con longitud nominal; las 150 cabeceras contienen señal y todo el exceso `vcfw` es cero (verificación estructural, ADR-0020) |
+| 2026-08-12 | AG-100 M1H | 2020-02-19 | secuencia completa | 512 muestras; Pc/Pk 0,483/−0,510 G | 512 muestras; Pc/Pk 0,483/−0,510 G | ✓ extremos conservados; RMS corregido de 0,15749 a 0,18746 G |
 
 ### Tendencia "Valores Globales" (`vddt`)
 
@@ -156,6 +158,7 @@ coincide con la unidad del texto (15 `1 - 20 KHz` de PM-0CI/1-3, 3
 |---|---|---|
 | 2026-05-31 | BUNGE completo, `--parallel 4` | **18,6 s**; 15 áreas, 311/347 equipos con datos, **0 fallos**; **137.270 FFT + 137.208 waveform = 274.478** (cuadra exacto con AMS); 622 Parquet, 1,3 GB; carga Hive OK |
 | 2026-07-27 | Área CONTRA INCENDIOS (4 equipos, `--types fft,waveform,trend`), conformidad `vibframe-validate` | **antes** (dataset publicado, copia): FAIL, 4/4 máquinas con `waves.data-length`; **después** (ADR-0017): **PASS 4/4**, 0 errores / 0 avisos con `--sample-rows 100000` (todas las filas). 34 s de reloj incl. arranque (0,2 s de export) |
+| 2026-08-12 | BUNGE completo VibFrame 0.2, `--types fft,waveform,trend --parallel 4` (ADR-0020) | **0 fallos**; 311/347 equipos con datos; 137.270 FFT + **137.208 waveform** + 1.571.433 trend, 1.735 Parquet. Auditoría por lotes de todos los `waves.parquet`: **137.208/137.208** filas con `len(data) == n_samples`, distribución exacta 256…16.384. El `vibframe-validate` instalado no es comparable al pin del repo: el checkout editable vecino avanzó a exigir unidades UN/CEFACT y deja 2 tests de conformidad rojos también sin este cambio; pendiente de migración coordinada, no es un fallo de waveform |
 
 ### Migración a VibFrame 0.2 (`5781773`)
 

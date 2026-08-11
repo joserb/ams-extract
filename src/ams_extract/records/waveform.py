@@ -1,7 +1,7 @@
 """Parsers for time-domain waveform records (``vdfw`` descriptor + ``vcfw`` data).
 
-Verified chain (per the 2026-05-29 sub-fase 5a reconnaissance against
-M1H of AG-100, BUNGE)::
+Verified chain (metadata from the 2026-05-29 sub-fase 5a reconnaissance and
+payload layout corrected on 2026-08-12 against all BUNGE waveforms)::
 
     pdcd.0x5C → vdfw (first waveform descriptor, oldest)
                  │
@@ -15,18 +15,18 @@ M1H of AG-100, BUNGE)::
                  ├── 0x3C → float32 CARGA % (load)
                  └── 0x6C → ASCII 8 bytes — units (e.g. "G's")
 
-    vcfw holds 244 int16 LE consecutive samples at offsets 0x18..0x1FF;
-    the chain links via 0x14 to the next vcfw, ending in 0. A waveform's
-    sample buffer is the concatenation of every vcfw in the chain that
-    descends from the waveform's vdfw.
+    The first 150 int16 LE samples live in the descriptor itself, at
+    ``vdfw.0xD4..0x1FF``. The continuation lives in ``vcfw`` records: each
+    holds 244 int16 LE samples at offsets 0x18..0x1FF and links via 0x14 to
+    the next record. AMS rounds that continuation up to whole records and
+    zero-pads only the physical tail.
 
-    The buffer length is NOT ``n_samples``: AMS stores ``n_samples - 150``
-    real samples and rounds the storage up to whole 244-sample records,
-    zero-padding the tail. Hence 512 → 2 records → 488 stored (362 real)
-    and 4096 → 17 records → 4148 stored (3946 real). Verified over the
-    137 208 waveforms of BUNGE, every nominal size (FORMAT §5.5,
-    ADR-0017). ``n_samples`` is the acquisition block AMS was configured
-    for; the emitted length is always ``len(samples)``.
+    Therefore the waveform is
+    ``concat(vdfw[0xD4:0x200], vcfw_chain)[:n_samples]``. For a nominal 512
+    block this is 150 descriptor samples + 362 continuation samples; the 126
+    remaining values in the second vcfw are padding. Verified structurally
+    over all 137 208 BUNGE waveforms and every nominal size (FORMAT §5.5,
+    ADR-0020, superseding ADR-0017).
 
 Unlike the FFT amplitudes (whose calibration is still open, FORMAT §5.6),
 the waveform calibration is solved: multiplying the raw int16 counts by
@@ -59,21 +59,14 @@ VDFW_FIRST_VCFW_OFFSET = 0x18
 VDFW_SAMPLE_PERIOD_OFFSET = 0x24
 VDFW_SCALE_OFFSET = 0x28
 VDFW_N_SAMPLES_OFFSET = 0x2C
-"""Nominal acquisition block size (2.56 x FFT lines), not the stored length."""
-
-VDFW_TAIL_NOT_STORED = 150
-"""Samples of the nominal block AMS never writes (FORMAT §5.5, ADR-0017).
-
-The stored buffer holds ``n_samples - 150`` real samples, padded with
-zeros up to the 244-sample ``vcfw`` record boundary. Documented, not
-applied: trimming the emitted array to the real payload would change the
-data and needs its own AMS gold.
-"""
+"""Complete waveform length (2.56 x FFT lines), including descriptor data."""
 VDFW_TIMESTAMP_OFFSET = 0x34
 VDFW_RPM_OFFSET = 0x38
 VDFW_CARGA_OFFSET = 0x3C
 VDFW_UNITS_OFFSET = 0x6C
 VDFW_UNITS_LENGTH = 8
+VDFW_DATA_OFFSET = 0xD4
+VDFW_DATA_SAMPLES = (RECORD_SIZE - VDFW_DATA_OFFSET) // 2  # 150 int16 LE
 
 # vcfw offsets
 VCFW_NEXT_OFFSET = 0x14
@@ -182,16 +175,33 @@ def walk_vdfw_chain(reader: RbmReader, first_vdfw: int) -> Iterator[VdfwDescript
     )
 
 
+def read_vdfw_samples(reader: RbmReader, vdfw_record: int) -> np.ndarray:
+    """Return the first 150 raw waveform samples stored in ``vdfw``.
+
+    The descriptor tail ``0xD4..0x1FF`` is not metadata or padding: it is the
+    first part of the time signal, exactly 150 int16 LE counts. The returned
+    float32 array is still uncalibrated; callers apply ``vdfw.0x28`` after
+    assembling it with the continuation chain.
+    """
+    record = reader.read_record(vdfw_record)
+    _check_tag(record, VDFW_TAG, vdfw_record)
+    return np.frombuffer(
+        record,
+        dtype="<i2",
+        count=VDFW_DATA_SAMPLES,
+        offset=VDFW_DATA_OFFSET,
+    ).astype(np.float32)
+
+
 def read_vcfw_samples(reader: RbmReader, first_vcfw: int) -> np.ndarray:
-    """Concatenate the int16 LE samples from one vcfw chain.
+    """Concatenate the continuation counts from one ``vcfw`` chain.
 
     Returns a 1-D ``np.ndarray`` of dtype ``float32`` (int16 samples cast
     up so downstream plotting/scaling never has to worry about overflow)
-    whose length is ``244 * <chain length>`` — 488 for the typical BUNGE
-    waveform (2 records of 244 samples). The chain length is
-    ``ceil((nominal - 150) / 244)``, so the buffer can be shorter (488 for
-    a nominal 512) or longer (4148 for a nominal 4096) than the nominal
-    block; the tail past ``nominal - 150`` is zero padding (FORMAT §5.5).
+    whose length is ``244 * <chain length>``. Only the first
+    ``n_samples - 150`` counts are signal; the rest of the last physical
+    record is zero padding. Use :func:`assemble_waveform` with the 150 counts
+    returned by :func:`read_vdfw_samples` to recover the complete block.
 
     Raises:
         WaveformChainError: If any record in the chain has the wrong tag
@@ -227,3 +237,37 @@ def read_vcfw_samples(reader: RbmReader, first_vcfw: int) -> np.ndarray:
     if not chunks:
         return np.empty(0, dtype=np.float32)
     return np.concatenate(chunks)
+
+
+def assemble_waveform(
+    descriptor_samples: np.ndarray,
+    continuation_samples: np.ndarray,
+    n_samples: int,
+) -> np.ndarray:
+    """Assemble and validate one complete nominal waveform buffer.
+
+    ``descriptor_samples`` precede the ``vcfw`` continuation. Any values past
+    ``n_samples`` must be physical zero-padding; non-zero overflow is rejected
+    instead of silently discarding data from an unknown layout variant.
+    """
+    if n_samples < 0:
+        raise WaveformChainError(f"negative waveform sample count: {n_samples}")
+    if descriptor_samples.size != VDFW_DATA_SAMPLES:
+        raise WaveformChainError(
+            "vdfw descriptor sample block has wrong length: "
+            f"{descriptor_samples.size} != {VDFW_DATA_SAMPLES}"
+        )
+    full = np.concatenate((descriptor_samples, continuation_samples)).astype(
+        np.float32, copy=False
+    )
+    if full.size < n_samples:
+        raise WaveformChainError(
+            f"waveform payload shorter than nominal: {full.size} < {n_samples}"
+        )
+    padding = full[n_samples:]
+    if np.any(padding):
+        raise WaveformChainError(
+            f"waveform has {int(np.count_nonzero(padding))} non-zero samples "
+            f"past nominal length {n_samples}"
+        )
+    return full[:n_samples].copy()

@@ -5,6 +5,9 @@ from __future__ import annotations
 import struct
 from pathlib import Path
 
+import numpy as np
+import pytest
+
 from ams_extract.models import Point
 from ams_extract.reader import RECORD_SIZE, RbmReader
 from ams_extract.records.point import VDPM_PDCD_POINTER_OFFSET, VDPM_TAG
@@ -18,6 +21,8 @@ from ams_extract.records.waveform import (
     VCFW_DATA_SAMPLES,
     VCFW_NEXT_OFFSET,
     VCFW_TAG,
+    VDFW_DATA_OFFSET,
+    VDFW_DATA_SAMPLES,
     VDFW_FIRST_VCFW_OFFSET,
     VDFW_N_SAMPLES_OFFSET,
     VDFW_SAMPLE_PERIOD_OFFSET,
@@ -104,15 +109,24 @@ def _waveform_fixture(path: Path, *, nominal: int, vcfw_records: int) -> Path:
     struct.pack_into("<I", vdfw, VDFW_N_SAMPLES_OFFSET, nominal)
     struct.pack_into("<I", vdfw, VDFW_TIMESTAMP_OFFSET, 1582106570)
     vdfw[VDFW_UNITS_OFFSET : VDFW_UNITS_OFFSET + 3] = b"G's"
+    for i in range(VDFW_DATA_SAMPLES):
+        struct.pack_into("<h", vdfw, VDFW_DATA_OFFSET + 2 * i, i + 1)
 
     records = [header, vdpm, pdcd, vdfw]
+    continuation_samples = nominal - VDFW_DATA_SAMPLES
     for index in range(vcfw_records):
         vcfw = bytearray(RECORD_SIZE)
         vcfw[TAG_OFFSET : TAG_OFFSET + 4] = VCFW_TAG
         next_stored = 0 if index == vcfw_records - 1 else 4 + index + 2
         struct.pack_into("<I", vcfw, VCFW_NEXT_OFFSET, next_stored)
         for i in range(VCFW_DATA_SAMPLES):
-            struct.pack_into("<h", vcfw, VCFW_DATA_OFFSET + 2 * i, index + 1)
+            continuation_index = index * VCFW_DATA_SAMPLES + i
+            value = (
+                VDFW_DATA_SAMPLES + continuation_index + 1
+                if continuation_index < continuation_samples
+                else 0
+            )
+            struct.pack_into("<h", vcfw, VCFW_DATA_OFFSET + 2 * i, value)
         records.append(vcfw)
 
     rbm = path / "waveform.rbm"
@@ -121,12 +135,9 @@ def _waveform_fixture(path: Path, *, nominal: int, vcfw_records: int) -> Path:
 
 
 class TestWalkWaveformsSynthetic:
-    def test_n_samples_is_the_decoded_length_not_the_nominal(
+    def test_assembles_the_nominal_block_in_descriptor_then_chain_order(
         self, tmp_path: Path
     ) -> None:
-        # AMS stores fewer samples than the nominal block (FORMAT §5.5), so
-        # emitting vdfw.0x2C would contradict len(samples) and break the
-        # VibFrame wave contract (n_samples == len(data)).
         rbm = _waveform_fixture(tmp_path, nominal=512, vcfw_records=2)
         point = Point(record_num=1, long_name="MOTOR", short_code="MOTOR")
 
@@ -135,20 +146,21 @@ class TestWalkWaveformsSynthetic:
 
         assert len(waveforms) == 1
         wave = waveforms[0]
-        assert wave.samples.size == 2 * VCFW_DATA_SAMPLES == 488
-        assert wave.n_samples == wave.samples.size
-        assert wave.nominal_n_samples == 512
+        assert wave.n_samples == wave.samples.size == wave.nominal_n_samples == 512
+        np.testing.assert_array_equal(
+            wave.samples,
+            np.arange(1, 513, dtype=np.float32) * 2.0,
+        )
 
-    def test_n_samples_follows_a_buffer_longer_than_the_nominal(
-        self, tmp_path: Path
-    ) -> None:
-        # The other direction: a nominal 4096 is stored in 17 records
-        # (4148 samples), i.e. MORE than the nominal block.
+    def test_drops_the_last_physical_records_zero_padding(self, tmp_path: Path) -> None:
         rbm = _waveform_fixture(tmp_path, nominal=4096, vcfw_records=17)
         point = Point(record_num=1, long_name="MOTOR", short_code="MOTOR")
 
         with RbmReader(rbm) as reader:
             wave = next(iter(walk_waveforms(reader, point)))
 
-        assert wave.n_samples == wave.samples.size == 4148
-        assert wave.nominal_n_samples == 4096
+        assert wave.n_samples == wave.samples.size == wave.nominal_n_samples == 4096
+        assert wave.samples[0] == pytest.approx(2.0)
+        assert wave.samples[149] == pytest.approx(300.0)
+        assert wave.samples[150] == pytest.approx(302.0)
+        assert wave.samples[-1] == pytest.approx(8192.0)

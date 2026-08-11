@@ -148,39 +148,37 @@ class TestExportDataset:
         assert "definition_provenance" not in machine_doc["machine"]
 
     def test_wave_row_n_samples_matches_the_emitted_array(self) -> None:
-        # VibFrame derives the time axis from t + i / sample_rate_hz, so
-        # n_samples must be len(data); the AMS nominal block (512 for these
-        # 488 stored samples) is documentary only (FORMAT §5.5, ADR-0017).
+        # ADR-0020 reconstructs the complete vdfw.0x2C block before export.
         point = Point(record_num=1, long_name="MOTOR", short_code="MOTOR")
         waveform = Waveform(
             record_num=3,
             point_record_num=point.record_num,
             timestamp_utc=datetime(2020, 1, 1, tzinfo=UTC),
-            n_samples=488,
+            n_samples=512,
             sample_rate_hz=2_560.0,
             rpm=1_455.0,
             units="G's",
             carga_pct=0.0,
-            samples=np.zeros(488, dtype=np.float32),
+            samples=np.zeros(512, dtype=np.float32),
             nominal_n_samples=512,
         )
 
         row = _waveform_row(waveform, point)
 
-        assert row["n_samples"] == len(row["data"]) == 488
+        assert row["n_samples"] == len(row["data"]) == 512
 
-    def test_mode_registry_defines_by_effective_shape_and_notes_the_nominal(self) -> None:
+    def test_mode_registry_defines_the_complete_nominal_shape(self) -> None:
         point = Point(record_num=1, long_name="MOTOR", short_code="MOTOR")
         waveform = Waveform(
             record_num=3,
             point_record_num=point.record_num,
             timestamp_utc=datetime(2020, 1, 1, tzinfo=UTC),
-            n_samples=488,
+            n_samples=512,
             sample_rate_hz=2_560.0,
             rpm=1_455.0,
             units="G's",
             carga_pct=0.0,
-            samples=np.zeros(488, dtype=np.float32),
+            samples=np.zeros(512, dtype=np.float32),
             nominal_n_samples=512,
         )
         spectrum = Spectrum(
@@ -201,16 +199,16 @@ class TestExportDataset:
 
         definitions = {d["definition_id"]: d for d in modes.mode_definitions()}
         assert wave_id.startswith("md-") and spec_id.startswith("md-")
-        # AMS blocks are waveform-only or spectrum-only; the emitted length is
-        # the definition's, and the nominal AMS block lives in the binding note.
-        assert definitions[wave_id]["waveform"]["n_samples"] == 488
+        # AMS blocks are waveform-only or spectrum-only; the complete nominal
+        # length is now also the emitted shape.
+        assert definitions[wave_id]["waveform"]["n_samples"] == 512
         assert "spectrum" not in definitions[wave_id]
         assert definitions[spec_id]["spectrum"]["lines"] == 1_600
         assert "waveform" not in definitions[spec_id]
         bindings = {b["proc_mode_id"]: b for b in modes.mode_bindings()}
         wave_binding = bindings["WAVE_ACC_2560"]
         assert wave_binding["definition_id"] == wave_id
-        assert "512" in wave_binding["notes"] and "488" in wave_binding["notes"]
+        assert wave_binding["notes"] == PROC_MODE_NOTES
         assert bindings["VEL_1000"]["notes"] == PROC_MODE_NOTES
 
     def test_mode_registry_splits_the_same_tag_by_effective_shape(self) -> None:

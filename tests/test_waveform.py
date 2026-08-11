@@ -17,6 +17,8 @@ from ams_extract.records.waveform import (
     VCFW_NEXT_OFFSET,
     VCFW_TAG,
     VDFW_CARGA_OFFSET,
+    VDFW_DATA_OFFSET,
+    VDFW_DATA_SAMPLES,
     VDFW_FIRST_VCFW_OFFSET,
     VDFW_N_SAMPLES_OFFSET,
     VDFW_NEXT_OFFSET,
@@ -28,8 +30,10 @@ from ams_extract.records.waveform import (
     VDFW_UNITS_LENGTH,
     VDFW_UNITS_OFFSET,
     WaveformChainError,
+    assemble_waveform,
     parse_vdfw_descriptor,
     read_vcfw_samples,
+    read_vdfw_samples,
     walk_vdfw_chain,
 )
 
@@ -55,6 +59,7 @@ def _make_vdfw(
     first_vcfw_stored: int,
     next_vdfw_stored: int = 0,
     scale_factor: float = 1.0,
+    samples: list[int] | None = None,
 ) -> bytes:
     record = _empty_record()
     record[TAG_OFFSET : TAG_OFFSET + 4] = VDFW_TAG
@@ -69,6 +74,10 @@ def _make_vdfw(
     units_slot = bytearray(b" " * VDFW_UNITS_LENGTH)
     units_slot[: len(units)] = units
     record[VDFW_UNITS_OFFSET : VDFW_UNITS_OFFSET + VDFW_UNITS_LENGTH] = bytes(units_slot)
+    for i, value in enumerate(samples or []):
+        if i >= VDFW_DATA_SAMPLES:
+            raise AssertionError(f"vdfw holds only {VDFW_DATA_SAMPLES} inline samples")
+        struct.pack_into("<h", record, VDFW_DATA_OFFSET + i * 2, value)
     return bytes(record)
 
 
@@ -232,3 +241,54 @@ class TestReadVcfwSamples:
         records = [_make_header(), _empty_record()]
         with reader_factory(records) as reader, pytest.raises(WaveformChainError):
             read_vcfw_samples(reader, 1)
+
+
+class TestReadVdfwSamples:
+    def test_decodes_the_150_inline_samples(self, reader_factory) -> None:
+        expected = [i - 75 for i in range(VDFW_DATA_SAMPLES)]
+        vdfw = _make_vdfw(
+            timestamp_raw=1_700_000_000,
+            n_samples=512,
+            sample_period=1.0 / 2_560.0,
+            rpm=1_455.0,
+            units=b"G's",
+            carga_pct=100.0,
+            first_vcfw_stored=0,
+            samples=expected,
+        )
+        with reader_factory([_make_header(), vdfw]) as reader:
+            samples = read_vdfw_samples(reader, 1)
+        assert samples.dtype == np.float32
+        assert samples.tolist() == expected
+
+    def test_rejects_record_with_wrong_tag(self, reader_factory) -> None:
+        with reader_factory([_make_header(), _empty_record()]) as reader, pytest.raises(
+            WaveformChainError
+        ):
+            read_vdfw_samples(reader, 1)
+
+
+class TestAssembleWaveform:
+    def test_prepends_descriptor_samples_and_drops_zero_padding(self) -> None:
+        head = np.arange(1, 151, dtype=np.float32)
+        continuation = np.concatenate(
+            (np.arange(151, 513, dtype=np.float32), np.zeros(126, dtype=np.float32))
+        )
+        samples = assemble_waveform(head, continuation, 512)
+        np.testing.assert_array_equal(samples, np.arange(1, 513, dtype=np.float32))
+
+    def test_rejects_a_short_payload(self) -> None:
+        with pytest.raises(WaveformChainError, match="shorter than nominal"):
+            assemble_waveform(
+                np.zeros(VDFW_DATA_SAMPLES, dtype=np.float32),
+                np.zeros(100, dtype=np.float32),
+                512,
+            )
+
+    def test_rejects_nonzero_values_past_the_nominal_length(self) -> None:
+        with pytest.raises(WaveformChainError, match="non-zero samples"):
+            assemble_waveform(
+                np.zeros(VDFW_DATA_SAMPLES, dtype=np.float32),
+                np.ones(488, dtype=np.float32),
+                512,
+            )

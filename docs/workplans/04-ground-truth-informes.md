@@ -10,6 +10,10 @@ updated: 2026-07-28
 > pero sus proyecciones son hoy las cuatro normativas de **VibFrame 0.2** (sin
 > CSV) y `crosswalk.csv` es artefacto de herramienta, no formato; ver ADR-0019
 > y el workplan 12.
+>
+> **Nota 2026-08-12** — ADR-0020 sustituye la interpretación de ADR-0017
+> citada en este plan: las 150 muestras no estaban ausentes, sino dentro de
+> `vdfw`; la cadena `vcfw` es sólo la continuación con padding físico.
 
 **Fecha**: 2026-07-28 · **Estado**: **COMPLETADO**. Formato DiagGT
 especificado (v0.1.4) con modelos normativos en `vibsynth-contracts`
@@ -236,7 +240,7 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
      `ground-truth/` mínimo (DiagGT de 3 observaciones + `crosswalk.csv`).
    - **Hallazgo de conformidad de este repo**: `rbm export` escribe
      `waves.n_samples` con el valor **nominal** del modo (512, 4096, 256)
-     mientras el array almacenado tiene otra longitud (488, 4148, 244) — 311
+     mientras el parser de entonces emitía otra longitud (488, 4148, 244) — 311
      de las 347 máquinas de `bunge_cartagena_ams`. Es el único incumplimiento
      del dataset: columnas, tipos, join trends↔metrics y escala de `alarm`
      pasan limpios en las 347. **Arreglado el mismo día** en el export
@@ -474,9 +478,9 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
    la última, 30 días y marcada abierta) y badge de status con el mismo
    criterio de dominancia que las bandas. 57/57 tests con dataset real.
 3. ~~Regenerar la copia de cortesía~~ — hecho (hoy sincronizada a v0.1.2).
-   ~~Arreglar `waves.n_samples`~~ — **hecho 2026-07-27** (ADR-0017);
-   incógnita del padding cerrada (FORMAT §5.5:
-   `stored = 244 · ceil((nominal − 150) / 244)`).
+   ~~Arreglar `waves.n_samples`~~ — **hecho 2026-07-27** (ADR-0017) y
+   **corregido 2026-08-12** (ADR-0020): el parser concatena las 150 muestras
+   inline de `vdfw` con la continuación `vcfw` y emite el nominal completo.
    ~~Re-exportar `bunge_cartagena_ams`~~ — **hecho 2026-07-27**: export con
    el fix + `t8-mapper --write` + `ground-truth/`; `vibframe-validate` PASS
    (347 máquinas, 7 docs DiagGT, 0 errores).
@@ -507,8 +511,9 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
 
 - Ley de la severidad `gdsc.0x1A` en zona D y las 18 alarmas con unidad
   inconsistente (FORMAT §5.9).
-- Recorte de la cola de ceros de la waveform al payload real — decisión
-  aparte con gold propio (ADR-0017).
+- ~~Recorte de la cola de ceros de la waveform~~ — resuelto por ADR-0020: el
+  padding es capacidad física de `vcfw`, se descarta después de reconstruir
+  `vdfw + vcfw` hasta la longitud nominal.
 - Re-extraer los 28 datasets T8 multi-generación (workplan 04 de t8-extract)
   y el colapso por `(metric_id, config_id)` en el visor.
 - CI de productores y procedimiento de cambio de formato (workplan 01 de

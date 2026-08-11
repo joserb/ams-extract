@@ -38,7 +38,8 @@ ams-extract»); aquí queda la parte de este repo.
   competir con «declarado nulo».
 - **`mode_definitions` + `mode_bindings`** sustituyen a `proc_modes`; las filas
   de `spectra`/`waves` llevan `mode_definition_id` y las notas de procedencia
-  (el bloque nominal de AMS, ADR-0017) cuelgan del *binding*.
+  cuelgan del *binding*. La antigua nota de divergencia del bloque nominal de
+  AMS quedó retirada por ADR-0020: la waveform completa sí tiene esa longitud.
 - **`machine.frequencies`** es el catálogo único; `fault_frequencies_order`
   queda prohibido. Este repo lo emite vacío: sigue declarando designaciones de
   rodamiento y RPM nominal sin resolverlas (workplans 07 y 08).

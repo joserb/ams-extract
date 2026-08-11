@@ -105,7 +105,9 @@ from ams_extract.records.trend import (
 from ams_extract.records.waveform import (
     WAVEFORM_VELOCITY_SCALE_MM_S,
     WaveformChainError,
+    assemble_waveform,
     read_vcfw_samples,
+    read_vdfw_samples,
     walk_vdfw_chain,
 )
 
@@ -477,7 +479,8 @@ def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
     """Yield every time-domain waveform recorded for ``point``, oldest first.
 
     Walks ``vdpm.0x10 → pdcd → 0x5C → vdfw → (chain via 0x14)`` and, for
-    each ``vdfw``, reads its full ``vcfw`` data chain into a numpy array.
+    each ``vdfw``, prepends its 150 inline samples to the ``vcfw`` continuation
+    and removes the final physical-record padding.
     Per-waveform failures are logged and the walk continues; a missing
     pdcd or first-vdfw yields zero waveforms.
     """
@@ -513,7 +516,9 @@ def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
             )
             continue
         try:
-            raw = read_vcfw_samples(reader, desc.first_vcfw)
+            descriptor_samples = read_vdfw_samples(reader, desc.record_num)
+            continuation = read_vcfw_samples(reader, desc.first_vcfw)
+            raw = assemble_waveform(descriptor_samples, continuation, desc.n_samples)
         except WaveformChainError as exc:
             _log.warning(
                 "vcfw_chain_failed",
@@ -536,11 +541,9 @@ def walk_waveforms(reader: RbmReader, point: Point) -> Iterator[Waveform]:
             record_num=desc.record_num,
             point_record_num=point.record_num,
             timestamp_utc=desc.timestamp_utc,
-            # The decoded length, NOT vdfw.0x2C: the stored buffer holds
-            # `nominal - 150` real samples rounded up to whole 244-sample
-            # vcfw records, so it is shorter (488 vs 512) or longer (4148
-            # vs 4096) than the nominal block (FORMAT §5.5, ADR-0017).
-            n_samples=int(calibrated.size),
+            # vdfw.0x2C is the complete length: 150 samples live inline in
+            # the descriptor and vcfw stores the continuation (ADR-0020).
+            n_samples=desc.n_samples,
             sample_rate_hz=desc.sample_rate_hz,
             rpm=desc.rpm,
             units=units,

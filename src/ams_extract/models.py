@@ -129,19 +129,18 @@ class Waveform:
     """One time-domain waveform measured at a point.
 
     Reached through ``vdpm.0x10 → pdcd → 0x5C → vdfw → 0x18 → vcfw``.
-    The samples array length is ``244 * <vcfw chain length>`` and does NOT
-    equal the nominal block size stored in ``vdfw.0x2C`` (488 vs 512, 4148
-    vs 4096): AMS writes ``nominal - 150`` real samples and rounds the
-    storage up to whole 244-sample ``vcfw`` records, zero-padding the tail
-    (FORMAT §5.5, ADR-0017). ``n_samples`` is therefore the length of
-    ``samples`` — the nominal is kept apart in ``nominal_n_samples``.
+    The first 150 samples live inline in ``vdfw.0xD4..0x1FF`` and the rest in
+    the ``vcfw`` chain, whose final physical record is zero-padded. The
+    assembled array is truncated to the complete block size in ``vdfw.0x2C``;
+    therefore ``n_samples == len(samples) == nominal_n_samples`` for native
+    RBM waveforms (FORMAT §5.5, ADR-0020).
 
     Attributes:
         record_num: Zero-based record number of the ``vdfw`` descriptor.
         point_record_num: Record number of the parent ``vdpm`` (point).
         timestamp_utc: Sample timestamp as decoded from ``vdfw.0x34``.
-        n_samples: Length of ``samples``, i.e. what was actually decoded
-            and is emitted. Every consumer derives the time axis from it
+        n_samples: Complete decoded block length and length of ``samples``.
+            Every consumer derives the time axis from it
             (``n_samples / sample_rate_hz`` seconds).
         sample_rate_hz: Sample rate in Hz, derived from ``vdfw.0x24``
             (``1 / sample_period``).
@@ -152,10 +151,9 @@ class Waveform:
             ``vcfw`` int16 counts multiplied by ``vdfw.0x28`` (scale
             factor). For M1H 19-feb-2020 this reproduces the AMS Pc/Pk
             values within 0.3% (FORMAT §5.5).
-        nominal_n_samples: Acquisition block size as configured in AMS,
-            verbatim from ``vdfw.0x2C`` (512, 4096…); ``None`` when the
-            waveform was rebuilt from an exported table instead of a
-            ``.rbm`` record. Documentary only — never a length.
+        nominal_n_samples: Acquisition block size from ``vdfw.0x2C``
+            (512, 4096…). Equal to ``n_samples`` for a correctly assembled
+            native waveform; ``None`` when rebuilt from an exported table.
     """
 
     record_num: int

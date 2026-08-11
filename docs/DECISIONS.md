@@ -1087,7 +1087,12 @@ define contracts, este repo lo produce sin depender de él en runtime.
 ## ADR-0017 — `waves.n_samples` es la longitud del array; el bloque nominal de AMS es prosa
 
 - **Fecha**: 2026-07-27
-- **Estado**: aceptada
+- **Estado**: sustituida por ADR-0020 (2026-08-12)
+
+> **Corrección 2026-08-12**: la premisa sobre el layout era incompleta. Las
+> 150 muestras supuestamente ausentes están en `vdfw.0xD4..0x1FF`; `vcfw`
+> guarda la continuación y padding cero. Se conserva el texto inferior como
+> registro histórico, pero su decisión ya no describe el exportador.
 
 ### Contexto
 
@@ -1295,7 +1300,7 @@ ola.
    separa la *definición* de un modo de adquisición (su firma: Fmax, líneas,
    ventana, sample rate…) de su *vínculo* con un punto concreto. Las filas de
    `spectra`/`waves` referencian su definición por `mode_definition_id`, y las
-   notas de procedencia (p. ej. el bloque nominal de AMS de ADR-0017) cuelgan
+   notas de procedencia (p. ej. las de adquisición del origen) cuelgan
    del binding, no de un modo global.
 4. **`MachineInfo.frequencies` es el catálogo único de frecuencias.**
    `fault_frequencies_order` queda prohibido. Este repo lo emite vacío y no
@@ -1350,3 +1355,60 @@ ola.
   GROUND_TRUTH.md §2.4/§4, FORMAT.md §5.5, el §4 del plan general y el
   docstring de `scripts/crosswalk_gt.py`. Los ADR y las filas de
   `VERIFICATION.md` no se reescriben: se anotan encima.
+
+## ADR-0020 — La waveform completa concatena 150 muestras de `vdfw` y la continuación `vcfw`
+
+- **Fecha**: 2026-08-12
+- **Estado**: aceptada
+- **Sustituye**: ADR-0017
+
+### Contexto
+
+ADR-0017 resolvió la incoherencia `len(data) != n_samples` haciendo que el
+exportador declarase la longitud física de la cadena `vcfw`. Esa solución
+partía de una lectura incompleta del descriptor: los 300 bytes finales de
+`vdfw`, `0xD4..0x1FF`, contienen **150 muestras `int16` LE reales**. La cadena
+`vcfw` no es el buffer completo, sino su continuación, redondeada a records de
+244 muestras con padding cero al final.
+
+La estructura se comprobó sobre las 137.208 waveforms de BUNGE:
+
+- todas tienen exactamente 150 muestras inline y ninguna cabecera es
+  enteramente cero;
+- la cadena mide `244 · ceil((n_samples − 150) / 244)` en todos los casos;
+- después de las `n_samples − 150` muestras de continuación, todo el exceso es
+  cero;
+- `concat(vdfw[0xD4:], vcfw)[:n_samples]` produce la longitud nominal en las
+  137.208, sin excepciones.
+
+En el gold AG-100 M1H de 2020-02-19 la reconstrucción completa conserva los
+extremos Pc(+)=0,483 G y Pk(−)=−0,510 G validados contra AMS. Sí corrige las
+estadísticas que dependen de todas las muestras: el RMS pasa de 0,15749 G con
+la secuencia errónea de 362 muestras reales + 126 ceros a 0,18746 G sobre las
+512 muestras reales.
+
+### Decisión
+
+1. Decodificar `vdfw.0xD4..0x1FF` como las primeras 150 muestras de cada
+   waveform.
+2. Concatenarlas delante de la cadena `vcfw`, conservar las primeras
+   `vdfw.0x2C` muestras y exigir que cualquier exceso de la cadena sea cero.
+   Un exceso no nulo indica un layout no caracterizado y la muestra se salta
+   con la política normal del parser, en vez de publicar datos ambiguos.
+3. Calibrar la secuencia ya reconstruida con `vdfw.0x28` y, para velocidad,
+   convertir de in/s a mm/s como hasta ahora.
+4. Emitir siempre
+   `Waveform.n_samples == Waveform.nominal_n_samples == len(samples)`. El
+   nominal deja de necesitar una nota de divergencia en el mode binding; se
+   mantiene el atributo `nominal_n_samples` por compatibilidad interna.
+
+### Consecuencias
+
+- Desaparecen los ceros artificiales al final y se recuperan las 150 muestras
+  reales omitidas al principio.
+- Pc/Pk y la calibración no cambian en el gold existente, pero RMS, factor de
+  cresta y cualquier análisis temporal deben recalcularse.
+- Los datasets AMS exportados con ADR-0017 deben regenerarse: aunque eran
+  conformes estructuralmente, su array `waves.data` era incorrecto.
+- La validación de corpus completo pasa a proteger tanto la igualdad con la
+  longitud nominal como la ausencia de padding no cero.

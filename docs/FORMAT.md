@@ -388,8 +388,9 @@ vdfw chain (chronological, oldest → newest):
               0x38 → float32 RPM (no Fmax como en vdps)
               0x3C → float32 CARGA %
               0x6C → ASCII 8 bytes — units (e.g. "G's")
+              0xD4 hasta 0x1FF → 150 × int16 LE (primeras muestras)
 
-vcfw chain (datos de la waveform):
+vcfw chain (continuación de la waveform):
   vcfw → 0x14 → siguiente vcfw  (0 = fin)
               0x18 hasta 0x1FF → 244 × int16 LE (muestras acel. centradas;
                      amplitud calibrada = int16 × scale_factor de vdfw.0x28)
@@ -412,76 +413,64 @@ Pk(-)=-0.510 G, idéntico al gold de AMS (error < 0.3%). El factor es
 > (units `plg/segs`/`in/sec`) → `mm/s`, igual que el FFT/trend de velocidad.
 > En BUNGE: 503 waveforms son de velocidad (resto G's).
 
-Para M1H 19-feb-2020 BUNGE: 2 vcfw records → 488 muestras decoded
-(24 menos que las 512 nominales — ver "Longitud almacenada" abajo).
-Cotejado contra el screenshot AMS:
+Para M1H 19-feb-2020 BUNGE: 150 muestras en `vdfw` + 362 muestras
+reales en 2 records `vcfw` = 512 muestras; las 126 posiciones restantes
+del segundo `vcfw` son padding cero y no se emiten. Cotejado contra el
+screenshot AMS:
 
 | Métrica | AMS | Decodificado | Match |
 |---|---|---|---|
-| Pc(+) | 0.483 G | 0.482 G | ✓ 0.2% |
-| Pk(-) | -0.510 G | -0.500 G | ✓ 2% |
-| n_samples (nominal) | 512 | 512 (en vdfw) | ✓ |
-| n_samples (reales decoded) | — | 488 | -4.7% |
+| Pc(+) | 0.483 G | 0.483 G | ✓ <0.3% |
+| Pk(-) | -0.510 G | -0.510 G | ✓ <0.3% |
+| n_samples | 512 | 512 | ✓ |
 | sample_rate | 2560 Hz (= 2.56 × Fmax_FFT) | 2560 Hz | ✓ |
-| Duration | 0.20-0.21 s | 0.191 s | ≈ |
+| Duration | 0.20 s | 0.200 s | ✓ |
 | Units | G | G | ✓ |
 
 > **Actualización sub-5b**: con `scale_factor` (vdfw.0x28) aplicado, Pc/Pk
 > mejoran a 0.483 / -0.510 (antes 0.482 / -0.500 con la escala empírica
 > de sub-5a). La calibración deja de ser deuda para la waveform.
 
-**Longitud almacenada vs `n_samples` — RESUELTO (2026-07-27)**. El
+**Reconstrucción y padding — RESUELTO (2026-08-12, ADR-0020)**. El
 `n_samples` de `vdfw.0x2C` (256, 512, 1024, 2048, 4096, 8192, 16384 =
-2.56 × líneas del FFT) es el **bloque nominal de adquisición**, no la
-longitud de lo almacenado. Barridas las 137.208 waveforms de BUNGE, la
-ley es exacta y sin excepciones:
+2.56 × líneas del FFT) es la longitud completa de la waveform. Sus
+primeras 150 muestras están dentro del propio descriptor, en
+`vdfw.0xD4..0x1FF`; la cadena `vcfw` contiene la continuación y redondea su
+capacidad a records completos de 244 muestras. Barridas las 137.208
+waveforms de BUNGE, la ley es exacta y sin excepciones:
 
 ```
-payload  = n_samples − 150          # últimas muestras reales del buffer
-stored   = 244 · ceil(payload/244)  # cadena de vcfw completos, cola a 0
+head         = 150                         # vdfw.0xD4..0x1FF
+continuation = n_samples − head            # muestras reales en vcfw
+vcfw_stored  = 244 · ceil(continuation/244) # capacidad física, cola a 0
+waveform     = concat(head, vcfw)[:n_samples]
 ```
 
-| nominal | payload (real) | vcfw | stored | stored − nominal | waveforms |
+| n_samples | continuación real | vcfw | capacidad vcfw | padding cero | waveforms |
 |---|---|---|---|---|---|
-| 256 | 106 | 1 | 244 | −12 | 1.813 |
-| 512 | 362 | 2 | 488 | −24 | 61.312 |
-| 1.024 | 874 | 4 | 976 | −48 | 5.022 |
-| 2.048 | 1.898 | 8 | 1.952 | −96 | 18.010 |
-| 4.096 | 3.946 | 17 | 4.148 | **+52** | 50.841 |
-| 8.192 | 8.042 | 33 | 8.052 | −140 | 202 |
-| 16.384 | 16.234 | 67 | 16.348 | −36 | 8 |
+| 256 | 106 | 1 | 244 | 138 | 1.813 |
+| 512 | 362 | 2 | 488 | 126 | 61.312 |
+| 1.024 | 874 | 4 | 976 | 102 | 5.022 |
+| 2.048 | 1.898 | 8 | 1.952 | 54 | 18.010 |
+| 4.096 | 3.946 | 17 | 4.148 | 202 | 50.841 |
+| 8.192 | 8.042 | 33 | 8.052 | 10 | 202 |
+| 16.384 | 16.234 | 67 | 16.348 | 114 | 8 |
 
-Es decir: AMS **no escribe las últimas 150 muestras** del bloque nominal
-(constante en todos los tamaños, unidades y sample rates; las ~30
-waveforms con payload `nominal−151` son sólo aquellas cuya última muestra
-real vale 0), y luego redondea el almacenamiento al múltiplo de 244 que
-cubre ese payload, rellenando la cola con ceros. De ahí que lo decoded
-salga a veces **más corto** que el nominal (488 < 512) y a veces **más
-largo** (4148 > 4096): no es recorte de calibración ni bins de cabecera,
-es cuantización de records + una cola no escrita.
-
-Consecuencias, implementadas en ADR-0017:
-
-- `Waveform.n_samples` es **`len(samples)`** (la longitud emitida); el
-  nominal se conserva aparte en `Waveform.nominal_n_samples` y viaja al
-  `machine.json` como prosa en las notas del **mode binding** del punto
-  (`mode_bindings[].notes`, que desde VibFrame 0.2 sustituye al `proc_mode`
-  plano; `_proc_mode_notes` en `export/dataset.py` conserva el nombre viejo).
-  El campo `waves.n_samples` de VibFrame es por contrato la longitud del
-  array.
-- **Pendiente (dato, no metadato)**: recortar el array emitido al payload
-  (`nominal − 150`) para no publicar la cola de ceros. Se documenta pero
-  **no se aplica**: cambia los datos y exige su propio gold de AMS (la
-  cola de ceros no afecta a Pc/Pk, sí a un RMS/factor de cresta calculado
-  aguas abajo). Constante `VDFW_TAIL_NOT_STORED = 150` en
-  `records/waveform.py`.
+La interpretación anterior confundía `vcfw_stored` con la waveform
+completa: omitía las 150 muestras del descriptor y publicaba en su lugar el
+padding del último record. ADR-0020 sustituye ADR-0017. El parser concatena
+ambas regiones antes de calibrar, exige que cualquier exceso posterior al
+nominal sea cero y emite siempre
+`Waveform.n_samples == nominal_n_samples == len(samples)`. Para el gold M1H
+19-feb-2020 Pc/Pk no cambian; el RMS sí pasa de 0,15749 G con la reconstrucción
+incorrecta a 0,18746 G con las 512 muestras reales.
 
 **Hipótesis descartada en sub-5a**: "AMS reconstruye FFT desde
-waveform". La waveform almacenada (488 muestras / 0.19 s) no permite
+waveform". La waveform completa (512 muestras / 0.20 s) no permite
 una FFT de 1600 líneas con resolución 0.625 Hz/bin como muestra AMS —
 necesitaría 4096 muestras / 1.6 s. Conclusión: `vcps` (FFT) y `vcfw`
-(waveform) son representaciones independientes en el fichero, y la
-deuda de calibración de amplitudes del FFT (§5.5) sigue abierta.
+(waveform) son representaciones independientes en el fichero; la calibración
+de amplitudes del FFT se resolvió por separado en §5.6.
 
 ### 5.6 Calibración y banda baja del FFT — RESUELTO (2026-05-30)
 
@@ -556,9 +545,10 @@ constante de digitización del formato, independiente de Fmax.
 - ~~**Padding 1586 vs 1600**~~: RESUELTO — los 14 que "faltaban" no eran
   el tema; el espectro real son 1664 bins (78 baja + 1586 cadena),
   truncados a 1600. La cadena tiene incluso ~64 bins por encima de Fmax.
-- ~~**`vcfw` (waveform)**~~: RESUELTO en sub-5b. Layout: 244 int16 LE
-  por record (no float32 como `vcps`), cadena de 2 records = 488 muestras
-  para M1H. Calibración vía `vdfw.0x28` (ver §5.5). Parser en
+- ~~**`vcfw` (waveform)**~~: RESUELTO en sub-5b y corregido por ADR-0020.
+  Layout: 150 int16 LE en `vdfw` + 244 int16 LE por record `vcfw` (no
+  float32 como `vcps`); M1H contiene 150 + 362 = 512 muestras reales.
+  Calibración vía `vdfw.0x28` (ver §5.5). Parser en
   `records/waveform.py`, walker `walk_waveforms`.
 - **`vddt` (pdcd.0x3C, 0x40)**: tras inspección no es complemento del
   espectro sino series temporales de tendencias. Mapeo completo
@@ -926,8 +916,9 @@ Resueltas en sub-fase 3a:
 Resueltas en Fase 5 / calibración (2026-05-30):
 
 - ~~Estructura interna de `vcfw` y `vdfw` (waveforms)~~: RESUELTO (§5.5).
-  `vdfw` descriptor (timestamp 0x34, scale_factor 0x28, …); `vcfw` =
-  244 int16 LE/record. Calibrado a G's vía `vdfw.0x28`.
+  `vdfw` descriptor (timestamp 0x34, scale_factor 0x28, …) y primeras 150
+  muestras en 0xD4; `vcfw` = continuación de 244 int16 LE/record. Calibrado
+  a G's vía `vdfw.0x28`.
 - ~~Escalado/normalización de las amplitudes en `vcps` para casar con
   el eje Y de AMS~~: RESUELTO (§5.6). Espectro completo = banda baja
   `vdps[0xC8:0x200]` + cadena `vcps`; velocidad ×48.5 → mm/s,
@@ -955,5 +946,6 @@ Pendientes:
 - Significado preciso de los i32 signed deltas en `gicm.0x60+`,
   `vdpm.0x10+`, `vdps.0x0C`/`0x10` y `vcps.0x0C`/`0x10`. No bloquean
   ninguna fase actual.
-- Padding waveform 488 vs 512 (24 muestras "fantasma" en el descriptor).
+- ~~Padding waveform 488 vs 512~~: RESUELTO (ADR-0020). Las primeras 150
+  muestras están en `vdfw`; `vcfw` contiene la continuación y padding cero.
 - Resto de la lista inicial en `docs/workplans/01-plan-general.md` §4.6.

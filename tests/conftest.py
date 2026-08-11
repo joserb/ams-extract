@@ -108,7 +108,7 @@ def _sample_waveform(point: Point) -> Waveform:
         units="G's",
         carga_pct=100.0,
         samples=np.linspace(-0.5, 0.5, 8, dtype=np.float32),
-        nominal_n_samples=512,
+        nominal_n_samples=8,
     )
 
 

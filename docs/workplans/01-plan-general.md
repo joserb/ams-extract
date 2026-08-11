@@ -144,10 +144,12 @@ vendorizado `export/vibframe_contract.py`):
   `metric_catalog.json` y se emite único por punto
   (`overall_velocity_rms__<point_id>`).
 
-Las notas de adquisición que no caben en un campo tipado (el bloque nominal de
-AMS, ADR-0017) viajan como prosa en el **mode binding** del punto, no en un
-modo global: `proc_modes` desapareció en 0.2 y lo sustituyen la pareja
+Las notas de adquisición que no caben en un campo tipado viajan como prosa en
+el **mode binding** del punto, no en un modo global: `proc_modes` desapareció
+en 0.2 y lo sustituyen la pareja
 `mode_definitions` (la firma) + `mode_bindings` (su aplicación a un punto).
+Desde ADR-0020 la waveform reconstruida coincide con el bloque nominal, por
+lo que esa longitud ya no necesita una nota de divergencia.
 
 El formato anterior (`manifest.parquet` + `samples/`) queda obsoleto. Los IDs
 de muestra del viewer se generan en memoria al cargar el VibFrame.

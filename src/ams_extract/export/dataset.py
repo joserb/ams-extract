@@ -430,17 +430,16 @@ PROC_MODE_NOTES = "Decoded from AMS RBM; detailed acquisition metadata not decod
 
 
 def _proc_mode_notes(n_samples: int | None, nominal_n_samples: int | None) -> str:
-    """Base note plus, for waveforms, the nominal block the analyzer asked for.
+    """Base note plus a compatibility note for externally built waveforms.
 
-    ``n_samples`` is always the emitted array length; the AMS acquisition
-    block (``vdfw.0x2C``) differs from it by design (FORMAT §5.5), so it is
-    recorded on the binding as prose instead of overwriting the length field.
+    Native RBM waveforms have equal emitted and nominal lengths since ADR-0020.
+    The mismatch branch remains for callers constructing legacy model objects.
     """
     if nominal_n_samples is None or nominal_n_samples == n_samples:
         return PROC_MODE_NOTES
     return (
-        f"{PROC_MODE_NOTES} AMS acquisition block is {nominal_n_samples} samples; "
-        f"{n_samples} are stored and emitted (FORMAT §5.5)."
+        f"{PROC_MODE_NOTES} Source acquisition block reports "
+        f"{nominal_n_samples} samples; the supplied waveform contains {n_samples}."
     )
 
 
@@ -561,11 +560,8 @@ def _spectrum_row(
 def _waveform_row(
     waveform: Waveform, point: Point, definition_id: str | None = None
 ) -> dict[str, Any]:
-    # VibFrame requires n_samples == len(data): the time axis is derived
-    # from t + i / sample_rate_hz, so any other value breaks the wave
-    # (vibframe-validate `waves.data-length`). Waveform.n_samples already
-    # is the emitted length; the AMS nominal block lives in the binding
-    # notes (FORMAT §5.5, ADR-0017).
+    # VibFrame requires n_samples == len(data): ADR-0020 reconstructs exactly
+    # the complete vdfw.0x2C block before this row is built.
     rpm = float(waveform.rpm)
     return {
         "t": _timestamp_us(waveform.timestamp_utc),
