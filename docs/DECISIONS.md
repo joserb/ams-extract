@@ -1412,3 +1412,40 @@ la secuencia errónea de 362 muestras reales + 126 ceros a 0,18746 G sobre las
   conformes estructuralmente, su array `waves.data` era incorrecto.
 - La validación de corpus completo pasa a proteger tanto la igualdad con la
   longitud nominal como la ausencia de padding no cero.
+
+## ADR-0021 — `unit` transporta Common Codes UN/CEFACT; las labels son presentación
+
+- **Fecha**: 2026-08-12
+- **Estado**: aceptada
+
+### Contexto
+
+VibFrame 0.2 separó la identidad física de su representación: el campo
+serializado `unit` ya no acepta símbolos de display (`mm/s`, `g`, `Hz`, `%`),
+sino el Common Code de UN/CEFACT Recommendation 20. El export AMS conservaba
+las labels y el validador actual reportaba `units.invalid-common-code` en
+`metric_catalog.json`, `spectra.parquet` y `waves.parquet`. Ese drift impedía
+también ejecutar el enriquecedor de máquina actual sobre Bunge.
+
+### Decisión
+
+1. Mantener las labels AMS/display dentro del parser y los modelos: siguen
+   decidiendo calibración, familia y presentación.
+2. Convertirlas sólo en la frontera VibFrame con la tabla normativa:
+   `mm/s → C16`, `G's`/`g → K40`, `Hz → HTZ`, `% → P1`.
+3. Rechazar una unidad sin correspondencia en vez de publicar una label que
+   parezca conforme por accidente.
+4. Re-vendorizar el contrato runtime sin añadir dependencia de
+   `vibsynth-contracts`: VibFrame sigue en `0.2.0`, con sello de origen
+   `99a44bffc879`.
+
+### Consecuencias
+
+- Los valores numéricos, escalas y golds AMS no cambian; cambia la identidad
+  serializada de la unidad.
+- Visores y reports resuelven la label desde el Common Code.
+- Los datasets anteriores deben reexportarse; editar sólo los JSON dejaría
+  unidades legacy en los Parquet.
+- Tras el reexport hay que volver a ejecutar `t8-mapper` y
+  `vibsynth-machines enrich`, porque ambos son postprocesos deliberadamente
+  externos al extractor.

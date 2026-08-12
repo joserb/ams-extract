@@ -26,6 +26,9 @@ descriptors are a null-free JSON catalog, not a fourth parquet — with
 catalog under `machine.frequencies`. The `ground-truth/` sidecar carries the
 four normative 0.2 projections. The spec is `docs/VIBFRAME.md` (and the id
 conventions, `docs/VECTORS-0.2.md`) in `vibsynth-contracts`.
+The serialized `unit` field carries the UN/CEFACT Recommendation 20 Common
+Code (`C16`, `K40`, `HTZ`, `P1`); symbols such as `mm/s`, `g`, `Hz` and `%`
+are presentation labels. The values and plots below use those labels.
 
 - **Velocity FFT** is reconstructed in full and calibrated to **mm/s**
   (validated against AMS on 3 machines, ±5–10%).

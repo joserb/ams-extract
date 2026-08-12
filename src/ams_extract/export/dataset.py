@@ -44,6 +44,10 @@ from ams_extract.export.vibframe_contract import (
     SPECTRA_FILE,
     TRENDS_COLUMNS,
     TRENDS_FILE,
+    UNIT_HERTZ,
+    UNIT_MILLIMETRE_PER_SECOND,
+    UNIT_PERCENT,
+    UNIT_STANDARD_GRAVITY,
     WAVES_COLUMNS,
     WAVES_FILE,
     ColumnSpec,
@@ -81,7 +85,10 @@ TREND_METRIC_NAME_ACCELERATION = "overall_acceleration_rms"
 # "Reserved context metrics"). AMS has no machine state -> no "state".
 CONTEXT_METRIC_SPEED = "speed"
 CONTEXT_METRIC_LOAD = "load"
-CONTEXT_METRIC_UNITS = {CONTEXT_METRIC_SPEED: "Hz", CONTEXT_METRIC_LOAD: "%"}
+CONTEXT_METRIC_UNITS = {
+    CONTEXT_METRIC_SPEED: UNIT_HERTZ,
+    CONTEXT_METRIC_LOAD: UNIT_PERCENT,
+}
 
 # ``metric_id`` and ``config_id`` are the 0.2 identity of a trend series.
 # Everything below is its provenance/calculation signature.  Human labels and
@@ -309,8 +316,18 @@ def _proc_prefix(unit: str) -> str:
 
 
 def _canonical_unit(unit: str) -> str:
-    """Map AMS display-unit spellings to VibFrame canonical units."""
-    return "g" if unit == "G's" else unit
+    """Map an internal display label to its VibFrame UNECE unit identity."""
+    common_codes = {
+        "mm/s": UNIT_MILLIMETRE_PER_SECOND,
+        "G's": UNIT_STANDARD_GRAVITY,
+        "g": UNIT_STANDARD_GRAVITY,
+        "Hz": UNIT_HERTZ,
+        "%": UNIT_PERCENT,
+    }
+    try:
+        return common_codes[unit]
+    except KeyError as exc:
+        raise ValueError(f"no UN/CEFACT Common Code mapping for AMS unit {unit!r}") from exc
 
 
 def _fmt_num(value: float) -> str:

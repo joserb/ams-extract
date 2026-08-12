@@ -30,6 +30,7 @@ from pathlib import Path
 import pyarrow.parquet as pq
 import pytest
 from typer.testing import CliRunner
+from vibsynth_contracts import units as contract_units
 from vibsynth_contracts.dataset import (
     DatasetInfo,
     MachineDoc,
@@ -47,6 +48,10 @@ from ams_extract.export.vibframe_contract import (
     SPECTRA_FILE,
     TRENDS_COLUMNS,
     TRENDS_FILE,
+    UNIT_HERTZ,
+    UNIT_MILLIMETRE_PER_SECOND,
+    UNIT_PERCENT,
+    UNIT_STANDARD_GRAVITY,
     WAVES_COLUMNS,
     WAVES_FILE,
     ColumnSpec,
@@ -83,6 +88,20 @@ def _assert_golden_conformant(golden: Path) -> None:
 
 
 # -------------------------------------------------------- our export passes
+
+
+def test_the_vendored_ams_unit_codes_match_the_current_contract() -> None:
+    assert {
+        UNIT_MILLIMETRE_PER_SECOND,
+        UNIT_STANDARD_GRAVITY,
+        UNIT_HERTZ,
+        UNIT_PERCENT,
+    } == {
+        contract_units.UNIT_MILLIMETRE_PER_SECOND,
+        contract_units.UNIT_STANDARD_GRAVITY,
+        contract_units.UNIT_HERTZ,
+        contract_units.UNIT_PERCENT,
+    }
 
 
 def test_our_export_passes_the_validator(vibframe_dataset: Path) -> None:

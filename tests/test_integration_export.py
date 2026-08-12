@@ -75,7 +75,7 @@ def test_export_m1h_samples_present_in_asset_tables(real_rbm: Path, tmp_path: Pa
     assert len(m1h_fft) == 5
     assert len(m1h_waves) == 5
     assert m1h_fft[0]["fmax_hz"] == pytest.approx(1000.0)
-    assert m1h_fft[0]["unit"] == "mm/s"
+    assert m1h_fft[0]["unit"] == "C16"
     assert len(m1h_fft[0]["data"]) == 1600
 
 
@@ -144,7 +144,7 @@ def test_export_emits_machine_level_context_metrics(real_rbm: Path, tmp_path: Pa
     )["metrics"]
     metrics = {m["metric_id"]: m for m in metric_rows}
 
-    for metric_id, unit in (("speed", "Hz"), ("load", "%")):
+    for metric_id, unit in (("speed", "HTZ"), ("load", "P1")):
         metric = metrics[metric_id]
         assert "point_id" not in metric  # null-free metric_catalog.json
         assert metric["statistic"] == "value"
@@ -182,7 +182,7 @@ def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
     )["metrics"]
     point_metrics = [m for m in metrics if m["point_id"] == point["id"]]
     metric = next(m for m in point_metrics if m["name"] == "overall_velocity_rms")
-    assert metric["unit"] == "mm/s"
+    assert metric["unit"] == "C16"
 
     trend_rows = pq.read_table(machine_dir / "trends.parquet").to_pylist()
     rows = sorted(
@@ -208,15 +208,15 @@ def test_export_trend_m1h_matches_gold(real_rbm: Path, tmp_path: Path) -> None:
     # HF band: raw acceleration RMS in G's with fixed Hz bounds (scale
     # validated against the AMS capture of PM-9101-A M1H, 2026-07-19).
     hf = band_metrics["1 - 20 KHz"]
-    assert hf["unit"] == "g"
+    assert hf["unit"] == "K40"
     assert hf["statistic"] == "spectrum_rms"
     assert hf["band_type"] == "single"
     assert hf["band_low_hz"] == pytest.approx(1000.0)
     assert hf["band_high_hz"] == pytest.approx(20000.0)
-    assert band_metrics["Mp Wave"]["unit"] == "g"
+    assert band_metrics["Mp Wave"]["unit"] == "K40"
     assert band_metrics["Mp Wave"]["statistic"] == "true_peak"
     assert band_metrics["Mp Wave"]["band_type"] == "none"
-    assert band_metrics["SUBSINCRONO"]["unit"] == "mm/s"
+    assert band_metrics["SUBSINCRONO"]["unit"] == "C16"
     # Band edges from the template, in shaft orders (contiguous bands).
     assert band_metrics["SUBSINCRONO"]["band_low_order"] == pytest.approx(0.0)
     assert band_metrics["SUBSINCRONO"]["band_high_order"] == pytest.approx(0.7)

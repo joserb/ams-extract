@@ -5,9 +5,10 @@ These definitions were imported from ``vibsynth-contracts`` (dataset layout and
 ``ams-extract`` does not depend on the vibsynth monorepo at runtime (ADR-0009).
 
 Origin state of this vendorization: VibFrame **0.2.0**, frozen coordinated
-state ``ea50b0f3e567`` (2026-08-09: branch ``agent/vibframe-redesign-workplans``,
-HEAD ``41e2f5f428b925a4b465fc54300bd2bb7d1a013d`` plus the uncommitted local
-diff whose sha256 is ``ea50b0f3e567a5b13937ffad3029e97fdf0883b6e54460ed135874ff70cfe2e1``).
+state ``99a44bffc879`` (2026-08-12: `vibsynth-contracts` HEAD
+``782fac98cdb9`` plus its local UNECE unit implementation; composite sha256
+of the copied source files
+``99a44bffc8795cf2b60c51a3e268e5b9fec8314e9c75249aa0ee9cc8882bef62``).
 Keep this file small: it covers only the layout, the columns and the mode
 signature needed to write AMS RBM exports and their ``ground-truth/``
 projections.
@@ -24,6 +25,13 @@ from typing import Any, Literal, cast
 import pyarrow as pa
 
 SCHEMA_VERSION = "0.2.0"
+
+# UN/CEFACT Recommendation 20 Common Codes used by the AMS producer. VibFrame
+# carries these identities in ``unit``; symbols are presentation labels only.
+UNIT_MILLIMETRE_PER_SECOND = "C16"
+UNIT_STANDARD_GRAVITY = "K40"
+UNIT_HERTZ = "HTZ"
+UNIT_PERCENT = "P1"
 
 DATASET_FILE = "dataset.json"
 MACHINE_DOC_FILE = "machine.json"

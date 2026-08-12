@@ -18,6 +18,7 @@ from ams_extract.export.dataset import (
     _band_metric_row,
     _band_trend_rows,
     _build_machine_doc,
+    _canonical_unit,
     _context_metric_row,
     _context_trend_rows,
     _insert_metric_row,
@@ -70,11 +71,15 @@ class TestExportDataset:
             mode_bindings=[],
         )
 
-        assert spectrum_row["unit"] == waveform_row["unit"] == "g"
+        assert spectrum_row["unit"] == waveform_row["unit"] == "K40"
         assert spectrum_row["speed_hz"] == waveform_row["speed_hz"] == 25.0
         assert machine_doc["config_generations"] == []
         # Location levels only: the machine is its own level in the viewers.
         assert machine_doc["machine"]["path"] == ["AREA"]
+
+    def test_rejects_an_unmapped_display_unit_at_the_vibframe_boundary(self) -> None:
+        with pytest.raises(ValueError, match="no UN/CEFACT Common Code mapping"):
+            _canonical_unit("made-up-unit")
 
     def test_point_docs_carry_the_placement_read_off_the_name(self) -> None:
         points = (
@@ -366,7 +371,7 @@ class TestBandExport:
         assert row["statistic"] == "spectrum_rms"
         assert row["detector"] == "rms"
         assert row["signal_family"] == "velocity"
-        assert row["unit"] == "mm/s"
+        assert row["unit"] == "C16"
         assert row["band_type"] == "single"
         assert row["band_low_order"] == 0.0
         assert row["band_high_order"] == pytest.approx(0.7)
@@ -397,7 +402,7 @@ class TestBandExport:
         assert row["statistic"] == "spectrum_rms"
         assert row["detector"] == "rms"
         assert row["signal_family"] == "acceleration"
-        assert row["unit"] == "g"
+        assert row["unit"] == "K40"
         assert row["band_type"] == "single"
         assert row["band_low_hz"] == 1000.0
         assert row["band_high_hz"] == 20000.0
@@ -408,7 +413,7 @@ class TestBandExport:
         assert row["statistic"] == "true_peak"
         assert row["detector"] == "peak"
         assert row["signal_family"] == "acceleration"
-        assert row["unit"] == "g"
+        assert row["unit"] == "K40"
         assert row["band_type"] == "none"
 
     def test_band_trend_rows(self) -> None:
@@ -517,7 +522,7 @@ class TestTrendMetricDescriptor:
         assert row["name"] == "overall_velocity_rms"
         assert row["path"] == "M1H:overall_velocity_rms"
         assert row["signal_family"] == "velocity"
-        assert row["unit"] == "mm/s"
+        assert row["unit"] == "C16"
 
     def test_acceleration_trend_descriptor(self) -> None:
         # PeakVue/HF overall trends are raw G's (validated 147/147 against
@@ -531,7 +536,7 @@ class TestTrendMetricDescriptor:
         assert row["name"] == "overall_acceleration_rms"
         assert row["path"] == "M1P:overall_acceleration_rms"
         assert row["signal_family"] == "acceleration"
-        assert row["unit"] == "g"
+        assert row["unit"] == "K40"
         assert row["statistic"] == "spectrum_rms"
         assert row["detector"] == "rms"
         assert _trend_rows(trend, point)[0]["metric_id"] == (
@@ -548,7 +553,7 @@ class TestContextMetrics:
         assert row["path"] == "AG-100:speed"
         assert row["statistic"] == "value"
         assert row["signal_family"] == "non_vibration"
-        assert row["unit"] == "Hz"
+        assert row["unit"] == "HTZ"
         assert row["band_type"] == "none"
         # Canonical labelling is a t8-mapper post-process (ADR-0011).
         assert row["canonical_metric"] is None
@@ -559,7 +564,7 @@ class TestContextMetrics:
         row = _context_metric_row("load", "DT-0070")
         assert row["metric_id"] == "load"
         assert row["path"] == "DT-0070:load"
-        assert row["unit"] == "%"
+        assert row["unit"] == "P1"
         assert row["point_id"] is None
 
     def test_speed_is_analysis_rpm_over_60_and_load_as_is(self) -> None:

@@ -65,3 +65,7 @@ físicos completos.
   vendorizado de este repo sigue pineado a `ea50b0f3e567`; por ello el
   `vibframe-validate --strict` instalado ya no puede validar este pin hasta la
   siguiente migración coordinada.
+
+> **Cierre posterior 2026-08-12** — el workplan 14 / ADR-0021 adoptó los
+> Common Codes UN/CEFACT y devolvió la conformidad a verde; este rojo queda
+> como registro del estado exacto en que se cerró el arreglo de waveforms.

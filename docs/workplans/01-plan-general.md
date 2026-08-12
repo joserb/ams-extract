@@ -132,6 +132,9 @@ dataset/
 **Esquema por tipo** (columnas requeridas; las opcionales, en el contrato
 vendorizado `export/vibframe_contract.py`):
 
+`unit` es siempre el Common Code de UN/CEFACT Recommendation 20, no una label:
+`C16` (mm/s), `K40` (gravedad estándar), `HTZ` (Hz), `P1` (%).
+
 - **FFT** (`spectra.parquet`): `t`, `point_id`, `proc_mode_id`, `fmin_hz`,
   `fmax_hz`, `lines`, `unit`, `signal_family`, `config_id`,
   `data: list<float32>`; más `mode_definition_id`, que resuelve la firma de

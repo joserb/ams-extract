@@ -6,6 +6,11 @@ updated: 2026-08-10
 
 # Plan: migración a VibFrame 0.2
 
+> **Nota 2026-08-12** — la identidad de `unit` se actualizó dentro de la misma
+> versión 0.2 a Common Codes UN/CEFACT; el nuevo sello vendorizado es
+> `99a44bffc879` (ADR-0021, workplan 14). El pin `ea50b0f3e567` inferior se
+> conserva como estado histórico de esta migración.
+
 Plan escrito **a posteriori**: la migración de código entró sin él, contra la
 convención del repo, y este documento la deja registrada junto con la ola
 documental que la cierra. Se abre y se cierra en la misma sesión.

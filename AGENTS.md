@@ -114,8 +114,8 @@ uv run ruff check . && uv run pyright src                       # antes de commi
 - **Conformidad VibFrame (0.2)**: el repo escribe **VibFrame 0.2**. El contrato
   que usa el runtime está vendorizado (`export/vibframe_contract.py`) y
   **pineado**: `SCHEMA_VERSION = "0.2.0"` y, en su docstring, el estado de
-  origen congelado del que se copió (`ea50b0f3e567`, la coordinada 0.2 de
-  `vibsynth-contracts` del 2026-08-09). Ese pin es la unidad de actualización:
+  origen congelado del que se copió (`99a44bffc879`, la coordinada 0.2 +
+  unidades UNECE de `vibsynth-contracts` del 2026-08-12). Ese pin es la unidad de actualización:
   si contracts se mueve, se re-vendoriza y se cambia el sello, no se parchea a
   trozos. `vibsynth-contracts` es dependencia **solo de tests/CI** y nunca se
   importa desde `src/`. `tests/test_vibframe_conformance.py` valida lo que
@@ -145,6 +145,9 @@ uv run ruff check . && uv run pyright src                       # antes de commi
   del ecosistema. Este repo no escribe `definition` ni
   `definition_provenance`: declara, no resuelve.
 - Unidades de display: velocidad mm/s (×25.4 desde in/s), aceleración G's.
+  En VibFrame, `unit` transporta la identidad UN/CEFACT Recommendation 20
+  (`C16` para mm/s, `K40` para gravedad estándar, `HTZ` para Hz y `P1` para
+  porcentaje); las labels quedan sólo para presentación.
   El etiquetado canónico es post-proceso con `t8-mapper vibframe --write`
   (ADR-0011), no un paso del export.
 - Commits atómicos en imperativo; `pytest` + `ruff check .` + `pyright src`
