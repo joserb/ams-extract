@@ -21,6 +21,10 @@ updated: 2026-08-13
 > `FORMATO_GROUND_TRUTH.md` de la carpeta de informes y del dataset RESONINS
 > se resincronizaron byte a byte con esta spec el 2026-08-13.
 > Los «pendientes» inferiores se conservan como foto y se aclaran en «Flecos».
+>
+> **Cierre posterior 2026-08-13** — el workplan 16 desplegó la determinista
+> 0.5.0 y la contextual 0.1.2. La matriz dejó de ser una estimación: el spike
+> cuenta 354 máquinas y 71 exclusivas, y se conserva fuera de DiagGT 0.1.5.
 
 **Fecha**: 2026-07-28 · **Estado**: **COMPLETADO**. Formato DiagGT
 especificado (v0.1.4) con modelos normativos en `vibsynth-contracts`

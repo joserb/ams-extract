@@ -47,9 +47,13 @@ The deployed AMS reference dataset is
 `~/wslprojects/RESONINS/datasets/bunge_cartagena_ams`: it was re-exported on
 2026-08-12 with FFT, waveform and trend data, then re-labelled with
 `t8-mapper` and enriched with `vibsynth-machines`. The current validator
-reports **0 errors**. Its 730 warnings are not unit or layout failures: 588
+reports **0 errors**. Its 731 warnings are not unit or layout failures: 589
 belong to preserved analysis layers whose input hashes predate the re-export,
-and 142 to open machine-node types emitted by the external enricher.
+including the expected stale DiagGT contrast after the 2026-08-13 GT update,
+and 142 to open machine-node types emitted by the external enricher. The
+analyst GT currently deployed is deterministic extractor 0.5.0 plus contextual
+overlay 0.1.2 (6,669 report observations); the archived deterministic output
+lives next to the reports.
 
 - **Velocity FFT** is reconstructed in full and calibrated to **mm/s**
   (validated against AMS on 3 machines, ±5–10%).

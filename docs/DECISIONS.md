@@ -1548,8 +1548,7 @@ representaría siempre el estado final que se desea entregar.
 ## ADR-0023 — Informes 0.5.0 recupera desbordes anclados y versiona reglas
 
 - **Fecha**: 2026-08-13
-- **Estado**: aceptada en código; pendiente de adenda del overlay, reemisión y
-  despliegue.
+- **Estado**: aceptada y desplegada.
 
 ### Contexto
 
@@ -1581,6 +1580,13 @@ ese bloque perdió evidencia en cinco TAG/modos del corpus de 921 páginas.
   textos distintos.
 - Se recuperan desbordes demostrados de `CF.9110S1`, `TC.1523A2`, `PM.4500`,
   `PM.9700A` y `LA.1249A2`, sin asignar texto ambiguo por posición.
-- Cambiar ids/reglas hace que el overlay detecte drift. Sólo los juicios
-  afectados reciben una adenda; hasta entonces 0.4.0/0.1.1 siguen siendo las
-  generaciones desplegadas y no se reescriben sus artefactos.
+- Cambiar ids/reglas hizo que el overlay detectara drift en 11 textos; otros
+  dos juicios quedaron sin observaciones al reconocer estados. La adenda
+  0.1.2 revisa sólo esos 13 textos / 42 observaciones, retira todos los
+  remapeos manuales y se despliega como
+  `informes-gt-weights-llm 0.1.2` sobre la determinista archivada 0.5.0.
+- La matriz se mantiene fuera de DiagGT 0.1.5: el spike demuestra 1.660 celdas
+  históricas únicas sobre 354 máquinas, pero el contrato aún no define la
+  semántica temporal ni la deduplicación de una celda sin texto. Se publica
+  como artefacto de auditoría no normativo hasta coordinar esa extensión en
+  `vibsynth-contracts`.

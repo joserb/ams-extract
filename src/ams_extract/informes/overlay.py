@@ -50,7 +50,7 @@ OVERLAY_KIND = "diaggt_weight_overlay"
 OVERLAY_SERIES = "0.1."
 """Serie de versiones de overlay que este módulo sabe leer."""
 
-LLM_EXTRACTOR = "informes-gt-weights-llm 0.1.0"
+LLM_EXTRACTOR = "informes-gt-weights-llm 0.1.2"
 """Lo que se anota en ``provenance.extractor`` de la generación LLM."""
 
 LLM_EXTRACTION_METHOD = "llm"

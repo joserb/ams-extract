@@ -129,6 +129,38 @@ como artefacto de auditoría no normativo si el contrato aún no está listo.
   evidencia rica; ejecutar overlay/adenda, matriz, reemisión, validación y
   despliegue (fases 3–5). No se ha tocado ningún artefacto desplegado.
 
+### Avance 2026-08-13 — adenda, matriz y despliegue
+
+- **Fase 3 completada**: el overlay sube a 0.1.2 y apunta a
+  `informes-gt-extract 0.5.0`. El diff exhaustivo detectó 11 textos cuyas
+  claves cambian (35 observaciones) y dos juicios de estado que dejan de tener
+  observaciones (7): la adenda re-juzga esos **13 textos / 42 observaciones**
+  y sólo esos. Quedan 133 juicios / 415 observaciones y **0 remapeos**: los
+  cinco de 0.1.1 ya los cubren reglas deterministas.
+- **Spike de matriz completado, emisión normativa aplazada**:
+  `scripts/audit_informes_status_matrix.py` lee imágenes 15x15 por coordenada
+  de celda y exige un catálogo de siete hashes. Sobre los seis PDF obtiene
+  102 páginas, 12.102 iconos, 1.660 celdas históricas únicas, 357 estados
+  actuales y 354 máquinas; no hay firmas desconocidas ni discrepancias entre
+  informes. DiagGT ya conoce 283 máquinas, 71 son exclusivas de la matriz y el
+  crosswalk vigente resuelve 273. El JSON completo se publica junto a los PDF
+  como artefacto no normativo; no se fuerzan filas mudas en 0.1.5.
+- **Fase 5 completada para las generaciones documentales**: determinista
+  0.5.0 archivada junto a 0.4.0/0.3.0 y contextual 0.1.2 desplegada junto a
+  los informes y en Bunge, con backup previo en
+  `/tmp/ams-wp16-backup-20260813.lD7m8e/`. Los 6 documentos preservan 6.669
+  ids y hashes PDF; las cuatro proyecciones de informes contienen 1.308
+  findings. Bunge materializa 7 documentos, 7.642 observaciones, 3.620
+  consolidadas y 2.281 findings; valida con 0 errores, 731 avisos y 5
+  informativos. El aviso adicional declara honestamente obsoleta la capa
+  `diaggt-contrast` por el nuevo hash de entrada.
+- **Sigue abierta sólo la evidencia rica**: el bloque `ACTUALIZACIÓN` de
+  `TC.1523A2` continúa refluyendo por las páginas 134–136 y las
+  intervenciones/medidas/peticiones no tienen aún proyección normativa. Se
+  preservan en el texto/PDF fuente; no se inventa `record_kind` ni tabla hasta
+  coordinar el contrato en `vibsynth-contracts`. Este punto mantiene el plan
+  `in-progress`.
+
 ### 0. Auditoría reproducible y fixtures
 
 - Crear el censo de cláusulas y `unmapped` de 0.4.0.

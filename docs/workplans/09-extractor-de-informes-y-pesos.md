@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-08-04
-updated: 2026-08-12
+updated: 2026-08-13
 ---
 
 # Plan: hogar del extractor de informes y línea base de pesos por finding
@@ -16,6 +16,10 @@ updated: 2026-08-12
 > `informes-gt-weights-llm 0.1.1`. Ambas materializan las cuatro proyecciones
 > normativas 0.2. El fixture 0.2.0 citado debajo se conserva a propósito como
 > línea base de regresión de las reglas anteriores.
+>
+> **Estado operativo 2026-08-13** — el workplan 16 sustituyó la publicación
+> por `informes-gt-extract 0.5.0` y `informes-gt-weights-llm 0.1.2`; las
+> generaciones citadas arriba quedan como historia reproducible.
 
 **Frente B.2** del plan «GT experto cuantificable». Dos cosas que van juntas
 porque la segunda no cabe en un script suelto: **dar hogar** al extractor de

@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-08-05
-updated: 2026-08-12
+updated: 2026-08-13
 ---
 
 # Plan: reglas GT corregidas, rodamientos inferidos y el `path` del export
@@ -14,6 +14,10 @@ updated: 2026-08-12
 > `--dataset-path`, volvió a etiquetarse y se enriqueció. El resultado actual
 > es 3.728 frecuencias en 91 máquinas; los flecos que siguen abiertos se
 > señalan como tales debajo.
+>
+> **Cierre posterior 2026-08-13** — `GT004v2`/`GT026`–`GT029` del workplan 16
+> permiten retirar los cinco remapeos que aún conservaba el overlay 0.1.1. La
+> publicación vigente es determinista 0.5.0 + contextual 0.1.2.
 
 **Frente O1-A** de la tanda «motor calibrado, GT corregido, corpus al día».
 Cuatro entregas que comparten una idea: lo que el frente anterior sólo pudo

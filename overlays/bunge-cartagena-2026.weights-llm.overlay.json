@@ -1,15 +1,15 @@
 {
- "$overlay_version": "0.1.1",
+ "$overlay_version": "0.1.2",
  "kind": "diaggt_weight_overlay",
  "target": {
   "origin": "inspection-report",
   "provider": "Preditec",
   "client": "BUNGE",
   "plant": "CARTAGENA",
-  "base_extractor": "informes-gt-extract 0.4.0",
+  "base_extractor": "informes-gt-extract 0.5.0",
   "schema_version": "0.1.5"
  },
- "extractor": "informes-gt-weights-llm 0.1.1",
+ "extractor": "informes-gt-weights-llm 0.1.2",
  "extraction_method": "llm",
  "scale": {
   "3": "conclusión principal: el análisis se centra ahí, o de ahí sale el estado",
@@ -173,20 +173,8 @@
      "score": 2
     },
     {
-     "finding": "UNMAPPED:-",
+     "finding": "OTHER:-",
      "score": 1
-    }
-   ],
-   "remap": [
-    {
-     "from": "UNMAPPED:-",
-     "to": {
-      "fault_group": "OTHER",
-      "fault_mode": null,
-      "label_quality": "group",
-      "matched_text": "suciedad y/o desgaste en la válvula"
-     },
-     "why": "«Posible suciedad y/o desgaste en la válvula»: fallo identificado sin FaultMode canónico."
     }
    ]
   },
@@ -213,10 +201,6 @@
     {
      "finding": "BEARING:-",
      "score": 3
-    },
-    {
-     "finding": "UNMAPPED:-",
-     "score": 0.25
     }
    ]
   },
@@ -364,17 +348,6 @@
    ]
   },
   {
-   "diagnosis_text": "Linea 1 de refinería parada",
-   "observations": 5,
-   "rationale": "«Línea 1 de refinería parada» es un estado de planta, no un fallo: se queda unmapped.",
-   "findings": [
-    {
-     "finding": "UNMAPPED:-",
-     "score": 1
-    }
-   ]
-  },
-  {
    "diagnosis_text": "Ruido de origen eléctrico.",
    "observations": 5,
    "rationale": "una sola afirmación leída por dos reglas: la eléctrica es la sustantiva, GT024 sólo recoge «ruido».",
@@ -512,20 +485,8 @@
    "rationale": "barras sueltas o rotas es el fallo eléctrico de rotor por antonomasia.",
    "findings": [
     {
-     "finding": "UNMAPPED:-",
+     "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
      "score": 1
-    }
-   ],
-   "remap": [
-    {
-     "from": "UNMAPPED:-",
-     "to": {
-      "fault_group": "ELECTRICAL",
-      "fault_mode": "ELECTRICAL_ROTOR",
-      "label_quality": "approximate",
-      "matched_text": "barras sueltas o rotas"
-     },
-     "why": "«bandas laterales […] fallo de barras sueltas o rotas»: barras de rotor = ELECTRICAL_ROTOR."
     }
    ]
   },
@@ -667,20 +628,8 @@
      "score": 2
     },
     {
-     "finding": "UNMAPPED:-",
+     "finding": "OTHER:-",
      "score": 2
-    }
-   ],
-   "remap": [
-    {
-     "from": "UNMAPPED:-",
-     "to": {
-      "fault_group": "OTHER",
-      "fault_mode": null,
-      "label_quality": "group",
-      "matched_text": "Deterioro del acoplamiento"
-     },
-     "why": "«Deterioro del acoplamiento»: fallo identificado sin FaultMode canónico en el catálogo."
     }
    ]
   },
@@ -853,15 +802,19 @@
   {
    "diagnosis_text": "Debilidad estructural del conjunto. Desalineación y/o deterioro del acoplamiento.",
    "observations": 3,
-   "rationale": "«se determina que existe cierto grado de debilidad estructural»; el acoplamiento/alineación es lo que «puede indicar» un armónico.",
+   "rationale": "«se determina que existe cierto grado de debilidad estructural»; desalineación y deterioro del acoplamiento son dos alternativas co-principales dentro de lo que «puede indicar» un armónico.",
    "findings": [
     {
      "finding": "MISALIGNMENT:-",
-     "score": 2
+     "score": 1.5
     },
     {
      "finding": "STRUCTURE:LOOSENESS",
      "score": 3
+    },
+    {
+     "finding": "OTHER:-",
+     "score": 1.5
     }
    ]
   },
@@ -1298,7 +1251,7 @@
   {
    "diagnosis_text": "Debilidad estructural / Desequilibrio. Estable. Se establece el buen estado.",
    "observations": 2,
-   "rationale": "«Estable» y «Se establece el buen estado» son dos cláusulas sin juicio que el 1/n premiaba con dos tercios de la masa.",
+   "rationale": "«Estable» y «Se establece el buen estado» son cláusulas de estado sin juicio; sólo se reparten los dos fallos declarados.",
    "findings": [
     {
      "finding": "IMBALANCE:IMBALANCE",
@@ -1307,10 +1260,6 @@
     {
      "finding": "STRUCTURE:LOOSENESS",
      "score": 3
-    },
-    {
-     "finding": "UNMAPPED:-",
-     "score": 0.5
     }
    ]
   },
@@ -1332,15 +1281,19 @@
   {
    "diagnosis_text": "Debilidad estructural del conjunto. ALERTA. Desalineación y/o deterioro del acoplamiento.",
    "observations": 2,
-   "rationale": "«se determina que existe un problema de debilidad estructural» y lleva la ALERTA; el acoplamiento es lo que «puede indicar» un armónico.",
+   "rationale": "«se determina que existe un problema de debilidad estructural» y lleva la ALERTA; desalineación y deterioro del acoplamiento son dos alternativas co-principales dentro de lo que «puede indicar» un armónico.",
    "findings": [
     {
      "finding": "MISALIGNMENT:-",
-     "score": 2
+     "score": 1.5
     },
     {
      "finding": "STRUCTURE:LOOSENESS",
      "score": 3
+    },
+    {
+     "finding": "OTHER:-",
+     "score": 1.5
     }
    ]
   },
@@ -1352,10 +1305,6 @@
     {
      "finding": "STRUCTURE:LOOSENESS",
      "score": 3
-    },
-    {
-     "finding": "UNMAPPED:-",
-     "score": 0.25
     }
    ]
   },
@@ -1384,6 +1333,10 @@
      "score": 2
     },
     {
+     "finding": "LOOSENESS:LOOSENESS",
+     "score": 1
+    },
+    {
      "finding": "STRUCTURE:LOOSENESS",
      "score": 1
     },
@@ -1394,22 +1347,6 @@
     {
      "finding": "ELECTRICAL:ELECTRICAL_ROTOR",
      "score": 1.5
-    },
-    {
-     "finding": "UNMAPPED:-",
-     "score": 1
-    }
-   ],
-   "remap": [
-    {
-     "from": "UNMAPPED:-",
-     "to": {
-      "fault_group": "LOOSENESS",
-      "fault_mode": "LOOSENESS",
-      "label_quality": "approximate",
-      "matched_text": "Huelgo leve"
-     },
-     "why": "«Huelgo leve»: huelgo es el sinónimo de holgura que GT003/GT004 no casan."
     }
    ]
   },
@@ -1538,33 +1475,10 @@
   {
    "diagnosis_text": "Ruido en el acople.",
    "observations": 2,
-   "rationale": "ruido reportado en el acoplamiento: familia de GT024 pero sin regla que lo case.",
+   "rationale": "ruido reportado en el acoplamiento: GT029 lo asigna al grupo OTHER sin inventar un FaultMode.",
    "findings": [
     {
-     "finding": "UNMAPPED:-",
-     "score": 1
-    }
-   ],
-   "remap": [
-    {
-     "from": "UNMAPPED:-",
-     "to": {
-      "fault_group": "OTHER",
-      "fault_mode": null,
-      "label_quality": "group",
-      "matched_text": "Ruido en el acople"
-     },
-     "why": "«Ruido en el acople»: mismo grupo OTHER que los ruidos mecánicos de GT024, sin FaultMode."
-    }
-   ]
-  },
-  {
-   "diagnosis_text": "Se aprecia buen estado de lubricación de los rodamientos del conjunto. Se establece su buen estado y se vigilará su evolución.",
-   "observations": 2,
-   "rationale": "GT011v2 ya no lee un fallo donde el texto afirma buen estado: lo que queda es la cláusula de cierre, que ninguna regla cubre, y se lleva la masa entera.",
-   "findings": [
-    {
-     "finding": "UNMAPPED:-",
+     "finding": "OTHER:-",
      "score": 1
     }
    ]
@@ -1690,10 +1604,6 @@
     {
      "finding": "BEARING:-",
      "score": 1
-    },
-    {
-     "finding": "UNMAPPED:-",
-     "score": 0.25
     }
    ]
   },
@@ -2234,6 +2144,14 @@
    "why": "las reglas corregidas de informes-gt-extract 0.4.0 (GT001v2, GT011v2, GT021v2, GT025) cambian los findings de 5 textos, y el aplicador rechaza un juicio cuyas claves no casan: se re-juzgan esos 5, y sólo esos.",
    "judgements_revised": 5,
    "observations_revised": 11
+  },
+  {
+   "version": "0.1.2",
+   "date": "2026-08-13",
+   "workplan": "docs/workplans/16-informes-diaggt-completo.md",
+   "why": "informes-gt-extract 0.5.0 reconoce estados inequívocos y las reglas GT004v2/GT026-GT029 cambian los findings de 11 textos; otros 2 textos de estado dejan de emitir findings. Se re-juzgan esos 13 textos, y sólo esos.",
+   "judgements_revised": 13,
+   "observations_revised": 42
   }
  ]
 }

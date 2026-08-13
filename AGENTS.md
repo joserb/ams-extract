@@ -60,26 +60,27 @@ inspección — extractor adoptado en el paquete el 2026-08-04, workplan 09). La
 copias del extractor que siguen junto a los informes y dentro del dataset
 `bunge_cartagena_ams` son artefactos desplegados, no código vivo.
 
-El GT del analista desplegado tiene **dos generaciones** (workplan 10): la determinista
-(`informes-gt-extract 0.4.0`, reparto `1/n` por cláusula, archivada en
-`<informes>/ground-truth/deterministic-0.4.0/`, con la 0.3.0 al lado como la
-línea sobre la que se midió el workplan 10) y la contextual
-(`informes-gt-weights-llm 0.1.1`, `extraction_method="llm"`, desplegada en el
+El GT del analista desplegado tiene **dos generaciones** (workplans 10 y 16):
+la determinista (`informes-gt-extract 0.5.0`, reparto `1/n` por cláusula,
+archivada en `<informes>/ground-truth/deterministic-0.5.0/`, con las 0.4.0 y
+0.3.0 al lado como líneas históricas) y la contextual
+(`informes-gt-weights-llm 0.1.2`, `extraction_method="llm"`, desplegada en el
 dataset y en `<informes>/ground-truth/`). La segunda sale de la primera
 aplicándole un overlay de juicio de `overlays/`; los documentos, la geometría y
 el `source_sha256` del PDF son los mismos, sólo cambia el reparto de `weight`.
 
-El código vivo está ya en **`informes-gt-extract 0.5.0`** (workplan 16):
-recupera desbordes de `ANÁLISIS`, amplía estados inequívocos y añade
-`GT004v2`/`GT026`–`GT029`. Aún no sustituye la publicación anterior: antes hay
-que crear la adenda del overlay, reemitir ambas generaciones y desplegarlas.
+`informes-gt-extract 0.5.0` recupera desbordes de `ANÁLISIS`, amplía estados
+inequívocos y añade `GT004v2`/`GT026`–`GT029`. La adenda 0.1.2 del overlay
+re-juzga sólo los 13 textos afectados y ya no necesita remapeos manuales. La
+matriz de estado está censada como artefacto no normativo (354 máquinas, 1.660
+celdas históricas únicas); no entra en DiagGT hasta cerrar su contrato.
 
 **Corpus desplegado (auditoría 2026-08-12).** RESONINS contiene 32 raíces
 VibFrame 0.2 y ninguna conserva `metrics.parquet`. Bunge/AMS y los 29 datasets
 T8 pasan el validador actual con 0 errores y usan Common Codes. Los dos demos
 `vibsynth_fleet_demo` y `vibsynth_opmodes_demo` tienen layout 0.2 pero aún
 serializan labels de unidad legacy y fallan: los regenera `vibsynth`, no este
-repo. Bunge pasa con 730 avisos conocidos —588 `analysis.stale-input` de las
+repo. Bunge pasa con 731 avisos conocidos —589 `analysis.stale-input` de las
 capas preservadas y 142 `definition.undocumented-node-type` del enriquecedor—,
 por lo que no está limpio en `--strict` aunque sí en conformidad normal.
 

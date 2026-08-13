@@ -387,8 +387,10 @@ class TestTheBungeOverlay:
         return load_overlay(BUNGE_OVERLAY)
 
     def test_it_covers_the_corpus_it_was_written_for(self, bunge) -> None:
-        assert len(bunge.judgements) == 135
-        assert sum(j.observations for j in bunge.judgements.values()) == 422
+        assert bunge.version == "0.1.2"
+        assert bunge.extractor == "informes-gt-weights-llm 0.1.2"
+        assert len(bunge.judgements) == 133
+        assert sum(j.observations for j in bunge.judgements.values()) == 415
         assert bunge.extraction_method == "llm"
 
     def test_every_share_adds_up_to_exactly_one(self, bunge) -> None:
@@ -399,17 +401,19 @@ class TestTheBungeOverlay:
 
     def test_every_remap_leaves_an_unmapped_for_a_real_group(self, bunge) -> None:
         remaps = [r for j in bunge.judgements.values() for r in j.remaps]
-        # 5 desde la adenda 0.1.1: el re-mapeo de «Desbalanceo» sobra porque
-        # GT001v2 casa ya el sinónimo y no queda un `unmapped` que rescatar.
-        # Un re-mapeo es el parche que se retira cuando la regla se arregla.
-        assert len(remaps) == 5
-        assert all(remap.why for remap in remaps), "a judgement without a reason is not auditable"
-        assert {r.fault_group for r in remaps} == {"OTHER", "ELECTRICAL", "LOOSENESS"}
+        # La adenda 0.1.2 retira los últimos parches: GT004v2/GT026-GT029
+        # producen ya las etiquetas que 0.1.1 tenía que rescatar por juicio.
+        assert remaps == []
 
-    def test_rule_0_5_drift_is_loud_until_the_adenda_exists(self, bunge) -> None:
+    def test_rule_0_5_drift_is_covered_by_the_adenda(self, bunge) -> None:
         text = "-Debilidad estructural (seguimiento). -Posible suciedad y/o desgaste en la válvula"
-        with pytest.raises(OverlayError, match="desfasado"):
-            apply_overlay(_document(text), bunge, ApplyReport())
+        report = ApplyReport()
+        result = apply_overlay(_document(text), bunge, report)
+        assert [finding_key(f) for f in result["observations"][0]["findings"]] == [
+            "STRUCTURE:LOOSENESS",
+            "OTHER:-",
+        ]
+        assert report.judged == 1
 
     def test_the_scores_live_in_the_declared_scale(self, bunge) -> None:
         scale = {"0.25", "0.5", "1", "1.5", "2", "3"}

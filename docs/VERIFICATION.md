@@ -95,8 +95,35 @@ La relectura geométrica completa de las **921 páginas** conservó anclas y
 conteos, y recuperó desbordes de `ANÁLISIS` demostrables en `CF.9110S1`,
 `TC.1523A2`, `PM.4500`, `PM.9700A` y `LA.1249A2`. La asignación exige una
 etiqueta de modalidad explícita o un ancla léxica inequívoca; un `_pre`
-ambiguo no se incorpora. Esta es verificación del código vivo, no una nueva
-publicación: la adenda del overlay, reemisión y despliegue siguen pendientes.
+ambiguo no se incorpora.
+
+La publicación del 2026-08-13 archivó la determinista 0.5.0 y desplegó la
+contextual 0.1.2 tanto junto a los informes como en Bunge. La adenda revisa
+**13 textos / 42 observaciones**: 11 textos cambian claves en 35 observaciones
+y dos textos de estado desaparecen del overlay al quedar `findings=[]` en 7.
+Quedan **133 juicios / 415 observaciones y 0 remapeos manuales**. Los seis
+documentos validan contra `DiagGTDocument`; preservan los seis `source_sha256`,
+los 6.669 `observation_id` y producen 1.308 findings. Frente a 0.4.0 cambian
+76 observaciones: 65 en findings, 11 en `analysis_text`, 6 en estado y 1 en
+alarma (con solapamiento entre campos).
+
+El dataset materializa 7 documentos, 7.642 observaciones, 3.620 consolidadas
+y 2.281 findings. Conserva la proyección del crosswalk: 6.349/6.669
+observaciones de informe y 973/973 alarmas tienen `dataset_machine_id`, igual
+que el backup. `vibframe-validate`: **0 errores**, 731 avisos y 5 informativos;
+el aviso nuevo es el hash honestamente obsoleto de
+`analysis/diaggt-contrast`, cuya entrada cambió. Backup previo:
+`/tmp/ams-wp16-backup-20260813.lD7m8e/`.
+
+El spike reproducible `scripts/audit_informes_status_matrix.py` leyó las 102
+páginas de «Resumen Estado de Máquinas» (17 por informe): 12.102 iconos, que
+son seis copias idénticas de **1.660 celdas históricas** y 357 estados
+actuales sobre **354 máquinas**. Los siete iconos raster tienen hashes
+estables y 0 firmas desconocidas; 283 máquinas ya aparecen en DiagGT, 71 son
+exclusivas de la matriz y el crosswalk vigente resuelve 273. No hubo ninguna
+discrepancia entre informes. El JSON completo no normativo está desplegado
+como `ground-truth/audit-status-matrix-2026-08-13.json` junto a los PDF
+(SHA-256 `5b937aaef2f4cb699d7a25e4425bdf8de50cb7da4cfeeb6608f217fd1e817a81`).
 
 ### Empaquetado VibFrame real (2026-08-13)
 

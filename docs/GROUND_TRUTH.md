@@ -784,21 +784,28 @@ No se emiten `observations.csv`, `findings.csv`,
   el texto; un futuro `component_ref` podría enlazar con nodos de
   `MachineDefinition`.
 - **Matriz de estados coloreada**: la sección "Resumen Estado de Máquinas"
-  del informe (17 páginas) codifica 12 inspecciones de estado por color de
-  celda, sin texto. Extraerla daría **cadencia mensual completa de toda la
-  planta**: son ~343 filas de máquina por informe contra las 138 que tienen
-  ficha, es decir **209 máquinas que el DiagGT no conoce en absoluto**, y para
-  ellas es la única fuente. Para las que sí tienen ficha es redundante con los
+  del informe (17 páginas) codifica inspecciones de estado por color de celda,
+  sin texto. El spike reproducible del 2026-08-13 corrige las estimaciones
+  visuales anteriores: son **354 máquinas**, 357 estados actuales y **1.660
+  celdas históricas únicas**; 283 máquinas ya aparecen en las fichas DiagGT y
+  **71 son exclusivas de la matriz**. Los seis informes contienen la misma
+  matriz, sin una sola discrepancia, y el crosswalk vigente resuelve 273
+  máquinas. Para las que sí tienen ficha la matriz es redundante con los
   diagnósticos previos (§3.3 del extractor de informes).
   **Corrección de 0.1.4**: hasta 0.1.3 esta spec decía que extraerla era leer
   el «color de rects del PDF». **No lo es**: las celdas se emiten como
   **imágenes** (`page.images`, ~2.000 por informe); los únicos `rects` con
   color de relleno son el gris del zebrado de fila. Sigue siendo una
-  extracción determinista, pero la operación es leer el píxel de cada imagen y
-  casar el color con el vocabulario `status` de §3.1, no inspeccionar
-  atributos de relleno vectoriales. Antes de emitirla hay que decidir si el
-  consolidado admite filas **sin texto** (`diagnosis_text=null`,
-  `findings=[]`) y resolver el crosswalk de los ~209 TAGs nuevos.
+  extracción determinista, pero la operación es leer los bytes de cada imagen
+  y casar su hash con el vocabulario `status` de §3.1, no inspeccionar
+  atributos de relleno vectoriales. El catálogo observado es cerrado: check
+  verde, avisos amarillo/naranja/rojo, pausa gris, asterisco azul y llave gris;
+  12.102 iconos produjeron 0 firmas desconocidas. El resultado completo vive
+  como artefacto **no normativo** `audit-status-matrix-2026-08-13.json`,
+  reproducible con `scripts/audit_informes_status_matrix.py`. Antes de
+  emitirlo hay que decidir si el consolidado admite filas **sin texto**
+  (`diagnosis_text=null`, `findings=[]`), su intervalo temporal y las 71
+  máquinas nuevas.
 - **Índice de figuras**: cada ficha de máquina lleva sus gráficos con pie
   («Tendencia de los valores globales…», «Espectros PeakVue…»), que el
   maquetador intercala con la prosa y que v0.1 dejaba pegados dentro de

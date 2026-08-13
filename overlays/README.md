@@ -44,7 +44,7 @@ eso el fichero no es auditable, sólo es un montón de números.
 
 | fichero | corpus | juicios |
 |---|---|---|
-| `bunge-cartagena-2026.weights-llm.overlay.json` | 6 informes Preditec de BUNGE Cartagena 2026 (`inspection-report`) | 135 textos, 422 observaciones, 6 re-mapeos |
+| `bunge-cartagena-2026.weights-llm.overlay.json` | 6 informes Preditec de BUNGE Cartagena 2026 (`inspection-report`) | 133 textos, 415 observaciones, 0 re-mapeos |
 
 ### Uso
 
@@ -54,8 +54,11 @@ uv run rbm informes-weights <ground-truth-dir> \
     [--out <dir>]
 ```
 
-Diseño y auditoría: `docs/workplans/10-pesos-contextuales-llm.md` (v0.1.0) y
-`docs/workplans/11-motor-calibrado-gt-corregido.md` (adenda v0.1.1).
+Diseño y auditoría: `docs/workplans/10-pesos-contextuales-llm.md` (v0.1.0),
+`docs/workplans/11-motor-calibrado-gt-corregido.md` (adenda v0.1.1) y
+`docs/workplans/16-informes-diaggt-completo.md` (adenda v0.1.2). La última
+retira los cinco remapeos que ya cubren `GT004v2`/`GT026`–`GT029` y dos
+juicios de estado que ahora producen correctamente `findings=[]`.
 
 ## 2. Entrada de rodamientos inferidos
 

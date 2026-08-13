@@ -876,12 +876,12 @@ def test_the_geometry_reproduces_the_published_document(pdf_name: str) -> None:
 
     pdf_dir = _informes_dir()
     # The root generation is the contextual LLM-weighted publication. Geometry
-    # and deterministic rule output are anchored by the archived 0.4.0
-    # generation, which is the direct output of ``build_document``.
+    # and deterministic rule output are anchored by the archived generation
+    # produced by the current ``build_document`` implementation.
     golden_path = (
         pdf_dir
         / "ground-truth"
-        / "deterministic-0.4.0"
+        / "deterministic-0.5.0"
         / f"{Path(pdf_name).stem}.diaggt.json"
     )
     if not golden_path.exists():
@@ -899,26 +899,8 @@ def test_the_geometry_reproduces_the_published_document(pdf_name: str) -> None:
     assert document["machines_stopped"] == golden["machines_stopped"]
     assert document["machines_not_measured"] == golden["machines_not_measured"]
     assert len(document["observations"]) == len(golden["observations"])
-    allowed_analysis_overflows = {
-        ("CF.9110S1", "vibration"),
-        ("LA.1249A2", "visual_inspection"),
-        ("PM.4500", "visual_inspection"),
-        ("TC.1523A2", "ultrasound"),
-        ("PM.9700A", "visual_inspection"),
-    }
-    rule_fields = {"findings", "status", "alarm"}
     for emitted, expected in zip(document["observations"], golden["observations"], strict=True):
-        # This golden is 0.4.0: rule-output changes are pinned by the 251-text
-        # regression above. Here the archived document protects every other
-        # field and enumerates the only geometric differences admitted.
-        assert {k: v for k, v in emitted.items() if k not in rule_fields | {"analysis_text"}} == {
-            k: v for k, v in expected.items() if k not in rule_fields | {"analysis_text"}
-        }
-        if emitted["analysis_text"] != expected["analysis_text"]:
-            key = (emitted["machine"]["external_tag"], emitted["modality"])
-            assert key in allowed_analysis_overflows
-            if expected["analysis_text"]:
-                assert emitted["analysis_text"].startswith(expected["analysis_text"])
+        assert emitted == expected
 
 
 @pytest.mark.integration
