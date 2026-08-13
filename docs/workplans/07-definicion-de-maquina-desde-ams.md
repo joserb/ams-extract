@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-08-12
 ---
 
 # Plan: definición de máquina desde AMS (fase C del marco ML)
@@ -23,6 +23,11 @@ hueco para ellos hasta las fases A/B del marco.
 > [`08-emision-de-la-definicion-de-punto.md`](08-emision-de-la-definicion-de-punto.md).
 > El decode y sus golds, abajo, no cambian; el «por qué no se emite todavía»
 > es el estado en que cerró este plan.
+>
+> **Estado operativo 2026-08-12** — Bunge está reexportado en VibFrame 0.2:
+> las declaraciones crudas salen en `PointDoc` y el enriquecedor externo las
+> proyecta a `machine.frequencies`. Este productor sigue sin escribir
+> `definition` ni `definition_provenance`.
 
 Ejecuta la **fase C** del plan marco *Marco de definiciones de máquina en
 VibFrame para ML*

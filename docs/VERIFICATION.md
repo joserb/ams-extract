@@ -7,21 +7,19 @@ Estado: jerarquía verificada en 7/15 áreas; FFT (velocidad mm/s + aceleración
 G's), waveform (G's / mm/s) y tendencia "Valores Globales" (mm/s, 47/47)
 validados contra el gold de AMS; alarmas almacenadas (`gdnl`) cruzadas contra
 los umbrales `pdla` (991/991). **Export completo validado end-to-end**
-(274.478 muestras, conteo exacto, 2026-05-31). Registro concreto en §5.
+(274.478 capturas FFT + waveform, conteo exacto) y **despliegue VibFrame 0.2
+revalidado** con Common Codes y waveforms completas (2026-08-12). Registro
+concreto en §5.
 
-**Nota (2026-08-10) — qué versión del formato validan estas filas.** Todo lo
-registrado abajo hasta esta fecha se midió sobre datasets **VibFrame 0.1**: es
-la validación del *decode* (escalas, unidades, conteos, timestamps, umbrales)
-y sigue siendo válida como tal, porque nada de eso cambió. Lo que cambió es el
-**envoltorio**: el 2026-08-10 el código migró a **VibFrame 0.2** (commit
-`5781773`, ADR-0019) y con él el layout de salida (`metric_catalog.json` en
-vez de `metrics.parquet`, `mode_definitions`/`mode_bindings`, JSON null-free,
-cuatro proyecciones normativas en `ground-truth/` y cero CSV). La
-**re-validación end-to-end 0.2 está pendiente**: exige regenerar los
-artefactos desplegados fuera del repo (`bunge_dataset/bunge_cartagena_ams/` y
-`Informes Bunge Cartagena 2026/ground-truth/`), que hoy siguen siendo
-emisiones 0.1. Hasta que eso ocurra, los números de conformidad de las filas
-de `vibframe-validate` son la foto 0.1.
+**Cómo leer el historial.** Las filas hasta 2026-08-10 se midieron sobre
+datasets **VibFrame 0.1** y siguen siendo el gold del *decode* (escalas,
+conteos, timestamps y umbrales). El envoltorio cambió a **VibFrame 0.2** en
+`5781773` (ADR-0019); la primera foto 0.2 quedó sólo en suite y aún marcaba el
+reexport como pendiente. Esa condición fue **resuelta el 2026-08-12** por
+ADR-0020/ADR-0021 y el workplan 14. El despliegue vigente es
+`~/wslprojects/RESONINS/datasets/bunge_cartagena_ams`; el antiguo
+`../bunge_dataset/` de junio (`manifest.parquet` + `samples/`) es un snapshot
+legacy distinto y no es la publicación VibFrame.
 
 ## 1. Objetivo
 
@@ -158,15 +156,33 @@ coincide con la unidad del texto (15 `1 - 20 KHz` de PM-0CI/1-3, 3
 |---|---|---|
 | 2026-05-31 | BUNGE completo, `--parallel 4` | **18,6 s**; 15 áreas, 311/347 equipos con datos, **0 fallos**; **137.270 FFT + 137.208 waveform = 274.478** (cuadra exacto con AMS); 622 Parquet, 1,3 GB; carga Hive OK |
 | 2026-07-27 | Área CONTRA INCENDIOS (4 equipos, `--types fft,waveform,trend`), conformidad `vibframe-validate` | **antes** (dataset publicado, copia): FAIL, 4/4 máquinas con `waves.data-length`; **después** (ADR-0017): **PASS 4/4**, 0 errores / 0 avisos con `--sample-rows 100000` (todas las filas). 34 s de reloj incl. arranque (0,2 s de export) |
-| 2026-08-12 | BUNGE completo VibFrame 0.2, `--types fft,waveform,trend --parallel 4` (ADR-0020) | **0 fallos**; 311/347 equipos con datos; 137.270 FFT + **137.208 waveform** + 1.571.433 trend, 1.735 Parquet. Auditoría por lotes de todos los `waves.parquet`: **137.208/137.208** filas con `len(data) == n_samples`, distribución exacta 256…16.384. El `vibframe-validate` instalado no es comparable al pin del repo: el checkout editable vecino avanzó a exigir unidades UN/CEFACT y deja 2 tests de conformidad rojos también sin este cambio; pendiente de migración coordinada, no es un fallo de waveform |
+| 2026-08-12 | BUNGE completo VibFrame 0.2, `--types fft,waveform,trend --parallel 4` (ADR-0020) | **0 fallos**; 311/347 equipos con datos; 137.270 FFT + **137.208 waveform** + 1.571.433 trend, 1.735 Parquet. Auditoría por lotes de todos los `waves.parquet`: **137.208/137.208** filas con `len(data) == n_samples`, distribución exacta 256…16.384. **Foto intermedia del mismo día**: el checkout editable ya exigía Common Codes y dejó visibles dos tests rojos de unidad; ADR-0021/workplan 14 los resolvió antes del cierre y la fila final de la sección registra el PASS. |
 
 ### Migración a VibFrame 0.2 (`5781773`)
 
 | Fecha | Alcance | Resultado |
 |---|---|---|
-| 2026-08-10 | Código del export y del materializador GT migrados a VibFrame 0.2 (commit `5781773` «Export VibFrame 0.2 datasets», ADR-0019) | **Verificado sólo en suite**: `tests/test_vibframe_conformance.py` valida con `vibframe-validate` (API y CLI) lo que escribe `rbm export` sobre fixtures, y hace round-trip de los tres goldens 0.2 (`ams-rbm`, `t8-backup`, `vibsynth`) — incluido `test_the_goldens_round_trip_through_our_writer[vibsynth]`, el rojo de `snap_t` del 2026-08-05, hoy en verde. **No hay validación 0.2 sobre la base real**: sin `RBM_TEST_FILE` los tests de integración se saltan y el re-export de BUNGE no se ha ejecutado |
-| 2026-08-10 | Re-validación end-to-end 0.2 del despliegue Bunge | **PENDIENTE**. `bunge_dataset/bunge_cartagena_ams/` y `Informes Bunge Cartagena 2026/ground-truth/` siguen siendo emisiones **0.1** (`metrics.parquet`, `observations.csv`, `observations_system.parquet`, snapshot `FORMATO_GROUND_TRUTH.md` v0.1.0). Hasta regenerarlos con el extractor 0.2 no hay número nuevo que registrar: las filas de `vibframe-validate` de arriba son la foto 0.1 |
+| 2026-08-10 | Código del export y del materializador GT migrados a VibFrame 0.2 (commit `5781773` «Export VibFrame 0.2 datasets», ADR-0019) | **Foto histórica, superada el 2026-08-12.** En ese commit sólo se verificó la suite: `tests/test_vibframe_conformance.py` validaba los fixtures y hacía round-trip de los tres goldens 0.2 (`ams-rbm`, `t8-backup`, `vibsynth`). Todavía no se había ejecutado la base real ni regenerado el despliegue. |
+| 2026-08-10 | Re-validación end-to-end 0.2 del despliegue Bunge | **Pendiente en esta fecha; completada el 2026-08-12.** La fila siguiente sustituye este estado y aporta los conteos actuales. Se conserva la fila para explicar el intervalo entre migrar el writer y regenerar la publicación. |
 | 2026-08-12 | BUNGE desplegado, reexport VibFrame 0.2 con Common Codes (ADR-0021) y postprocesos | **COMPLETADO**. 347 máquinas; 137.270 spectra + 137.208 waves + 1.571.433 trends; 24.684 métricas. Unidades del catálogo: 15.367 `C16`, 8.695 `K40`, 311 `HTZ`, 311 `P1`; spectra: 85.698 `C16` + 51.572 `K40`; waves: 503 `C16` + 136.705 `K40`. Auditoría completa: 0 ondas con `len(data) != n_samples`. `t8-mapper`: 23.590/24.684 labels (95,6 %), 0 diferencias en segunda pasada. `enrich`: definición en 347 máquinas, 3.728 frecuencias en 91 máquinas, 0 cambios en segunda pasada y 56 designaciones sin resolver. Los 24 ficheros preservados de `ground-truth/` y `analysis/` coinciden byte a byte. Validador: **0 errores**, 730 avisos conocidos (588 hashes obsoletos de las capas de análisis conservadas y 142 tipos de nodo del enriquecedor aún no documentados); por ello `--strict` falla deliberadamente y no se falsearon los hashes para hacerlo pasar. |
+
+### Auditoría del corpus RESONINS (2026-08-12)
+
+Se inspeccionaron las 32 raíces bajo `~/wslprojects/RESONINS/datasets`, sus
+catálogos y las columnas `unit` de 1.543.477 espectros y 1.534.375 ondas, y se
+ejecutó el validador actual sin muestreo de arrays:
+
+- las 32 declaran VibFrame `0.2.0`, usan `metric_catalog.json` y no contienen
+  `metrics.parquet`;
+- Bunge/AMS y los 29 datasets T8 terminan con **0 errores**; los avisos de
+  esos 30 pertenecen a procedencia, crosswalk, leyendas de estado o
+  vocabulario abierto, no a unidades;
+- `vibsynth_fleet_demo` y `vibsynth_opmodes_demo` fallan con 12 errores cada
+  uno porque conservan labels (`mm/s`, `g`, `Hz`, `°`, `adim`, `id`) en el
+  catálogo y los Parquet. Son deuda de regeneración de `vibsynth`, no del
+  productor AMS;
+- los `load` T8 con `M39` son conformes y deliberados: el backup declara la
+  carga en `cm/s²`, y la métrica reservada conserva la magnitud del origen.
 
 ### Máquinas sin muestras (GT 2026-07-20)
 

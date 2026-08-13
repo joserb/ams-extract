@@ -4,13 +4,19 @@
 > detalles del formato binario de RBMware / AMS Machinery Manager (MT4.00).
 
 Estado: Fases 0–6 completadas + **calibración FFT resuelta (2026-05-30)** +
-**tendencias `vddt` resueltas (2026-05-30)**. Secciones §1, §2, §3, §5 y §6
+**tendencias `vddt` resueltas (2026-05-30)** + **waveforms completas
+`vdfw + vcfw` resueltas (2026-08-12)**. Secciones §1, §2, §3, §5 y §6
 verificadas contra el fichero real `BUNGE CARTAGENA marzo 2.0.rbm`. Los
 sample records (§5) están totalmente decodificados y calibrados: FFT
 velocidad (mm/s), FFT aceleración —PeakVue + alta frecuencia— (G's),
-waveform (G's) y tendencias de Valores Globales (mm/s, §5.7). Pendiente
-menor: etiquetar las 7 bandas del `vddt` y el catálogo exhaustivo de tags
-poco frecuentes (§4).
+waveform (G's / mm/s) y tendencias de Valores Globales + bandas (mm/s / G's,
+§5.7–§5.8). Quedan incógnitas no bloqueantes en campos poco frecuentes, la
+ley de severidad D y el catálogo exhaustivo de tags (§7).
+
+Las unidades citadas en este documento son las labels y magnitudes con las que
+AMS presenta y calibra el binario. En la frontera VibFrame 0.2, `unit`
+serializa Common Codes UN/CEFACT: `C16` (mm/s), `K40` (gravedad estándar),
+`HTZ` (Hz) y `P1` (%); véase ADR-0021.
 
 ## 1. Estructura general
 
@@ -207,8 +213,9 @@ devuelve `list[Area]` con `equipment` y `points` poblados.
 configuración del punto, no medida. El walker los deja en
 `Point.bearing_designations` / `Point.nominal_speed_rpm`, y `rbm export` los
 emite **tal cual** en `PointDoc.bearing_designations` (lista vacía si el punto
-no declara ninguno) y `PointDoc.nominal_speed_rpm` (`null`, nunca `0`, si no
-hay velocidad) desde que el contrato les abrió hueco (workplan 08; hueco
+no declara ninguno) y `PointDoc.nominal_speed_rpm` (`None` en el modelo y
+**campo ausente** en el JSON null-free, nunca `0`, si no hay velocidad) desde
+que el contrato les abrió hueco (workplan 08; hueco
 definido en el workplan 04 de vibsynth-contracts). Normalizar la designación
 contra un catálogo y proyectarla a frecuencias de fallo sigue siendo del
 enriquecedor, no de este extractor.
@@ -285,7 +292,7 @@ n_lines=1600, RPM=1455, CARGA=100%, 5 espectros con timestamps
 ```
 vdpm (point)
   └── 0x10 → pdcd ("Set Colección Datos Primar" — índice del punto)
-        ├── 0x04 → vcfw (waveform chain head — pendiente §5.5)
+        ├── 0x04 → vcfw (continuación de waveform; datos iniciales en vdfw, §5.5)
         ├── 0x38 → vdpm (back-ref al propio punto)
         ├── 0x3C → vddt (primer record de tendencias; Valores Globales — §5.7)
         ├── 0x40 → vddt (último record de tendencias — §5.7)
@@ -318,9 +325,10 @@ vcps chain (datos amplitud de un espectro):
   vcps → 0x14 → siguiente vcps (0 = fin de cadena de este espectro)
               0x18 hasta 0x1FF → 122 × float32 LE (amplitud bin a bin)
 
-Total por espectro: ~13 vcps × 122 = 1586 floats (n_lines=1600 nominal;
-los últimos ~14 bins quedan implícitos o como zero-pad, pendiente de
-afinar).
+La cadena aporta ~13 vcps × 122 = 1586 floats. No faltan los 14 bins que
+parecía sugerir `n_lines=1600`: el descriptor `vdps` guarda antes otros 78
+bins en `0xC8..0x1FF`. El espectro completo concatena 78 + 1586 = 1664 y se
+trunca a `n_lines` (§5.6).
 ```
 
 ### 5.2 `pdcd` record — índice de tipos de medida por punto
@@ -697,7 +705,8 @@ Tipos de banda (`0xDC`):
 - `0x04` — Hz fijos pero el **valor** de la columna es energía HF en G's
   ("1 - 20 KHz", 1000–20000 Hz). Escala VALIDADA (2026-07-19) contra la
   captura AMS de PM-9101-A M1H: el crudo ES el "RMS Aceleración" en G's que
-  pinta AMS, valor a valor (0.229→0.463, 2016→2025) → se emite en `g`.
+  pinta AMS, valor a valor (0.229→0.463, 2016→2025) → label de modelo `G's`,
+  `unit=K40` en VibFrame.
 - `0x0B` — pico de forma de onda ("Mp Wave"), sin rango de frecuencia.
 
 **Validación numérica** (la clave del cierre): el valor de la columna
@@ -707,7 +716,8 @@ cuadrados (RSS) de los bins crudos del espectro (§5.6, en in/s, antes del
 < 0.1 % (a menudo < 0.01 %) sobre 7 plantillas (ap 1, 2, 3, 7, 10, 16, 84)
 × ~30 puntos × bandas, comparando espectro y lectura de trend con el mismo
 timestamp. Para bandas en órdenes el borde en Hz usa las RPM del análisis =
-el valor CRUDO de `vdps.0x28` (= 2 × `Spectrum.rpm`, ojo: ver §5.3).
+el valor crudo de `vdps.0x28` = `Spectrum.rpm`, sin dividir (ver §5.3 y la
+corrección fechada de ADR-0013).
 
 #### `pdla` — Alarm Limit Set (umbrales de alarma)
 

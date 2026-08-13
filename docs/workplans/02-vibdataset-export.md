@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-07-09
-updated: 2026-08-05
+updated: 2026-08-12
 ---
 
 # Plan: sustituir `rbm export` por VibDataset
@@ -9,6 +9,11 @@ updated: 2026-08-05
 > **Nota 2026-08-10** — histórico escrito contra **VibFrame 0.1**: lo que aquí
 > se llama `metrics.parquet` es hoy `metric_catalog.json`; ver ADR-0019 y el
 > workplan 12.
+>
+> **Cierre 2026-08-12** — la identidad de unidad de la emisión 0.2 usa ya
+> Common Codes UN/CEFACT (`C16`, `K40`, `HTZ`, `P1`); véanse ADR-0021 y el
+> workplan 14. Los nombres legibles que aparecen debajo describen la interfaz
+> de entonces, no los valores serializados hoy en `unit`.
 
 **Fecha**: 2026-07-09 · **Estado**: completado (histórico) — ejecutado en
 `cf4b240`; el formato se llama ahora **VibFrame** y su conformidad continúa

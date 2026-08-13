@@ -1,16 +1,18 @@
 ---
 status: completed
 created: 2026-07-29
-updated: 2026-07-29
+updated: 2026-08-12
 ---
 
 # Plan: conformidad VibFrame en CI y nulabilidad alineada de los parquet
 
 **Fecha**: 2026-07-29 · **Estado**: **COMPLETADO**. `tests/test_vibframe_conformance.py`
 pone lo que escribe `rbm export` bajo `vibframe-validate` (API y CLI) y hace
-round-trip de los goldens de los tres orígenes; las columnas requeridas de las
-cuatro tablas parquet pasan a declararse **non-nullable**, como en t8-extract y
-vibsynth.
+round-trip de los goldens de los tres orígenes. En la foto 0.1 de este plan,
+las columnas requeridas de las cuatro tablas parquet pasaron a declararse
+**non-nullable**. VibFrame 0.2 sustituyó la tabla de métricas por
+`metric_catalog.json`, por lo que hoy son tres Parquet más un catálogo JSON
+null-free (workplan 12).
 
 Cierra dos pendientes del workplan 03 de t8-extract
 (`~/wslprojects/t8-extract/docs/workplans/03-unificacion-repos-extraccion.md`,
@@ -112,3 +114,14 @@ escribir sus propias filas a mano y comparte la fixture.
   declaración.
 - Sigue pendiente la Parte 3 del workplan 03 (empaquetado `.vibframe.zip`,
   `rbm export --zip`): fuera de alcance aquí a propósito.
+
+### Actualización 2026-08-12
+
+- El golden AMS, `snap_t` y la nulabilidad 0.2 están sincronizados; la suite
+  compara además los Common Codes del contrato vendorizado con los de
+  `vibsynth-contracts`.
+- El empaquetado `.vibframe.zip` sigue siendo responsabilidad del contrato/
+  tooling común; `rbm export` escribe directorios y no ofrece `--zip`.
+- El workflow aislado de GitHub continúa necesitando una estrategia de
+  publicación o checkout coordinado para las dependencias por path; la matriz
+  local Linux/WSL es la verificación reproducible de este checkout.

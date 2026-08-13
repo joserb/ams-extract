@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-07-10
-updated: 2026-07-20
+updated: 2026-08-12
 ---
 
 # Plan: alinear `rbm export` con VibFrame v0.1 y cerrar los huecos del export
@@ -9,8 +9,16 @@ updated: 2026-07-20
 > **Nota 2026-08-10** — histórico escrito contra **VibFrame 0.1**, incluido su
 > título: el formato vigente es 0.2 (catálogo JSON, `mode_definitions`/
 > `mode_bindings`, `snap_t` ya en el contrato); ver ADR-0019 y el workplan 12.
+>
+> **Cierre 2026-08-12** — los huecos que aún figuraban como presentes en el
+> cuerpo se resolvieron después: `pdpa`/`pdla` y contexto en ADR-0012–0015,
+> definición de punto en workplans 07–08, layout 0.2 en el workplan 12,
+> waveform completa en el 13 y Common Codes + reexport Bunge en el 14. Las
+> cifras de 45,0 % de mapper quedan como línea base histórica; el despliegue
+> actual alcanza 23.590/24.684 (95,6 %).
 
-**Fecha**: 2026-07-10 (actualizado 2026-07-20) · **Estado**: en curso —
+**Fecha**: 2026-07-10 (cierre consolidado 2026-08-12) · **Estado**:
+**COMPLETADO (histórico VibFrame 0.1)** —
 conformidad base cerrada (`f17bb9c`), bandas vddt + `path=[área]` emitidas
 (`2c5e1fe`, ADR-0010), etiquetado canónico vía mapper operativo (§4,
 ADR-0011), decode de `pdpa`/`pdla` con límites de banda + columna `alarm`
@@ -93,19 +101,19 @@ Del estudio (gaps conocidos, en orden de valor):
 ### 4. Etiquetado canónico
 
 `canonical_metric`/`proxy_quality`/`mapping_rule` se dejan **null**: los
-rellenará el adaptador VibFrame→firma de `t8-metrics-mapper` (trabajo aparte
+rellenará el adaptador VibFrame→firma de `vibsynth-metrics-mapper` (trabajo aparte
 en ese repo). No implementar mapeo de nombres aquí — en VibFrame el nombre
 nunca decide semántica; lo que importa es rellenar bien los descriptores
 estructurales del §3.
 
 **HECHO (2026-07-19, ADR-0011): el etiquetado es un post-proceso con el
-front-end VibFrame de `t8-metrics-mapper`** (repo
-`~/wslprojects/t8-metrics-mapper`), no un paso de `rbm export` — cero
+front-end VibFrame de `vibsynth-metrics-mapper`** (CLI `t8-mapper`), no un
+paso de `rbm export` — cero
 dependencias nuevas aquí y un único punto de verdad de las reglas para los
 tres orígenes (T8/AMS/vibsynth). Tras cada export:
 
 ```bash
-# en el repo t8-metrics-mapper
+# en el repo vibsynth-metrics-mapper
 uv run t8-mapper vibframe /ruta/al/dataset --write   # escribe las etiquetas
 uv run t8-mapper vibframe /ruta/al/dataset --diff    # valida el round-trip
 ```

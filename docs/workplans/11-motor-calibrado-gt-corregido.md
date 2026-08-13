@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-08-05
-updated: 2026-08-05
+updated: 2026-08-12
 ---
 
 # Plan: reglas GT corregidas, rodamientos inferidos y el `path` del export
@@ -9,6 +9,11 @@ updated: 2026-08-05
 > **Nota 2026-08-10** — histórico escrito contra **VibFrame 0.1**: su pendiente
 > de `snap_t` en el contrato vendorizado quedó resuelto por la migración a 0.2,
 > que además prohíbe `fault_frequencies_order`; ver ADR-0019 y el workplan 12.
+>
+> **Cierre posterior 2026-08-12** — Bunge fue reexportado con
+> `--dataset-path`, volvió a etiquetarse y se enriqueció. El resultado actual
+> es 3.728 frecuencias en 91 máquinas; los flecos que siguen abiertos se
+> señalan como tales debajo.
 
 **Frente O1-A** de la tanda «motor calibrado, GT corregido, corpus al día».
 Cuatro entregas que comparten una idea: lo que el frente anterior sólo pudo
@@ -364,21 +369,14 @@ re-exportar—, no un daño colateral de éste.
   del `.rbm`, y sería una invención con aspecto de dato. Sin la opción, el
   campo no se escribe.
 
-## Pendiente
+## Pendientes al cierre y estado posterior
 
-- **`snap_t` en `trends.parquet`: un test rojo en `HEAD`** (pendiente de
-  código, anotado el 2026-08-05 al promoverlo desde §6). El
-  `TRENDS_COLUMNS` del contrato vendorizado
-  (`src/ams_extract/export/vibframe_contract.py`) **no** lleva `snap_t`,
-  mientras que `vibsynth-contracts` ya lo declara opcional en las tres tablas
-  de captura y tendencia; el golden de vibsynth lo trae y
-  `test_the_goldens_round_trip_through_our_writer[vibsynth]` falla por eso —
-  ya antes de este frente, no es daño colateral suyo. Adoptarlo es trabajo de
-  conformidad con su propio alcance: re-vendorizar el contrato (anotando el
-  commit de origen) y re-exportar. La columna sería null, como ya lo es en
-  `spectra`/`waves` (`_spectrum_row`/`_waveform_row` la escriben así): el `.rbm`
-  no tiene noción de snapshot. Mientras no se haga, la suite tiene un rojo
-  conocido que no viene de este repo.
+- ~~**`snap_t` en `trends.parquet`: un test rojo en `HEAD`.**~~ Resuelto por
+  la migración 0.2 (workplan 12): `snap_t` forma parte de las tres tablas y el
+  golden de vibsynth hace round-trip. Al cerrar este plan, el contrato
+  vendorizado aún no llevaba la columna mientras `vibsynth-contracts` ya la
+  declaraba opcional; por eso fallaba aquel golden. El `.rbm` no tiene noción
+  de snapshot y el valor emitido sigue siendo ausente/null según la capa.
 - **El vocabulario de estado no cubre las fórmulas de cierre del analista.**
   «Se establece su buen estado», «Estable», «Sin evolución en el último mes»,
   «Informar a Preditec si se ha intervenido». Con GT011v2 arreglado, la ficha
@@ -398,6 +396,5 @@ re-exportar—, no un daño colateral de éste.
 - **Las 31 designaciones sin geometría.** El camino honesto no es que las
   invente el mismo que las falla: es una tabla de fabricante o los factores que
   el propio T8 trae en su tabla `bearing`, que ya están en ese formato.
-- **Volver a etiquetar el dataset.** `t8-mapper vibframe --write` no hace falta
-  aquí (no ha habido re-export), pero el día que se re-exporte, el
-  `--dataset-path` ya no habrá que restaurarlo a mano.
+- ~~**Volver a etiquetar el dataset.**~~ Hecho tras el reexport del 2026-08-12
+  (workplan 14); `--dataset-path` quedó preservado por el export.

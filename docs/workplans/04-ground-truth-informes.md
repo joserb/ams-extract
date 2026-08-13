@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-07-27
-updated: 2026-07-28
+updated: 2026-08-13
 ---
 
 # Plan: ground truth de diagnóstico externo (DiagGT) desde los informes Preditec
@@ -14,6 +14,13 @@ updated: 2026-07-28
 > **Nota 2026-08-12** — ADR-0020 sustituye la interpretación de ADR-0017
 > citada en este plan: las 150 muestras no estaban ausentes, sino dentro de
 > `vdfw`; la cadena `vcfw` es sólo la continuación con padding físico.
+>
+> **Cierre documental 2026-08-12** — DiagGT está en 0.1.5, el extractor
+> determinista vigente en 0.4.0 y el contextual en 0.1.1. Bunge y la carpeta
+> de informes tienen ya las cuatro proyecciones VibFrame 0.2. Los snapshots
+> `FORMATO_GROUND_TRUTH.md` de la carpeta de informes y del dataset RESONINS
+> se resincronizaron byte a byte con esta spec el 2026-08-13.
+> Los «pendientes» inferiores se conservan como foto y se aclaran en «Flecos».
 
 **Fecha**: 2026-07-28 · **Estado**: **COMPLETADO**. Formato DiagGT
 especificado (v0.1.4) con modelos normativos en `vibsynth-contracts`
@@ -494,9 +501,9 @@ que no concretan `FaultMode`. De ahí el formato nuevo.
    documentos regenerados.
 5. ~~Auditar la cobertura del extractor por lectura completa de un informe~~ —
    **hecho 2026-07-28** (Hecho §10) y **fix determinista ejecutado**
-   (Hecho §11-§13, extractor v0.2.0, spec v0.1.4). Pendiente derivado: subir
-   `DIAGGT_SCHEMA_VERSION` a `"0.1.4"` en `vibsynth-contracts` (documentación,
-   no contrato). La **matriz de estados coloreada** queda como paso aparte y
+   (Hecho §11-§13, extractor v0.2.0, spec v0.1.4). El derivado de subir
+   `DIAGGT_SCHEMA_VERSION` quedó **cumplido** después y hoy contracts/este
+   productor declaran 0.1.5. La **matriz de estados coloreada** queda como paso aparte y
    posterior, con la asunción de la spec ya corregida (celdas = imágenes).
 
 ## Flecos que sobreviven al plan (fuera de su alcance)

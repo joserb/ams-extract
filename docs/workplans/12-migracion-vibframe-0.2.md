@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-08-10
-updated: 2026-08-10
+updated: 2026-08-13
 ---
 
 # Plan: migración a VibFrame 0.2
@@ -95,8 +95,8 @@ por `materialization.json`.
   referencia viva del contrato de salida. La razón queda escrita en el propio
   bloque.
 - `docs/VERIFICATION.md`: entrada nueva fechada, sin tocar filas históricas —
-  lo validado end-to-end era 0.1, la re-validación 0.2 está pendiente de
-  regenerar los artefactos externos.
+  anotó que lo validado end-to-end era 0.1 y que la re-validación 0.2 quedaba
+  entonces pendiente de regenerar los artefactos externos.
 - `docs/FORMAT.md` §5.5: las notas del bloque nominal viajan en el *mode
   binding*, no en un `proc_mode`.
 - Docstrings de `scripts/crosswalk_gt.py` y `src/ams_extract/informes/
@@ -114,14 +114,16 @@ CLI) lo que escribe `rbm export` y hace round-trip de los tres goldens 0.2;
 `test_the_goldens_round_trip_through_our_writer[vibsynth]` —el rojo de
 `snap_t` del 2026-08-05— pasa.
 
-## Pendiente (fuera de este repo)
+## Cierre posterior de los artefactos externos (2026-08-12)
 
-Los **artefactos desplegados** siguen siendo emisiones 0.1 y quedan por
-regenerar con el extractor 0.2:
+El pendiente original quedó completado en el workplan 14. El dataset vigente
+es `~/wslprojects/RESONINS/datasets/bunge_cartagena_ams`, no el snapshot
+histórico `../bunge_dataset/`: 347 máquinas, cuatro proyecciones DiagGT 0.2,
+Common Codes UN/CEFACT y validación normal con **0 errores**. Los 730 avisos de
+`--strict` son 588 análisis derivados desfasados y 142 nodos de definición sin
+tipo documentado; no son incumplimientos de layout ni de unidad.
 
-- `…/bunge_dataset/bunge_cartagena_ams/` (dataset y su `ground-truth/`).
-- `…/Informes Bunge Cartagena 2026/ground-truth/` (incluido el snapshot de
-  cortesía `FORMATO_GROUND_TRUTH.md`, v0.1.0).
-
-De esa regeneración salen los números de la re-validación end-to-end 0.2 que
-`docs/VERIFICATION.md` deja anotada como pendiente.
+La carpeta externa de informes también contiene las cuatro proyecciones 0.2.
+Sus copias de cortesía `FORMATO_GROUND_TRUTH.md`, allí y dentro del dataset
+RESONINS, se resincronizaron byte a byte con la spec tras la revisión del
+workplan 15 (2026-08-13).

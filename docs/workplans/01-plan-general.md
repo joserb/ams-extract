@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-05-27
-updated: 2026-08-10
+updated: 2026-08-12
 ---
 
 # ams-extract — estado y arquitectura
@@ -10,9 +10,9 @@ updated: 2026-08-10
 > Manager (`.rbm`) a formatos modernos (Parquet + JSON), sin depender de la VM
 > Windows XP ni del software AMS original.
 
-Última actualización: 2026-06-14 (movido a `docs/workplans/` el 2026-07-19;
-el trabajo VibFrame posterior vive en `02-vibdataset-export.md` y
-`03-vibframe-conformidad.md`) · Repo: `git@github.com:joserb/ams-extract.git`
+Estado consolidado el 2026-08-12 (movido a `docs/workplans/` el 2026-07-19;
+la evolución posterior vive en los workplans 02–15) · Repo:
+`git@github.com:joserb/ams-extract.git`
 (privado) · Branch de trabajo: `master`.
 
 > **Nota histórica**: este documento fue originalmente un plan por fases (0–7)
@@ -23,11 +23,11 @@ el trabajo VibFrame posterior vive en `02-vibdataset-export.md` y
 > [`DECISIONS.md`](../DECISIONS.md); el protocolo y registro de verificación en
 > [`VERIFICATION.md`](../VERIFICATION.md).
 >
-> **Nota (2026-08-05)**: este documento es de 2026-06-14 y el proyecto ha
-> seguido. Lo que dice de los visores y del inventario de comandos ha
-> caducado; las notas fechadas de abajo lo señalan en su sitio. La referencia
-> viva de la CLI es `README.md`; el trabajo posterior, los workplans 02–11 y
-> los ADRs 0009–0018.
+> **Nota (2026-08-12)**: la referencia viva de la CLI es `README.md`; este
+> documento conserva la arquitectura y las decisiones del plan original. Las
+> notas fechadas explican las sustituciones posteriores (visor portable,
+> VibFrame 0.2, waveforms completas y Common Codes). El historial completo
+> continúa en los workplans 02–15 y ADR-0009–ADR-0021.
 
 ## 1. Objetivo y caso de uso
 
@@ -50,9 +50,9 @@ Parquet por su API/loader. No es librería embebida ni escribe `.rbm`.
 | Jerarquía (`rbm tree`) | ✅ 15 áreas, 347 equipos, 5203 puntos (verificado vs AMS) |
 | FFT velocidad → mm/s | ✅ banda baja `vdps` + cadena `vcps`, ×48.5 (3 máquinas, ±5–10%) |
 | FFT aceleración (PeakVue + HF) → G's | ✅ ×1.30 (validado PeakVue y HF fmax 6000, ±10%) |
-| Waveforms → G's / mm/s | ✅ escala `vdfw.0x28`; velocidad ×25.4 → mm/s |
+| Waveforms → G's / mm/s | ✅ 150 muestras inline de `vdfw` + continuación `vcfw`, escala `vdfw.0x28`; velocidad ×25.4 → mm/s |
 | Tendencias "Valores Globales" → mm/s | ✅ `vddt`, off-by-one de fechas (validado 47/47) |
-| Export masivo (`rbm export`) | ✅ BUNGE entero (1,8 GiB) en **~19 s** `--parallel 4`; **274.478** muestras FFT+wv = conteo exacto AMS; 0 fallos; ~1,3 GB Parquet; ahora emite `report.html` |
+| Export masivo (`rbm export`) | ✅ BUNGE entero (1,8 GiB) en **~19 s** `--parallel 4`; **274.478** capturas FFT+wv = conteo exacto AMS; con trends: 1.571.433 filas; 0 fallos; VibFrame 0.2 + `report.html` |
 | Estadísticas (`rbm stats`) | ✅ summary / machines / points (sp/wv/tn) |
 | Inventario HTML (`rbm report`) | ✅ árbol localizaciones → máquinas con conteos + fechas (primera/última) por tipo, archivo único con filtro; leído del `.rbm` |
 | Viewer on-demand (`rbm serve`) | ✅ sirve un `.rbm` directo (arranque solo jerarquía; puntos/muestras lazy; render desde el `.rbm`) o un dataset Parquet exportado; FFT/onda/tendencia bajo demanda (sin pregenerar PNG) |
@@ -96,7 +96,7 @@ se renderizan **bajo demanda** y nunca se pregenera PNG.
 
 `sp` = espectros FFT, `wv` = waveforms, `tn` = lecturas de tendencia.
 
-**Nota (2026-08-05)**: este inventario de comandos está incompleto — faltan
+**Nota (2026-08-12)**: este inventario de comandos está incompleto — faltan
 `rbm alarms` (workplan 04), `rbm informes` e `rbm informes-weights`
 (workplans 09 y 10) y la opción `rbm export --dataset-path` (workplan 11). La
 referencia viva es el bloque «Commands» del `README.md`; aquí no se duplica.
@@ -161,8 +161,9 @@ de muestra del viewer se generan en memoria al cargar el VibFrame.
 
 `models.py` (frozen + slots): `Area` → `Equipment` → `Point`; y las muestras
 `Spectrum` (amplitude calibrada), `Waveform` (samples calibradas), `Trend`
-(serie `timestamps_utc` + `overall` en mm/s). Sin Pydantic en el parser; solo
-en los modelos de export.
+(serie `timestamps_utc` + `overall` en mm/s o G's y bandas). Sin Pydantic en
+el parser; los modelos normativos de `vibsynth-contracts` sólo entran en
+tests/CI, no en runtime.
 
 ## 6. Decisiones técnicas clave
 
@@ -171,7 +172,7 @@ en RAM) con lectura lazy de muestras; `structlog` JSON desde el día uno;
 política **saltar-con-log** (no abortar) salvo `--strict`; export paralelo con
 `ProcessPoolExecutor` (un equipo por proceso). Encoding cp1252 → cp850 →
 latin-1. Detalle y justificación en [`DECISIONS.md`](../DECISIONS.md)
-(ADR-0001…0008; la serie sigue hasta ADR-0018).
+(ADR-0001…ADR-0021).
 
 ## 7. Trabajo restante / opcional
 

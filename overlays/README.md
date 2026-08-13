@@ -95,3 +95,9 @@ ella **nunca es `direct`**.
   `BPFO + BPFI = Z` exacto, `FTF < 0,5`, `BSF` entre 1 y `Z/2`.
 
 Diseño y números: `docs/workplans/11-motor-calibrado-gt-corregido.md`.
+
+Estado desplegado (2026-08-12): tras el reexport VibFrame 0.2 y una nueva
+pasada del enriquecedor, Bunge contiene **3.728 entradas** en
+`machine.frequencies`, repartidas entre **91 máquinas**. Permanecen **56
+designaciones** sin resolver; el extractor conserva siempre el texto AMS
+verbatim para que el enriquecimiento pueda repetirse.

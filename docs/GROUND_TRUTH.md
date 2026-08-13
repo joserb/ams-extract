@@ -1,8 +1,8 @@
 # DiagGT — Formato de intercambio de ground truth de diagnóstico externo
 
-**Versión de esquema: 0.1.5** · Estado: propuesta · Ámbito: ecosistema VibFrame
-(vibsynth-contracts, vibsynth-diagnostics, vibsynth-metrics, ams-extract,
-t8-extract, t8-mapper)
+**Versión de esquema: 0.1.5** · Estado: implementada · Ámbito: ecosistema
+VibFrame (`vibsynth-contracts`, `vibsynth-diagnostics`, `vibsynth-metrics`,
+`ams-extract`, `t8-extract`, `vibsynth-metrics-mapper`; CLI `t8-mapper`)
 
 > **Hogar del contrato**: los **modelos normativos** de DiagGT viven en
 > `vibsynth-contracts` (`vibsynth_contracts.diagnosis.external`, Pydantic v2),
@@ -641,11 +641,12 @@ verdad de construcción de los datasets demo de vibsynth.
     ├── materialization.json             # política, herramienta, inputs y hashes
     ├── crosswalk.csv                    # (no normativo) artefacto de herramienta
     ├── crosswalk_ambiguities.md         # (no normativo) artefacto de herramienta
-    └── FORMATO_GROUND_TRUTH.md          # esta especificación
+    └── FORMATO_GROUND_TRUTH.md          # snapshot de cortesía de esta spec
 ```
 
-Normativas son las cuatro primeras entradas: los `*.diaggt.json` y las tres
-proyecciones con su `materialization.json`. **`crosswalk.csv` y
+Normativos son los `*.diaggt.json` como fuente documental y las cuatro
+entradas de materialización VibFrame 0.2: las tres tablas más
+`materialization.json`. **`crosswalk.csv` y
 `crosswalk_ambiguities.md` no son miembros del formato**: son **artefactos de
 herramienta** que emite `scripts/crosswalk_gt.py` (ams-extract) para dejar
 auditable el mapeo TAG ↔ `machine_id` — la regla CWxxx que ganó, los
@@ -825,7 +826,8 @@ No se emiten `observations.csv`, `findings.csv`,
   `<dataset>/ground-truth/`.
 - **Productores conocidos**: `ams_extract.export.diag_gt` (`system-alarm`,
   alarmas `gdnl` de AMS), `ams_extract.informes` (`inspection-report`, los
-  informes PDF de Preditec para Bunge; el único que emite `weight` hoy),
+  informes PDF de Preditec para Bunge; el único productor conocido que emite
+  `weight` en esta revisión),
   `t8_extract.ground_truth` (`system-alarm`, `alarms.db` del T8) y
   `vibsynth_metrics.diag_gt_export` (`synthetic-truth`, verdad de construcción
   de los datasets sintéticos).

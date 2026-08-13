@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-08-04
-updated: 2026-08-05
+updated: 2026-08-12
 ---
 
 # Plan: hogar del extractor de informes y línea base de pesos por finding
@@ -10,6 +10,12 @@ updated: 2026-08-05
 > consolidadas son hoy las cuatro proyecciones normativas 0.2 (sin CSV) y el
 > `crosswalk.csv` es artefacto de herramienta, no formato; ver ADR-0019 y el
 > workplan 12.
+>
+> **Estado operativo 2026-08-12** — la generación determinista vigente es
+> `informes-gt-extract 0.4.0`; la contextual es
+> `informes-gt-weights-llm 0.1.1`. Ambas materializan las cuatro proyecciones
+> normativas 0.2. El fixture 0.2.0 citado debajo se conserva a propósito como
+> línea base de regresión de las reglas anteriores.
 
 **Frente B.2** del plan «GT experto cuantificable». Dos cosas que van juntas
 porque la segunda no cabe en un script suelto: **dar hogar** al extractor de
@@ -286,6 +292,11 @@ restaurando el ground truth viejo y volviendo a validar). Nuevo en el informe:
   con CRLF; no se toca aquí.)
 
 ## Pendiente
+
+Este apartado es la lista al cierre del plan. Las reglas GT001/GT011/GT021 y
+GT025 se resolvieron y versionaron en el workplan 11; cualquier cifra de
+`unmapped` restante debe medirse sobre la generación 0.4.0 antes de convertirla
+en una tarea nueva.
 
 - **Vista de contraste con pesos**: `analysis/diaggt-contrast` sigue leyendo
   `observations`, que es lo que necesita (`alarm` contra `alarm`). El primer

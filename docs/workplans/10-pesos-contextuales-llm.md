@@ -1,10 +1,15 @@
 ---
 status: completed
 created: 2026-08-05
-updated: 2026-08-05
+updated: 2026-08-12
 ---
 
 # Plan: pesos contextuales del analista (pasada LLM sobre el GT de Bunge)
+
+> **Cierre posterior 2026-08-12** — el overlay vigente es la adenda 0.1.1,
+> aplicada por `informes-gt-weights-llm 0.1.1` y desplegada en Bunge. La línea
+> determinista 0.4.0 se conserva al lado; las reglas que este plan detectó se
+> corrigieron en el workplan 11.
 
 **Frente B.3** del plan «GT experto cuantificable». El workplan 09 dejó una
 **línea base determinista**: la masa de juicio de cada observación repartida

@@ -69,6 +69,15 @@ dataset y en `<informes>/ground-truth/`). La segunda sale de la primera
 aplicándole un overlay de juicio de `overlays/`; los documentos, la geometría y
 el `source_sha256` del PDF son los mismos, sólo cambia el reparto de `weight`.
 
+**Corpus desplegado (auditoría 2026-08-12).** RESONINS contiene 32 raíces
+VibFrame 0.2 y ninguna conserva `metrics.parquet`. Bunge/AMS y los 29 datasets
+T8 pasan el validador actual con 0 errores y usan Common Codes. Los dos demos
+`vibsynth_fleet_demo` y `vibsynth_opmodes_demo` tienen layout 0.2 pero aún
+serializan labels de unidad legacy y fallan: los regenera `vibsynth`, no este
+repo. Bunge pasa con 730 avisos conocidos —588 `analysis.stale-input` de las
+capas preservadas y 142 `definition.undocumented-node-type` del enriquecedor—,
+por lo que no está limpio en `--strict` aunque sí en conformidad normal.
+
 Cambiar la lógica de una regla `GTxxx` obliga a **versionar su id** (`GT001v2`,
 como los `IRxxx` del t8-mapper) y deja el overlay desfasado allí donde cambien
 los findings: el aplicador lo dice en voz alta y esos juicios —sólo ésos— se
@@ -121,6 +130,11 @@ uv run ruff check . && uv run pyright src                       # antes de commi
   importa desde `src/`. `tests/test_vibframe_conformance.py` valida lo que
   escribe `rbm export` con `vibframe-validate` (API y CLI) y hace round-trip de
   los goldens de los tres orígenes.
+- **Validación normal vs estricta**: cero errores significa que el dataset es
+  conforme; `--strict` convierte también los avisos en fallo. No se alteran
+  hashes ni vocabularios abiertos para hacer verde artificialmente un sidecar
+  preservado. En Bunge las dos deudas estrictas actuales pertenecen a las
+  capas de análisis y al enriquecedor externos, no al writer AMS.
 - **Lo que 0.2 cambia aquí**: los descriptores de métrica **no** son una tabla —
   `metrics.parquet` está prohibido y en su lugar cada partición lleva
   `metric_catalog.json`, JSON **null-free** (`prune_nulls` del contrato

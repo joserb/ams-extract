@@ -10,6 +10,13 @@ aparecen durante la implementación. Los punteros «§N del PLAN» de los ADRs m
 antiguos citan la numeración del plan **por fases** original, reducido a estado
 y arquitectura el 2026-06-14.
 
+Las entradas son un registro temporal: su contexto y sus cifras no se
+reescriben cuando una decisión posterior las sustituye. Para el estado
+vigente, seguir `Estado`, `Sustituye/Supersede` y las notas de corrección
+fechadas. En particular, ADR-0019 sustituye el layout VibFrame 0.1, ADR-0020
+sustituye la interpretación incompleta de waveforms de ADR-0017 y ADR-0021
+adopta los Common Codes.
+
 ---
 
 ## ADR-0001 — Indexación de registros base-0
@@ -638,7 +645,8 @@ jerarquía/muestras que el export.
 - **Fecha**: 2026-07-09
 - **Estado**: aceptada — **superseded by ADR-0019 (parcial, 2026-08-10)**: la
   decisión de vendorizar el contrato sigue en pie; lo que cambia es *qué*
-  contrato se vendoriza (VibFrame 0.2, pineado a `ea50b0f3e567`). En
+  contrato se vendoriza (VibFrame 0.2; desde ADR-0021, pin
+  `99a44bffc879`). En
   particular, la última consecuencia («enriquecer
   `machine.json`/`metrics.parquet`») nombra un fichero que 0.2 prohíbe: hoy es
   `metric_catalog.json`.
@@ -681,13 +689,23 @@ producir ese formato, pero no debe depender en runtime del monorepo
   direcciones de puntos, modos reales de adquisición, configuración `pdpa`,
   alarmas, RPM en FFT, tendencias por banda y contexto operativo.
 
+### Estado posterior
+
+La lista anterior es la foto del 2026-07-09. `pdpa`/`pdla`, RPM, bandas,
+alarmas y contexto `speed`/`load` se resolvieron en ADR-0012–ADR-0015;
+dirección/ubicación y declaraciones de eje en los workplans 07–08. En 0.2 el
+catálogo es `metric_catalog.json`; sensores/modos no declarados por AMS siguen
+sin inventarse.
+
 ## ADR-0010 — Bandas `vddt` como métricas VibFrame y `machine.path` solo con niveles de ubicación
 
 - **Fecha**: 2026-07-18
 - **Estado**: aceptada — **superseded by ADR-0019 (parcial, 2026-08-10)**: las
   bandas se siguen emitiendo con los mismos descriptores y el mismo `path`,
   pero su descriptor ya no va a `metrics.parquet` (§1 y §2 de la decisión):
-  desde VibFrame 0.2 vive en `metric_catalog.json`.
+  desde VibFrame 0.2 vive en `metric_catalog.json`. ADR-0021 sustituye además
+  la identidad serializada `g` por `K40`; `G's` sigue siendo la label de
+  modelo/display.
 
 ### Contexto
 
@@ -731,7 +749,8 @@ que la máquina aparecía duplicada como pseudo-sububicación.
 - `trends.parquet` multiplica filas (62 lecturas × 6 bandas extra en M1H);
   los consumidores que asumían una métrica por punto deben filtrar por
   `name`/`metric_id` (test de integración actualizado).
-- El mapper (`t8-metrics-mapper`) recibe descriptores estructurales de banda
+- El mapper (`vibsynth-metrics-mapper`, CLI `t8-mapper`) recibe descriptores
+  estructurales de banda
   con nombre original y podrá etiquetarlos canónicamente; aquí no se mapea
   semántica de nombres (workplans/03-vibframe-conformidad.md §4).
 - Los datasets exportados antes de este ADR deben regenerarse para obtener
@@ -757,7 +776,7 @@ está instalado.
 ### Decisión
 
 1. **Post-proceso, no paso de export**: el etiquetado lo hace
-   `t8-mapper vibframe <dataset> --write` (repo `t8-metrics-mapper`),
+   `t8-mapper vibframe <dataset> --write` (repo `vibsynth-metrics-mapper`),
    que reconstruye la firma estructural desde `metrics.parquet` +
    `machine.json` y escribe las etiquetas de vuelta. `ams-extract` no
    depende del mapper ni del monorepo vibsynth (se mantiene la decisión de
@@ -786,6 +805,15 @@ está instalado.
   esas 8 584 filas: con límites Hz el mapper las clasificaría por estructura.
 - Cada regeneración del dataset (`rbm export`) exige repasar el mapper
   (`--write`); documentado en workplans/03 §4.
+
+### Estado posterior
+
+ADR-0012 resolvió los límites `pdpa` y ADR-0015 hizo que el productor emitiese
+las métricas reservadas `speed`/`load`. El reexport del 2026-08-12 dejó
+23.590/24.684 métricas etiquetadas (95,6 %); las 1.094 restantes son huecos
+del catálogo/reglas del mapper, no datos que `ams-extract` deba adivinar. La
+descripción anterior del fallback de `spectra.speed_hz` queda como foto del
+estado previo a ADR-0015.
 
 ## ADR-0012 — Bandas y alarmas desde las plantillas `pdpa`/`pdla`; columna `alarm` derivada
 
@@ -852,7 +880,9 @@ del set 5 (1.4 / 2.2 mm/s) reproducen las transiciones C/D del gold de M1H.
 ## ADR-0013 — `spectra.speed_hz` = RPM del análisis sin dividir; banda "1 - 20 KHz" emitida en g
 
 - **Fecha**: 2026-07-19
-- **Estado**: aceptada
+- **Estado**: aceptada — **superseded by ADR-0021 (parcial, 2026-08-12)** sólo
+  en la identidad serializada: donde este ADR dice `unit=g`, VibFrame 0.2
+  escribe `unit=K40`. La escala y la label AMS `G's` no cambian.
 
 ### Contexto
 
@@ -910,7 +940,8 @@ tecleando la velocidad medida.
 ## ADR-0014 — Tendencias de aceleración (PeakVue/HF) emitidas: overall crudo en G's
 
 - **Fecha**: 2026-07-20
-- **Estado**: aceptada
+- **Estado**: aceptada — **superseded by ADR-0021 (parcial, 2026-08-12)** sólo
+  en `unit`: el modelo conserva `G's` y VibFrame serializa `K40`.
 
 ### Contexto
 
@@ -967,7 +998,8 @@ plot — la derivación de alarma de ADR-0012 aplica sin cambios.
   reservadas `speed`/`load` se emiten igual y con los mismos campos, pero su
   «descriptor machine-level en `metrics.parquet`» (§2) es hoy una entrada de
   `metric_catalog.json`, donde además los campos nulos se omiten en vez de
-  escribirse a `null`.
+  escribirse a `null`. ADR-0021 cambia sus unidades serializadas de `Hz`/`%`
+  a `HTZ`/`P1`.
 
 ### Contexto
 
@@ -1335,7 +1367,13 @@ ola.
    `vibsynth-contracts` del 2026-08-09). Se mantiene la decisión de ADR-0009
    (sin dependencia runtime de vibsynth); lo que se actualiza es el sello.
 
-### Consecuencias
+### Actualización 2026-08-12 — unidades y nuevo pin
+
+ADR-0021 re-vendorizó la misma versión VibFrame 0.2 con Common Codes
+UN/CEFACT. El pin vigente es `99a44bffc879`; `ea50b0f3e567` queda como
+coordenada histórica de la primera migración 0.2.
+
+### Consecuencias en la fecha de adopción
 
 - **Los datasets 0.1 no se pueden leer y hay que regenerarlos.** Todo lo
   exportado antes de `5781773` es ilegible para el pipeline 0.2. Los artefactos
@@ -1355,6 +1393,20 @@ ola.
   GROUND_TRUTH.md §2.4/§4, FORMAT.md §5.5, el §4 del plan general y el
   docstring de `scripts/crosswalk_gt.py`. Los ADR y las filas de
   `VERIFICATION.md` no se reescriben: se anotan encima.
+
+### Cierre posterior 2026-08-12
+
+La regeneración pendiente se completó en el workplan 14. La publicación
+vigente es `~/wslprojects/RESONINS/datasets/bunge_cartagena_ams`: 347 máquinas,
+137.270 espectros, 137.208 ondas, 1.571.433 filas de tendencia y 0 errores del
+validador. `../Informes Bunge Cartagena 2026/ground-truth/` también tiene las
+cuatro proyecciones 0.2. Sus snapshots `FORMATO_GROUND_TRUTH.md`, junto a los
+informes y dentro del dataset RESONINS, se resincronizaron byte a byte con la
+spec alojada el 2026-08-13 tras la revisión editorial del workplan 15. El
+directorio local
+`../bunge_dataset/`, que aún contiene `manifest.parquet + samples/`, es un
+snapshot legacy de junio, no el despliegue VibFrame que describía esta
+consecuencia.
 
 ## ADR-0020 — La waveform completa concatena 150 muestras de `vdfw` y la continuación `vcfw`
 

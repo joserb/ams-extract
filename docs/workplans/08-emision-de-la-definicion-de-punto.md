@@ -1,7 +1,7 @@
 ---
 status: completed
 created: 2026-08-04
-updated: 2026-08-04
+updated: 2026-08-12
 ---
 
 # Plan: emitir al dataset lo que AMS declara del eje del punto
@@ -10,6 +10,11 @@ updated: 2026-08-04
 > no resolver frecuencias sigue en pie, pero `fault_frequencies_order` está
 > prohibido en 0.2 (catálogo único `machine.frequencies`); ver ADR-0019 y el
 > workplan 12.
+>
+> **Estado operativo 2026-08-12** — el reexport 0.2 conserva las 347
+> declaraciones de máquina. Tras etiquetar y enriquecer fuera de este repo,
+> el despliegue contiene **3.728 frecuencias** en **91 máquinas** y deja **56
+> designaciones** sin resolver; el detalle vigente está en el workplan 14.
 
 **Fecha**: 2026-08-04 · **Estado**: **COMPLETADO**. `rbm export` emite ya
 `PointDoc.bearing_designations` y `PointDoc.nominal_speed_rpm` en cada

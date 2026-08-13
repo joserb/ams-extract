@@ -20,7 +20,10 @@ database nor the inspection report PDFs.
   `mapping_rule`). Protects the layer this package owns — the mapping — text
   by text, without the PDFs (49-73 MB each) in the repo. See
   `tests/test_informes.py`, which normalizes versioned rule ids (`GT001v2`)
-  before comparing.
+  before comparing. The `0.2.0` producer label is intentionally historical:
+  current deployed outputs use deterministic extractor 0.4.0 or contextual
+  extractor 0.1.1, while this fixture freezes the pre-fix mapping so rule
+  changes remain explicit and reviewable.
 
 ## Regenerating
 
