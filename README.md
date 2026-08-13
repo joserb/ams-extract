@@ -76,10 +76,12 @@ rbm extract FILE --point NAME [--equipment SUBSTR] \
                  --type fft|waveform|trend|both --limit N --out DIR   # Parquet + PNG
 rbm export FILE --out dataset/ [--types fft,waveform,trend] \
                 [--areas …] [--dataset-path LEVEL]… \
-                [--parallel N]                # VibFrame 0.2 (dataset.json +
+                [--parallel N] [--zip [--zip-out FILE]]
+                                              # VibFrame 0.2 (dataset.json +
                                               # machine=<asset>/{machine.json,
                                               #   metric_catalog.json, spectra,
                                               #   waves, trends} + report.html)
+rbm package dataset/ [--out FILE.vibframe.zip] # package an existing dataset
 rbm alarms FILE [--out dataset/ground-truth] [--name STEM] \
                 [--client C] [--plant P] [--consolidate] \
                 [--skip-hash]                 # AMS's own alarms
@@ -132,6 +134,14 @@ overlay does not match the documents.
 above the dataset ("Bunge Cartagena"), outermost first and repeatable. It is
 the one field that does not come out of the `.rbm`; without the option it is
 not written.
+
+`rbm package` writes a safe, atomic `.vibframe.zip` snapshot with the dataset
+contents at the archive root, including `ground-truth/`, `analysis/` and other
+legitimate sidecars. `rbm export --zip` is a convenience for packaging
+immediately after a successful export; `--zip-out` selects its destination.
+For a deployed dataset, package **after** running mapper, machine enrichment
+and any analysis that should travel in the delivery, because packaging never
+runs those post-processors implicitly. The source directory is preserved.
 
 Canonical metric labels and resolved machine frequencies are deliberately
 post-processing steps, not part of extraction. After regenerating a deployed

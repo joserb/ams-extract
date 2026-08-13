@@ -106,6 +106,11 @@ que solo entiende este repo.
 
 - El empaquetado `.vibframe.zip` (Parte 3 del workplan 03) tocaría a `rbm
   export --zip`; fuera de alcance aquí.
+
+> **Cierre posterior 2026-08-13** — la parte AMS quedó implementada en el
+> workplan 18: `rbm package` y `rbm export --zip` producen paquetes que el
+> visor abre con el mismo HTML que el directorio. La alineación transversal de
+> la convención CLI entre productores continúa en dicho plan.
 - `rbm report` sigue siendo propio y no tiene equivalente en el visor: es el
   inventario del `.rbm` sin exportar. Si algún día `vibframe-viewer report`
   cubre el caso «antes de exportar», habría que revisarlo.

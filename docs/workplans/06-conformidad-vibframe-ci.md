@@ -125,3 +125,10 @@ escribir sus propias filas a mano y comparte la fixture.
 - El workflow aislado de GitHub continúa necesitando una estrategia de
   publicación o checkout coordinado para las dependencias por path; la matriz
   local Linux/WSL es la verificación reproducible de este checkout.
+
+### Actualización 2026-08-13
+
+El workplan 18 resolvió la parte de este productor: `rbm package` y
+`rbm export --zip` escriben de forma atómica y sus tests pasan el validador
+API/CLI en estricto y el viewer. Sigue pendiente llevar los vectores y la
+convención CLI común a contracts y a los demás productores.

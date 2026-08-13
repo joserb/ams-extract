@@ -31,7 +31,7 @@ OVERLAYS_DIR = Path(__file__).parent.parent / "overlays"
 BUNGE_OVERLAY = OVERLAYS_DIR / "bunge-cartagena-2026.weights-llm.overlay.json"
 
 PAIR = "-Desequilibrio del ventilador. -Debilidad estructural del motor."
-WITH_UNMAPPED = "-Debilidad estructural. -Posible desgaste en la válvula."
+WITH_UNMAPPED = "-Debilidad estructural. -Informar a Preditec si se ha intervenido."
 
 
 def _document(*texts: str) -> dict[str, Any]:
@@ -260,9 +260,9 @@ class TestApplying:
                     "fault_group": "OTHER",
                     "fault_mode": None,
                     "label_quality": "group",
-                    "matched_text": "desgaste en la válvula",
+                    "matched_text": "informar a Preditec",
                 },
-                "why": "el desgaste de la válvula es un fallo, sin FaultMode canónico",
+                "why": "el test ejercita un remap explícito desde unmapped",
             }
         ]
         overlay = load_overlay(_overlay_file(tmp_path, judgement))
@@ -273,7 +273,7 @@ class TestApplying:
         assert rescued["fault_mode"] is None
         assert rescued["label_quality"] == "group"
         assert rescued["mapping_rule"] is None
-        assert rescued["matched_text"] == "desgaste en la válvula"
+        assert rescued["matched_text"] == "informar a Preditec"
         assert rescued["source_text"] == WITH_UNMAPPED
         assert report.remapped == 1
 
@@ -405,6 +405,11 @@ class TestTheBungeOverlay:
         assert len(remaps) == 5
         assert all(remap.why for remap in remaps), "a judgement without a reason is not auditable"
         assert {r.fault_group for r in remaps} == {"OTHER", "ELECTRICAL", "LOOSENESS"}
+
+    def test_rule_0_5_drift_is_loud_until_the_adenda_exists(self, bunge) -> None:
+        text = "-Debilidad estructural (seguimiento). -Posible suciedad y/o desgaste en la válvula"
+        with pytest.raises(OverlayError, match="desfasado"):
+            apply_overlay(_document(text), bunge, ApplyReport())
 
     def test_the_scores_live_in_the_declared_scale(self, bunge) -> None:
         scale = {"0.25", "0.5", "1", "1.5", "2", "3"}

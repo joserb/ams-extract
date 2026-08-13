@@ -10,10 +10,18 @@ from typing import Any
 import pytest
 
 from ams_extract.point_naming import (
+    DirectionProposal,
+    EvidenceHit,
+    FieldEvidence,
     PointPlacement,
+    acquisition_base_name,
+    audit_name_corpus,
+    normalize_point_name,
     parse_point_name,
     point_direction,
     point_location,
+    point_name_evidence,
+    propose_sibling_directions,
 )
 from ams_extract.reader import RbmReader
 from ams_extract.tree import walk_hierarchy
@@ -21,6 +29,7 @@ from ams_extract.tree import walk_hierarchy
 CORPUS_FILE = Path(__file__).parent / "fixtures" / "bunge_point_names.json"
 """Every distinct point name of the real Bunge Cartagena database, with the
 number of points carrying it and the placement the rules must produce."""
+AUDIT_FILE = Path(__file__).parent / "fixtures" / "bunge_point_metadata_audit.json"
 
 
 @pytest.fixture(scope="module")
@@ -149,6 +158,87 @@ class TestParsePointName:
         assert parse_point_name("") == PointPlacement(location=None, direction=None)
 
 
+class TestPointNameEvidence:
+    def test_it_retains_normalized_tokens_and_stable_rules(self) -> None:
+        evidence = point_name_evidence("BOMBA LÖA VERTICAL PEAKVUE")
+
+        assert evidence.normalized_name == "bomba loa vertical peakvue"
+        assert evidence.location == FieldEvidence(
+            "NDE", "derived", (EvidenceHit("location.token-loa-v1", "loa", "NDE"),)
+        )
+        assert evidence.direction == FieldEvidence(
+            "V", "derived", (EvidenceHit("direction.vert-v1", "vertical", "V"),)
+        )
+        assert evidence.component_hint.value == "pump"
+        assert evidence.acquisition_hint.value == "peakvue"
+        assert evidence.placement == parse_point_name(evidence.original_name)
+
+    def test_contradiction_is_distinct_from_absence(self) -> None:
+        ambiguous = point_name_evidence("MOTOR LA LOA HORIZONTAL VERTICAL")
+        absent = point_name_evidence("Eje Entrada")
+
+        assert (ambiguous.location.value, ambiguous.location.status) == (None, "ambiguous")
+        assert (ambiguous.direction.value, ambiguous.direction.status) == (None, "ambiguous")
+        assert (absent.location.value, absent.location.status) == (None, "absent")
+        assert (absent.direction.value, absent.direction.status) == (None, "absent")
+
+    def test_two_components_or_acquisitions_do_not_get_an_ordered_winner(self) -> None:
+        evidence = point_name_evidence("MOTOR BOMBA LA PEAKVUE (HF)")
+
+        assert evidence.component_hint.status == "ambiguous"
+        assert evidence.component_hint.value is None
+        assert evidence.acquisition_hint.status == "ambiguous"
+        assert evidence.acquisition_hint.value is None
+
+    def test_normalization_is_comparison_only_and_keeps_the_original(self) -> None:
+        name = "  Eje Entradaç  VERTÍ "
+        evidence = point_name_evidence(name)
+
+        assert normalize_point_name(name) == "eje entradac verti"
+        assert evidence.original_name == name
+
+
+class TestSiblingDirectionProposals:
+    def test_only_closed_acquisition_suffixes_are_removed(self) -> None:
+        assert acquisition_base_name("MOTOR LOA HORIZONTAL PEAKVUE") == (
+            "motor loa horizontal"
+        )
+        assert acquisition_base_name("1º eje Rodam Sup (HF) 2000Hz") == (
+            "1o eje rodam sup"
+        )
+        assert acquisition_base_name("MOTOR LOA SENSOR ESPECIAL") == (
+            "motor loa sensor especial"
+        )
+
+    def test_one_explicit_sibling_produces_a_report_only_proposal(self) -> None:
+        proposals = propose_sibling_directions(
+            ["MOTOR LOA HORIZONTAL", "MOTOR LOA PEAKVUE"]
+        )
+
+        assert proposals == (
+            DirectionProposal(
+                point_name="MOTOR LOA PEAKVUE",
+                direction="H",
+                sibling_name="MOTOR LOA HORIZONTAL",
+            ),
+        )
+
+    def test_two_possible_directions_produce_no_proposal(self) -> None:
+        assert not propose_sibling_directions(
+            ["MOTOR LOA HORIZONTAL", "MOTOR LOA VERTICAL", "MOTOR LOA PEAKVUE"]
+        )
+
+    def test_missing_side_or_component_produces_no_proposal(self) -> None:
+        assert not propose_sibling_directions(
+            ["Eje Entrada HORIZONTAL", "Eje Entrada PEAKVUE"]
+        )
+
+    def test_a_different_shaft_name_is_not_a_sibling(self) -> None:
+        assert not propose_sibling_directions(
+            ["Reductor Eje Entrada LOA Horizontal", "Reductor Eje Salida LOA Peakvue"]
+        )
+
+
 class TestRealCorpus:
     """The 232 distinct names of the 5 203 real points, one golden per name."""
 
@@ -179,6 +269,15 @@ class TestRealCorpus:
         placements = [parse_point_name(e["name"]) for e in corpus["names"]]
         assert {p.location for p in placements} <= {"DE", "NDE", None}
         assert {p.direction for p in placements} <= {"H", "V", "A", None}
+
+    def test_the_aggregate_metadata_audit_is_reproducible(
+        self, corpus: dict[str, Any]
+    ) -> None:
+        expected = json.loads(AUDIT_FILE.read_text(encoding="utf-8"))
+        actual = audit_name_corpus(corpus["names"])
+        actual["source"] = CORPUS_FILE.name
+
+        assert actual == expected
 
     @pytest.mark.integration
     def test_the_corpus_still_matches_the_real_database(

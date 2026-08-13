@@ -95,6 +95,28 @@ empezar por «Espectros …».
 MODALITY_SPLIT_RE = re.compile(
     r"(Vibraciones|Inspecci[oó]n visual|Termograf[ií]a|Ultrasonidos):", re.U
 )
+OVERFLOW_MODALITY_ANCHORS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    (
+        "vibration",
+        re.compile(r"\bvibratori|\bpeakvue\b|\bfirmas? espectral", re.I),
+    ),
+    (
+        "ultrasound",
+        re.compile(
+            r"\bultrasonid|\bmedidas? (?:realizadas? )?mediante ultrasonidos", re.I
+        ),
+    ),
+    ("thermography", re.compile(r"\btermograf|\btermograma", re.I)),
+    ("visual_inspection", re.compile(r"\binspecci[oó]n visual", re.I)),
+)
+"""Anclas léxicas que permiten atribuir un ``_pre`` sin etiqueta.
+
+El maquetador puede desbordar ``ANÁLISIS`` a la columna derecha sin repetir ni
+la cabecera de sección ni la modalidad. No basta con asumir que pertenece a la
+única modalidad ya vista: la ficha de abril de ``TC.1523A2`` tiene Vibraciones
+a la izquierda y Ultrasonidos a la derecha. Sólo se recupera el párrafo cuando
+su propio vocabulario deja una modalidad inequívoca.
+"""
 PREV_DIAG_RE = re.compile(r"-\s*(\d{2}/\d{2}/\d{4}):\s*\(([^)]+)\)\s*")
 TITLE_RE = re.compile(r"^(?:\d+(?:\.\d+)*\s+)?(.+)$")
 RPM_RE = re.compile(
@@ -230,6 +252,36 @@ def split_by_modality(section_text: str) -> dict[str, str]:
         text = parts[i + 1].strip().strip("\n")
         out[modality] = re.sub(r"[ \t]*\n[ \t]*", " ", text).strip()
     return out
+
+
+def merge_analysis_overflow(analysis: dict[str, str], overflow: str) -> dict[str, str]:
+    """Incorpora un desborde derecho de ``ANÁLISIS`` con atribución demostrable.
+
+    Una etiqueta explícita (``Ultrasonidos:``) es el ancla más fuerte. Cuando
+    el maquetador no la repite, se exige que el párrafo contenga anclas léxicas
+    de exactamente una modalidad. Un bloque ambiguo se deja intacto: recuperar
+    menos texto es preferible a asignar evidencia a la modalidad equivocada.
+    """
+    text = re.sub(r"[ \t]*\n[ \t]*", " ", overflow or "").strip()
+    if not text or count_anchors(text):
+        return dict(analysis)
+
+    attributed = split_by_modality(text)
+    if not attributed:
+        modalities = [
+            modality
+            for modality, pattern in OVERFLOW_MODALITY_ANCHORS
+            if pattern.search(text)
+        ]
+        if len(modalities) != 1:
+            return dict(analysis)
+        attributed = {modalities[0]: text}
+
+    merged = dict(analysis)
+    for modality, extra in attributed.items():
+        current = merged.get(modality)
+        merged[modality] = f"{current} {extra}".strip() if current else extra
+    return merged
 
 
 def parse_previous(text: str) -> list[dict[str, str]]:
@@ -407,6 +459,7 @@ def parse_machine_page(page: Any) -> dict[str, Any] | None:
     diagnosis = split_by_modality(left.get("DIAGNÓSTICO:", ""))
     recommendation = split_by_modality(left.get("RECOMENDACIÓN:", ""))
     analysis = split_by_modality(left.get("ANÁLISIS:", ""))
+    analysis = merge_analysis_overflow(analysis, right.get("_pre", ""))
     # Los previos viven en cualquiera de las cuatro fuentes (§3.1, §3.2).
     sources = [
         left.get(PREVIOUS_HEAD, ""),

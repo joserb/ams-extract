@@ -1,0 +1,83 @@
+{
+  "distinct_names": 232,
+  "fields": {
+    "acquisition_hint": {
+      "status": {
+        "absent": 3145,
+        "derived": 2058
+      },
+      "values": {
+        "electrical_current": 1,
+        "high_frequency": 654,
+        "high_resolution": 81,
+        "peakvue": 1322
+      }
+    },
+    "component_hint": {
+      "status": {
+        "absent": 292,
+        "ambiguous": 80,
+        "derived": 4831
+      },
+      "values": {
+        "bell": 20,
+        "centrifuge": 94,
+        "fan": 99,
+        "gearbox": 712,
+        "motor": 2903,
+        "pump": 1003
+      }
+    },
+    "direction": {
+      "status": {
+        "absent": 983,
+        "derived": 4220
+      },
+      "values": {
+        "A": 578,
+        "H": 1316,
+        "V": 2326
+      }
+    },
+    "location": {
+      "status": {
+        "absent": 95,
+        "derived": 5108
+      },
+      "values": {
+        "DE": 2734,
+        "NDE": 2374
+      }
+    }
+  },
+  "limitations": [
+    "component_hint and acquisition_hint are internal report-only candidates",
+    "sensor, speed_source and binary channel kind require AMS golds",
+    "no inferred sibling direction is emitted to machine.json"
+  ],
+  "rule_hits_weighted_by_points": {
+    "acquisition.current-v1": 1,
+    "acquisition.high-frequency-v1": 1063,
+    "acquisition.high-resolution-v1": 151,
+    "acquisition.parenthesized-p-v1": 96,
+    "acquisition.peakvue-v1": 1226,
+    "component.token-bomba-v1": 1003,
+    "component.token-campana-v1": 20,
+    "component.token-centrifuga-v1": 94,
+    "component.token-motor-v1": 2983,
+    "component.token-reductor-v1": 777,
+    "component.token-reductora-v1": 15,
+    "component.token-ventilador-v1": 99,
+    "direction.axial-v1": 578,
+    "direction.horiz-v1": 1316,
+    "direction.vert-v1": 2326,
+    "location.lado-de-v1": 619,
+    "location.lado-nde-v1": 378,
+    "location.token-la-v1": 2115,
+    "location.token-lca-v1": 35,
+    "location.token-loa-v1": 1961
+  },
+  "schema_version": 1,
+  "source": "bunge_point_names.json",
+  "total_points": 5203
+}

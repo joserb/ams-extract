@@ -19,6 +19,7 @@ from ams_extract.export.diag_gt import (
 )
 from ams_extract.export.html_report import write_inventory_html
 from ams_extract.export.json_tree import build_tree_document, write_tree_json
+from ams_extract.export.package import PackageError, PackageSummary, package_dataset
 from ams_extract.export.parquet_samples import (
     write_spectrum_parquet,
     write_trend_parquet,
@@ -72,6 +73,18 @@ def _abort(message: str) -> typer.Exit:
     """Print an error message in red and return a non-zero ``typer.Exit``."""
     _console.print(f"[red]error:[/red] {message}")
     return typer.Exit(code=1)
+
+
+def _print_package_summary(summary: PackageSummary) -> None:
+    """Print the common package fields after either packaging entry point."""
+    _console.print(
+        f"package: [bold]{summary.package}[/bold]\n"
+        f"  entries: {summary.entries}  "
+        f"expanded: {summary.expanded_bytes:,} bytes  "
+        f"package: {summary.package_bytes:,} bytes  "
+        f"duration: {summary.duration_seconds:.2f}s",
+        soft_wrap=True,
+    )
 
 
 @app.callback()
@@ -423,6 +436,14 @@ def export(
         int,
         typer.Option("--parallel", help="Worker processes; 1 means serial."),
     ] = 1,
+    zip_: Annotated[
+        bool,
+        typer.Option("--zip", help="Also package the completed dataset as .vibframe.zip."),
+    ] = False,
+    zip_out: Annotated[
+        Path | None,
+        typer.Option("--zip-out", help="Package path; requires --zip."),
+    ] = None,
 ) -> None:
     """Dump the full database to the VibFrame 0.2 layout.
 
@@ -440,6 +461,8 @@ def export(
         raise _abort(f"file not found: {file}")
     if parallel < 1:
         raise _abort(f"--parallel must be >= 1, got {parallel}")
+    if zip_out is not None and not zip_:
+        raise _abort("--zip-out requires --zip")
 
     type_set = {t.strip().lower() for t in types.split(",") if t.strip()}
     if not type_set:
@@ -478,6 +501,28 @@ def export(
         f"{summary.trend_samples} trend  "
         f"({summary.parquet_files} parquet files)"
     )
+    if zip_:
+        try:
+            package_summary = package_dataset(out, zip_out)
+        except PackageError as exc:
+            raise _abort(str(exc)) from exc
+        _print_package_summary(package_summary)
+
+
+@app.command("package")
+def package(
+    dataset: Annotated[Path, typer.Argument(help="Existing VibFrame dataset directory.")],
+    out: Annotated[
+        Path | None,
+        typer.Option("--out", help="Package path; defaults to <dataset>.vibframe.zip."),
+    ] = None,
+) -> None:
+    """Package an existing dataset without running export or post-processing."""
+    try:
+        summary = package_dataset(dataset, out)
+    except PackageError as exc:
+        raise _abort(str(exc)) from exc
+    _print_package_summary(summary)
 
 
 @app.command("alarms")

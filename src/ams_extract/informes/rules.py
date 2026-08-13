@@ -72,7 +72,7 @@ FINDING_RULES: tuple[tuple[str, str, str | None, str, str], ...] = (
     ("GT001v2", r"desequilibri|desbalance", "IMBALANCE", "IMBALANCE", "direct"),
     ("GT002", r"desalineac", None, "MISALIGNMENT", "group"),
     ("GT003", r"holguras? rotacional", "LOOSENESS", "LOOSENESS", "direct"),
-    ("GT004", r"holgura", "LOOSENESS", "LOOSENESS", "approximate"),
+    ("GT004v2", r"holgura|huelgo", "LOOSENESS", "LOOSENESS", "approximate"),
     ("GT005", r"debilidad estructural|debilidad en", "LOOSENESS", "STRUCTURE", "approximate"),
     ("GT006", r"resonancia", "RESONANCE", "STRUCTURE", "direct"),
     ("GT007", r"pista externa|bpfo", "BEARING_OUTER", "BEARING", "direct"),
@@ -139,6 +139,36 @@ FINDING_RULES: tuple[tuple[str, str, str | None, str, str], ...] = (
         "BELT",
         "group",
     ),
+    (
+        "GT026",
+        r"(?:suciedad|desgaste|deterioro).{0,35}v[aá]lvula|"
+        r"v[aá]lvula.{0,35}(?:sucia|suciedad|desgaste|deterioro)",
+        None,
+        "OTHER",
+        "group",
+    ),
+    (
+        "GT027",
+        r"deterioro\s+(?:en|del?)\s+(?:el\s+)?acoplamiento",
+        None,
+        "OTHER",
+        "group",
+    ),
+    (
+        "GT028",
+        r"bandas? laterales?.{0,80}barras?.{0,20}(?:rotas?|sueltas?)|"
+        r"barras?.{0,20}(?:rotas?|sueltas?)",
+        "ELECTRICAL_ROTOR",
+        "ELECTRICAL",
+        "direct",
+    ),
+    (
+        "GT029",
+        r"ruido\s+(?:en|del?)\s+(?:el\s+)?acople",
+        None,
+        "OTHER",
+        "group",
+    ),
 )
 """``(rule_id, patrón, fault_mode|None, fault_group, label_quality)``.
 
@@ -152,7 +182,9 @@ El sufijo ``vN`` del id versiona la **lectura** de una regla, como los
 un finding ya emitido siga diciendo qué regla lo produjo. En 0.4.0 (workplan
 11) se versionaron las tres que el corpus desmentía: ``GT001v2`` (añade el
 sinónimo «desbalanceo»), ``GT011v2`` y ``GT021v2`` (ganan veto, ver
-:data:`RULE_VETOES`).
+:data:`RULE_VETOES`). En 0.5.0 ``GT004v2`` incorpora el sinónimo observado
+«huelgo»; ``GT026`` a ``GT029`` son familias nuevas sustentadas por el censo
+0.4.0 (válvula, acoplamiento, barras del rotor y ruido en el acople).
 """
 
 RULE_VETOES: dict[str, re.Pattern[str]] = {
@@ -229,10 +261,17 @@ HEALTHY_RE = re.compile(
     # «Se aprecia buen estado de lubricación de los rodamientos del conjunto»
     # declara una parte sana; sin esto la cláusula era masa de juicio y GT011
     # la leía como fallo de lubricación (workplan 11).
-    r"|\bbuen(?:a|as|os)?\s+(?:estado\s+de\s+)?lubricaci",
+    r"|\bbuen(?:a|as|os)?\s+(?:estado\s+de\s+)?lubricaci"
+    r"|\bse establece (?:su|el) buen estado\b"
+    r"|\bno se aprecian? (?:\S+\s+){0,2}?trazas? de fallo\b"
+    r"|\bniveles? aptos? (?:de|para) operaci[oó]n\b",
     re.I,
 )
-STOPPED_RE = re.compile(r"m[aá]quina parada", re.I)
+STABLE_RE = re.compile(
+    r"^estable\b|\bsin evoluci[oó]n(?: negativa)?\b",
+    re.I,
+)
+STOPPED_RE = re.compile(r"m[aá]quina parada|l[ií]nea .{0,40} parada\b", re.I)
 NOT_MEASURED_RE = re.compile(r"m[aá]quina no medida|no se ha medido", re.I)
 OUT_OF_SERVICE_RE = re.compile(r"fuera de servicio", re.I)
 
@@ -241,6 +280,7 @@ STATUS_CLAUSES: tuple[tuple[re.Pattern[str], tuple[str, int | None]], ...] = (
     (NOT_MEASURED_RE, ("NOT_MEASURED", None)),
     (OUT_OF_SERVICE_RE, ("OUT_OF_SERVICE", None)),
     (HEALTHY_RE, ("OK", 0)),
+    (STABLE_RE, ("OK", 0)),
 )
 """Prioridad al agregar el estado de un texto de varias cláusulas."""
 

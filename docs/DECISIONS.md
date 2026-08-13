@@ -1501,3 +1501,86 @@ también ejecutar el enriquecedor de máquina actual sobre Bunge.
 - Tras el reexport hay que volver a ejecutar `t8-mapper` y
   `vibsynth-machines enrich`, porque ambos son postprocesos deliberadamente
   externos al extractor.
+
+## ADR-0022 — El productor AMS empaqueta snapshots `.vibframe.zip` atómicos
+
+- **Fecha**: 2026-08-13
+- **Estado**: aceptada para `ams-extract`; la convención entre productores
+  sigue coordinándose en el workplan 18.
+
+### Contexto
+
+VibFrame 0.2 ya define el envelope `.vibframe.zip`, el validador lo acepta y
+el viewer lo consume, pero este productor sólo entregaba directorios. El flujo
+real añade después del export etiquetas canónicas, definición de máquina y
+capas de análisis, por lo que empaquetar únicamente dentro de `rbm export` no
+representaría siempre el estado final que se desea entregar.
+
+### Decisión
+
+1. Ofrecer dos entradas al mismo núcleo: `rbm package DATASET [--out FILE]`
+   para un dataset ya postprocesado y `rbm export ... --zip [--zip-out FILE]`
+   como conveniencia inmediata.
+2. Publicar exactamente un dataset por ZIP, con `dataset.json`, `machine=*` y
+   todos los sidecars legítimos en la raíz, sin carpeta envolvente ni
+   manifiesto adicional.
+3. Censar con `lstat`, no seguir symlinks y rechazar symlinks, ficheros
+   especiales o nombres que no sean paths POSIX relativos normalizados.
+4. Ordenar las entradas, usar `deflate`, streaming y ZIP64. El orden y los
+   bytes descomprimidos son deterministas; se conservan timestamps/permisos y
+   por ahora no se promete identidad byte a byte entre dos ZIP.
+5. Escribir en un temporal hermano y publicar con `os.replace`. Un fallo no
+   altera un paquete anterior ni deja el destino final parcial. Si el destino
+   está dentro del dataset, se excluyen el propio destino y su temporal.
+6. Mantener el writer en stdlib y sin dependencia runtime de
+   `vibsynth-contracts`; su API y CLI son oráculos de test.
+
+### Consecuencias
+
+- El paquete representa el directorio en el instante de la orden. No ejecuta
+  mapper, enriquecedor ni análisis implícitamente.
+- El viewer produce el mismo report desde directorio y paquete, y el paquete
+  sintético pasa `vibframe-validate --strict` por API y CLI.
+- Contracts y los demás productores aún deben converger en vectores y nombres
+  de opciones comunes; la capacidad local no afirma que esa coordinación haya
+  terminado.
+
+## ADR-0023 — Informes 0.5.0 recupera desbordes anclados y versiona reglas
+
+- **Fecha**: 2026-08-13
+- **Estado**: aceptada en código; pendiente de adenda del overlay, reemisión y
+  despliegue.
+
+### Contexto
+
+La generación determinista 0.4.0 conserva 61 findings `unmapped` en 22 textos.
+Su auditoría por cláusula separó fallos explícitos, estados sanos/estables,
+peticiones administrativas y un caso sin contexto. Además, el maquetador de
+los PDF deja a veces la continuación de `ANÁLISIS` en `right["_pre"]`; ignorar
+ese bloque perdió evidencia en cinco TAG/modos del corpus de 921 páginas.
+
+### Decisión
+
+1. Subir sólo la versión del extractor a `informes-gt-extract 0.5.0`; el
+   esquema DiagGT continúa en 0.1.5 porque la forma documental no cambia.
+2. Incorporar un `_pre` a `analysis_text` únicamente si repite una etiqueta de
+   modalidad o contiene anclas léxicas de exactamente una modalidad. Un bloque
+   ambiguo queda fuera.
+3. Añadir `GT026`–`GT029` para válvula, deterioro de acoplamiento, barras
+   rotas/sueltas y ruido en acople. El acoplamiento se declara como grupo
+   `OTHER`, no `BELT`, porque no es una correa y no existe grupo específico.
+4. Versionar `GT004` como `GT004v2` al incorporar «huelgo».
+5. Tratar las fórmulas inequívocas de buen estado, estabilidad y línea parada
+   como estado por cláusula. Una cláusula sana no silencia otra que nombra un
+   fallo. Informar, comentar o revisar sigue siendo juicio no mapeado.
+
+### Consecuencias
+
+- La lectura 0.5.0 del corpus 0.4.0 deja 24 `unmapped` y masa 20,333332, frente
+  a 61 y 44,999997; cada diferencia está enumerada por la regresión de los 251
+  textos distintos.
+- Se recuperan desbordes demostrados de `CF.9110S1`, `TC.1523A2`, `PM.4500`,
+  `PM.9700A` y `LA.1249A2`, sin asignar texto ambiguo por posición.
+- Cambiar ids/reglas hace que el overlay detecte drift. Sólo los juicios
+  afectados reciben una adenda; hasta entonces 0.4.0/0.1.1 siguen siendo las
+  generaciones desplegadas y no se reescriben sus artefactos.

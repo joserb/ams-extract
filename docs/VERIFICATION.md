@@ -80,6 +80,35 @@ capturas de AMS.
 
 ## 5. Registro de verificaciones realizadas
 
+### Informes Preditec — auditoría 0.5.0 (2026-08-13)
+
+El script reproducible `scripts/audit_informes_unmapped.py` leyó los seis
+documentos archivados de la generación determinista 0.4.0: **6.669
+observaciones**, **61 findings `unmapped` en 22 textos** y masa 44,999997.
+Con las reglas del extractor 0.5.0 quedan **24 `unmapped`** y masa 20,333332.
+La clasificación exclusiva de las 61 observaciones de partida fue: 18 fallos
+explícitos, 25 estados sanos/estables, 17 peticiones administrativas y 1 caso
+sin contexto suficiente. `pdfplumber` fue 0.11.10; el auditor registra además
+hashes de cada documento, reglas, vetos, cláusulas y observaciones afectadas.
+
+La relectura geométrica completa de las **921 páginas** conservó anclas y
+conteos, y recuperó desbordes de `ANÁLISIS` demostrables en `CF.9110S1`,
+`TC.1523A2`, `PM.4500`, `PM.9700A` y `LA.1249A2`. La asignación exige una
+etiqueta de modalidad explícita o un ancla léxica inequívoca; un `_pre`
+ambiguo no se incorpora. Esta es verificación del código vivo, no una nueva
+publicación: la adenda del overlay, reemisión y despliegue siguen pendientes.
+
+### Empaquetado VibFrame real (2026-08-13)
+
+`rbm package` leyó el Bunge desplegado directamente desde RESONINS y escribió
+una copia temporal fuera del dataset: **1.761 entradas**, 1.444.234.607 bytes
+expandidos, 1.295.722.789 bytes comprimidos con `deflate` y **44,83 s**. La
+validación completa del `.vibframe.zip` encontró 347 máquinas, 7 documentos
+DiagGT y 2 capas de análisis con **0 errores**, 730 avisos y 5 informativos.
+Los 730 avisos son exactamente las dos deudas ya registradas para el
+directorio (588 `analysis.stale-input` + 142 tipos de nodo abiertos), no
+problemas del envelope. El paquete temporal se eliminó después de validar.
+
 ### Jerarquía (Fase 2 / 2b)
 
 | Fecha | Alcance | Resultado | Notas |

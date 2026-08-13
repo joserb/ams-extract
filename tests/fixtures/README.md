@@ -13,6 +13,10 @@ database nor the inspection report PDFs.
   Cartagena database (232 names over 5,203 points), each with the placement
   (`location` / `direction`) the rules must produce. Drives the real-corpus
   coverage tests of `point_naming` (`tests/test_point_naming.py`).
+- `bunge_point_metadata_audit.json` — deterministic aggregate census derived
+  from that name corpus: evidence statuses, non-emitted component/acquisition
+  hints and weighted rule coverage. Regenerate or check it with
+  `scripts/audit_point_metadata.py`.
 - `informes_gt_findings.json` — regression corpus of the inspection-report
   DiagGT extractor: every distinct `diagnosis_text` of the 6 BUNGE 2026
   documents with the findings `informes-gt-extract 0.2.0` gave it

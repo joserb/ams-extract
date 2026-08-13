@@ -28,6 +28,7 @@ from ams_extract.informes.consolidate import (
     observation_rows,
     read_crosswalk,
 )
+from ams_extract.informes.parse import merge_analysis_overflow
 from ams_extract.informes.rules import (
     FINDING_RULES,
     clauses,
@@ -58,7 +59,7 @@ def _signature(finding: dict[str, Any]) -> tuple[Any, ...]:
     )
 
 
-WORKPLAN_11_TEXTS: dict[str, tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]] = {
+EXPECTED_RULE_CHANGES: dict[str, tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]] = {
     # text → (findings that appear, findings that vanish), as
     # (fault_group, fault_mode, rule family).
     "Debilidad estructural / Desequilibrio, excentricidad en polea.": (
@@ -77,16 +78,43 @@ WORKPLAN_11_TEXTS: dict[str, tuple[list[tuple[Any, ...]], list[tuple[Any, ...]]]
     "Desbalanceo en el rotor del ventilador posiblemente amplificado por debilidad en la "
     "estructura.Frecuencias de naturaleza eléctrica en el lado acoplado del motor. "
     "Lubricación mejorable en rodamientos del ventilador. Huelgo leve.": (
-        [("IMBALANCE", "IMBALANCE", "GT001"), ("UNMAPPED", None, None)],
+        [("IMBALANCE", "IMBALANCE", "GT001"), ("LOOSENESS", "LOOSENESS", "GT004")],
         [],
     ),
     "Se aprecia buen estado de lubricación de los rodamientos del conjunto. Se establece "
     "su buen estado y se vigilará su evolución.": (
-        [("UNMAPPED", None, None)],
+        [],
         [("LUBRICATION", "BEARING_LUBRICATION", "GT011")],
     ),
+    "-Debilidad estructural (seguimiento). -Posible suciedad y/o desgaste en la válvula": (
+        [("OTHER", None, "GT026")],
+        [],
+    ),
+    "-Deterioro del acoplamiento. - Debilidad estructural del motor.": (
+        [("OTHER", None, "GT027")],
+        [],
+    ),
+    "Debilidad estructural del conjunto. ALERTA. Desalineación y/o deterioro del "
+    "acoplamiento.": (
+        [("OTHER", None, "GT027")],
+        [],
+    ),
+    "Debilidad estructural del conjunto. Desalineación y/o deterioro del acoplamiento.": (
+        [("OTHER", None, "GT027")],
+        [],
+    ),
+    "Existencia de bandas laterales que podrían estar relacionadas con un fallo de "
+    "barras sueltas o rotas.": (
+        [("ELECTRICAL", "ELECTRICAL_ROTOR", "GT028")],
+        [("UNMAPPED", None, None)],
+    ),
+    "Linea 1 de refinería parada": ([], [("UNMAPPED", None, None)]),
+    "Ruido en el acople.": (
+        [("OTHER", None, "GT029")],
+        [("UNMAPPED", None, None)],
+    ),
 }
-"""Los cinco textos del corpus que las reglas corregidas de 0.4.0 leen distinto."""
+"""Diferencias deliberadas respecto al destilado histórico 0.2.0."""
 
 
 @pytest.fixture(scope="module")
@@ -149,8 +177,8 @@ class TestMapFindings:
         assert findings[0]["label_quality"] == "direct"
         assert findings[0]["source_text"] == "Desequilibrio del ventilador"
 
-    def test_unrecognized_fault_text_is_declared_not_dropped(self) -> None:
-        findings = map_findings("Posible suciedad en la válvula")
+    def test_an_administrative_request_is_declared_not_dropped(self) -> None:
+        findings = map_findings("Informar a Preditec si se ha intervenido")
         assert [f["fault_group"] for f in findings] == ["UNMAPPED"]
         assert findings[0]["label_quality"] == "unmapped"
         assert findings[0]["mapping_rule"] is None
@@ -190,7 +218,7 @@ class TestTheRulesTheCorpusDisproved:
             "Se aprecia buen estado de lubricación de los rodamientos del conjunto. "
             "Se establece su buen estado y se vigilará su evolución."
         )
-        assert [f["fault_group"] for f in findings] == ["UNMAPPED"]
+        assert findings == []
 
     def test_the_veto_does_not_reach_the_lubrication_that_is_a_fault(self) -> None:
         # «Mejorable» is a fault and «Deficiente/Ineficiente» carry «eficiente»
@@ -226,6 +254,92 @@ class TestTheRulesTheCorpusDisproved:
         ]
 
 
+class TestWorkplan16Rules:
+    @pytest.mark.parametrize(
+        ("text", "rule", "group", "mode"),
+        [
+            ("Posible suciedad y/o desgaste en la válvula", "GT026", "OTHER", None),
+            ("Deterioro del acoplamiento", "GT027", "OTHER", None),
+            (
+                "Existencia de bandas laterales relacionadas con barras sueltas o rotas",
+                "GT028",
+                "ELECTRICAL",
+                "ELECTRICAL_ROTOR",
+            ),
+            ("Ruido en el acople", "GT029", "OTHER", None),
+            ("Huelgo leve", "GT004v2", "LOOSENESS", "LOOSENESS"),
+        ],
+    )
+    def test_the_remaining_explicit_faults_are_mapped(
+        self, text: str, rule: str, group: str, mode: str | None
+    ) -> None:
+        findings = map_findings(text)
+        assert [(f["mapping_rule"], f["fault_group"], f["fault_mode"]) for f in findings] == [
+            (rule, group, mode)
+        ]
+
+    def test_a_bearing_reference_near_coupling_does_not_become_a_coupling_fault(self) -> None:
+        text = (
+            "Lubricación mejorable en rodamiento de la bomba, lado opuesto al "
+            "acoplamiento, así como posible deterioro incipiente en el mismo."
+        )
+        assert all(f["mapping_rule"] != "GT027" for f in map_findings(text))
+
+    @pytest.mark.parametrize(
+        "text",
+        [
+            "Estable",
+            "Sin evolución en el último mes",
+            "Se establece su buen estado",
+            "No se aprecian trazas de fallo",
+            "Linea 1 de refinería parada",
+        ],
+    )
+    def test_inequivocal_state_clauses_do_not_become_findings(self, text: str) -> None:
+        assert map_findings(text) == []
+        assert status_from_text(text) is not None
+
+    def test_a_stable_clause_does_not_hide_a_fault_clause(self) -> None:
+        findings = map_findings("Debilidad estructural. Estable. Se establece su buen estado.")
+        assert [f["mapping_rule"] for f in findings] == ["GT005"]
+        assert findings[0]["weight"] == 1.0
+
+    def test_administrative_requests_remain_explicitly_unmapped(self) -> None:
+        for text in (
+            "Informar a Preditec si se ha intervenido.",
+            "Comentar a Preditec qué labores se han llevado a cabo.",
+            "Revisar protección ventilador motor.",
+        ):
+            assert [f["label_quality"] for f in map_findings(text)] == ["unmapped"]
+
+
+class TestAnalysisOverflow:
+    def test_an_explicit_modality_is_recovered(self) -> None:
+        assert merge_analysis_overflow(
+            {"vibration": "Análisis vibratorio."},
+            "Ultrasonidos: Ruido ultrasónico en el reductor.",
+        ) == {
+            "vibration": "Análisis vibratorio.",
+            "ultrasound": "Ruido ultrasónico en el reductor.",
+        }
+
+    def test_an_unlabelled_paragraph_needs_one_lexical_anchor(self) -> None:
+        assert merge_analysis_overflow(
+            {"vibration": "Primera parte."},
+            "En las firmas espectrales se observa una componente excitada.",
+        ) == {
+            "vibration": "Primera parte. En las firmas espectrales se observa una "
+            "componente excitada."
+        }
+
+    def test_an_ambiguous_paragraph_is_not_assigned_by_position(self) -> None:
+        original = {"vibration": "Primera parte."}
+        assert (
+            merge_analysis_overflow(original, "ACTUALIZACIÓN sin ancla de modalidad.")
+            == original
+        )
+
+
 class TestWeights:
     def test_a_single_clause_takes_the_whole_mass(self) -> None:
         findings = map_findings("Desequilibrio del ventilador")
@@ -243,7 +357,9 @@ class TestWeights:
         assert [f["weight"] for f in findings] == [0.5, 0.25, 0.25]
 
     def test_the_uncovered_clause_gives_its_mass_to_the_unmapped(self) -> None:
-        findings = map_findings("Desequilibrio del ventilador. Suciedad en la válvula.")
+        findings = map_findings(
+            "Desequilibrio del ventilador. Informar a Preditec si se ha intervenido."
+        )
         assert [f["fault_group"] for f in findings] == ["IMBALANCE", "UNMAPPED"]
         assert [f["weight"] for f in findings] == [0.5, 0.5]
 
@@ -296,7 +412,7 @@ class TestRegressionAgainstTheStandaloneScript:
         assert len(regression_cases) == 251
         assert sum(case["observations"] for case in regression_cases) == 6_669
 
-    def test_only_a_veto_takes_a_finding_away(
+    def test_every_finding_removed_from_the_historical_reading_is_enumerated(
         self, regression_cases: list[dict[str, Any]]
     ) -> None:
         """Reading by clause may add; only a veto subtracts.
@@ -315,8 +431,14 @@ class TestRegressionAgainstTheStandaloneScript:
             for finding in case["findings"]:
                 if tuple(finding[key] for key in FINDING_KEYS)[1:] not in got:
                     lost.append((text, str(finding["mapping_rule"])))
-        assert sorted(rule for _text, rule in lost) == ["GT011", "GT021"]
-        by_rule = dict((rule, text) for text, rule in lost)
+        assert sorted(rule for _text, rule in lost if rule != "None") == ["GT011", "GT021"]
+        assert sorted(text for text, rule in lost if rule == "None") == [
+            "Existencia de bandas laterales que podrían estar relacionadas con un fallo "
+            "de barras sueltas o rotas.",
+            "Linea 1 de refinería parada",
+            "Ruido en el acople.",
+        ]
+        by_rule = dict((rule, text) for text, rule in lost if rule != "None")
         assert by_rule["GT011"].startswith("Se aprecia buen estado de lubricación")
         assert "excentricidad en polea" in by_rule["GT021"]
 
@@ -325,13 +447,13 @@ class TestRegressionAgainstTheStandaloneScript:
     ) -> None:
         """Pinned diff against the 0.2.0 emission (workplans 09 §3 and 11).
 
-        Of the 251 distinct texts of the corpus, 231 map identically; 8 gain
+        Of the 251 distinct texts of the corpus, 230 map identically; two gain
         the partial ``unmapped`` that measures the share of the judgement the
         rules do not cover; 7 move the ``matched_text`` of GT012, whose
         ``rodamiento.*deterior`` alternative used to match *across* clauses
         («rodamientos del conjunto. Posible deterioro»); and 5 are the texts
-        the corrected rules of 0.4.0 read differently, pinned one by one in
-        :data:`WORKPLAN_11_TEXTS`.
+        the corrected rules through 0.5.0 read differently, pinned one by one
+        in :data:`EXPECTED_RULE_CHANGES`.
         """
         identical = added_unmapped = moved_match = corrected = 0
         for case in regression_cases:
@@ -343,16 +465,16 @@ class TestRegressionAgainstTheStandaloneScript:
                 continue
             appeared = [(f[2], f[1], f[4]) for f in got if f not in expected]
             vanished = [(f[2], f[1], f[4]) for f in expected if f not in got]
-            if text in WORKPLAN_11_TEXTS:
+            if text in EXPECTED_RULE_CHANGES:
                 corrected += 1
-                assert (appeared, vanished) == WORKPLAN_11_TEXTS[text], text
+                assert (appeared, vanished) == EXPECTED_RULE_CHANGES[text], text
             elif vanished:
                 assert all(rule == "GT012" for _g, _m, rule in vanished), f"{text!r}"
                 moved_match += 1
             else:
                 assert all(group == "UNMAPPED" for group, _m, _r in appeared), f"{text!r}"
                 added_unmapped += 1
-        assert (identical, added_unmapped, moved_match, corrected) == (231, 8, 7, 5)
+        assert (identical, added_unmapped, moved_match, corrected) == (230, 2, 7, 12)
 
     def test_the_source_text_is_the_verbatim_of_the_diagnosis(
         self, regression_cases: list[dict[str, Any]]
@@ -597,7 +719,7 @@ class TestMaterialization:
     def test_writes_the_three_projections_and_the_manifest(self, tmp_path: Path) -> None:
         import pyarrow.parquet as pq
 
-        text = "-Desequilibrio. -Suciedad en la válvula."
+        text = "-Desequilibrio. -Informar a Preditec si se ha intervenido."
         self._write_documents(
             tmp_path, [_document([_observation(diagnosis_text=text, findings=map_findings(text))])]
         )
@@ -689,7 +811,7 @@ class TestContractConformance:
 
     def test_a_weighted_observation_validates_against_the_models(self) -> None:
         external = pytest.importorskip("vibsynth_contracts.diagnosis.external")
-        text = "-Desequilibrio del ventilador. -Suciedad en la válvula."
+        text = "-Desequilibrio del ventilador. -Informar a Preditec si se ha intervenido."
         observation = _observation(diagnosis_text=text, findings=map_findings(text))
         model = external.DiagGTObservation.model_validate(observation)
         assert [f.weight for f in model.findings] == [0.5, 0.5]
@@ -777,5 +899,64 @@ def test_the_geometry_reproduces_the_published_document(pdf_name: str) -> None:
     assert document["machines_stopped"] == golden["machines_stopped"]
     assert document["machines_not_measured"] == golden["machines_not_measured"]
     assert len(document["observations"]) == len(golden["observations"])
+    allowed_analysis_overflows = {
+        ("CF.9110S1", "vibration"),
+        ("LA.1249A2", "visual_inspection"),
+        ("PM.4500", "visual_inspection"),
+        ("TC.1523A2", "ultrasound"),
+        ("PM.9700A", "visual_inspection"),
+    }
+    rule_fields = {"findings", "status", "alarm"}
     for emitted, expected in zip(document["observations"], golden["observations"], strict=True):
-        assert emitted == expected
+        # This golden is 0.4.0: rule-output changes are pinned by the 251-text
+        # regression above. Here the archived document protects every other
+        # field and enumerates the only geometric differences admitted.
+        assert {k: v for k, v in emitted.items() if k not in rule_fields | {"analysis_text"}} == {
+            k: v for k, v in expected.items() if k not in rule_fields | {"analysis_text"}
+        }
+        if emitted["analysis_text"] != expected["analysis_text"]:
+            key = (emitted["machine"]["external_tag"], emitted["modality"])
+            assert key in allowed_analysis_overflows
+            if expected["analysis_text"]:
+                assert emitted["analysis_text"].startswith(expected["analysis_text"])
+
+
+@pytest.mark.integration
+def test_the_known_analysis_overflows_are_recovered() -> None:
+    """Los dos layouts reales que motivan workplan 16, anclados por texto."""
+    import pdfplumber
+
+    from ams_extract.informes.parse import parse_machine_page
+
+    pdf_dir = _informes_dir()
+    expected = [
+        (
+            "Informe Bunge Cartagena Marzo 2026.pdf",
+            "CF.9110S1",
+            "vibration",
+            "acumulación de suciedad en el bowl de la centrífuga",
+        ),
+        (
+            "Informe Bunge Cartagena Enero 2026.pdf",
+            "TC.1523A2",
+            "ultrasound",
+            "ruido ultrasónico con excitación asíncrona a 127 Hz",
+        ),
+        (
+            "Informe Bunge Cartagena Marzo 2026.pdf",
+            "PM.4500",
+            "visual_inspection",
+            "Revisar bancada de emplazamiento del equipo, pata coja",
+        ),
+        (
+            "Informe Bunge Cartagena Mayo 2026.pdf",
+            "LA.1249A2",
+            "visual_inspection",
+            "Ruido mecánico en rodamiento del laminador, lado opuesto al acoplamiento",
+        ),
+    ]
+    for filename, tag, modality, fragment in expected:
+        with pdfplumber.open(pdf_dir / filename) as pdf:
+            records = (parse_machine_page(page) for page in pdf.pages)
+            machine = next(record for record in records if record and record["tag"] == tag)
+        assert fragment in machine["analysis"][modality]

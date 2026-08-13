@@ -32,10 +32,13 @@ from __future__ import annotations
 
 __all__ = ["EXTRACTOR_VERSION"]
 
-EXTRACTOR_VERSION = "informes-gt-extract 0.4.0"
+EXTRACTOR_VERSION = "informes-gt-extract 0.5.0"
 """Herramienta y versión que se anota en ``provenance.extractor``.
 
-0.4.0 corrige las tres lecturas que el corpus desmintió (workplan 11):
+0.5.0 recupera los desbordes de ``ANÁLISIS`` demostrables por modalidad,
+amplía las fórmulas inequívocas de estado y añade ``GT026`` a ``GT029`` para
+fallos que el censo 0.4.0 dejó sin mapa; ``GT004v2`` incorpora «huelgo».
+0.4.0 corrigió las tres lecturas que el corpus desmintió (workplan 11):
 ``GT001v2`` casa también «desbalanceo», ``GT011v2`` no dispara sobre «buen
 estado de lubricación» y ``GT021v2`` deja de llevar «excentricidad en polea»
 al rotor eléctrico — la recoge ``GT025`` como fallo de transmisión. 0.3.0

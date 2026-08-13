@@ -38,7 +38,7 @@ ams-extract/
 │   ├── models.py          # modelos del dominio (Area/Equipment/Point + muestras)
 │   ├── point_naming.py    # location/direction leídos del nombre AMS del punto
 │   ├── cli.py             # CLI `rbm` (info/tree/report/stats/extract/export/
-│   │                      #   alarms/informes/informes-weights/serve)
+│   │                      #   package/alarms/informes/informes-weights/serve)
 │   └── …                  # naming.py (nombres → ids de fichero), stats.py y
 │                          #   report.py (conteos de `rbm stats`/`rbm report`),
 │                          #   encoding.py, logging_setup.py, cli_dev.py (`rbm-dev`)
@@ -60,7 +60,7 @@ inspección — extractor adoptado en el paquete el 2026-08-04, workplan 09). La
 copias del extractor que siguen junto a los informes y dentro del dataset
 `bunge_cartagena_ams` son artefactos desplegados, no código vivo.
 
-El GT del analista tiene **dos generaciones** (workplan 10): la determinista
+El GT del analista desplegado tiene **dos generaciones** (workplan 10): la determinista
 (`informes-gt-extract 0.4.0`, reparto `1/n` por cláusula, archivada en
 `<informes>/ground-truth/deterministic-0.4.0/`, con la 0.3.0 al lado como la
 línea sobre la que se midió el workplan 10) y la contextual
@@ -68,6 +68,11 @@ línea sobre la que se midió el workplan 10) y la contextual
 dataset y en `<informes>/ground-truth/`). La segunda sale de la primera
 aplicándole un overlay de juicio de `overlays/`; los documentos, la geometría y
 el `source_sha256` del PDF son los mismos, sólo cambia el reparto de `weight`.
+
+El código vivo está ya en **`informes-gt-extract 0.5.0`** (workplan 16):
+recupera desbordes de `ANÁLISIS`, amplía estados inequívocos y añade
+`GT004v2`/`GT026`–`GT029`. Aún no sustituye la publicación anterior: antes hay
+que crear la adenda del overlay, reemitir ambas generaciones y desplegarlas.
 
 **Corpus desplegado (auditoría 2026-08-12).** RESONINS contiene 32 raíces
 VibFrame 0.2 y ninguna conserva `metrics.parquet`. Bunge/AMS y los 29 datasets
@@ -89,6 +94,8 @@ re-juzgan como adenda versionada del overlay (workplan 11).
 uv sync
 uv run rbm info FILE
 uv run rbm export FILE --out DIR --types fft,waveform,trend --parallel 4
+uv run rbm export FILE --out DIR --zip [--zip-out FILE.vibframe.zip]
+uv run rbm package DIR --out FILE.vibframe.zip  # tras mapper/enrich si es entrega
 uv run rbm export FILE --out DIR --dataset-path "Bunge Cartagena"  # dataset.json:path
 uv run rbm extract FILE --point NAME [--equipment SUBSTR] --type both --out DIR
 uv run rbm informes PDFDIR --out PDFDIR/ground-truth   # GT desde informes PDF

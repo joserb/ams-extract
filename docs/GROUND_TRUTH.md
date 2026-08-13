@@ -458,7 +458,7 @@ cambiar la lógica de una regla obliga a nuevo id o sufijo de versión.
 | GT001v2 | desequilibri- / desbalance- | IMBALANCE | IMBALANCE | direct |
 | GT002 | desalineac- | — | MISALIGNMENT | group |
 | GT003 | holguras rotacionales | LOOSENESS | LOOSENESS | direct |
-| GT004 | holgura (genérica) | LOOSENESS | LOOSENESS | approximate |
+| GT004v2 | holgura / huelgo (genérica) | LOOSENESS | LOOSENESS | approximate |
 | GT005 | debilidad estructural | LOOSENESS | STRUCTURE | approximate |
 | GT006 | resonancia | RESONANCE | STRUCTURE | direct |
 | GT007–GT010 | pista externa/interna, elementos rodantes, jaula (o BPFO/BPFI/BSF/FTF) | BEARING_* | BEARING | direct |
@@ -501,6 +501,21 @@ y no el modo porque el único `FaultMode` de `BELT` es `BELT_FAULT` y el fallo
 no es la correa sino la polea: el catálogo no tiene modo para eso y el
 contrato prefiere `group` con `fault_mode` nulo a un modo cercano (§2.5).
 
+**GT026–GT029** se incorporan a `informes-gt-extract` 0.5.0 tras auditar los
+22 textos que aún producían `unmapped` en la generación determinista 0.4.0:
+
+| Regla | Patrón (es) | fault_mode | grupo | calidad |
+|---|---|---|---|---|
+| GT026 | suciedad/desgaste/deterioro de válvula | — | OTHER | group |
+| GT027 | deterioro de acoplamiento | — | OTHER | group |
+| GT028 | bandas laterales asociadas a barras rotas/sueltas | ELECTRICAL_ROTOR | ELECTRICAL | direct |
+| GT029 | ruido en el acople | — | OTHER | group |
+
+GT027 queda en `OTHER`: un acoplamiento no es una correa y el catálogo no
+tiene un grupo propio. GT004 pasa a `GT004v2` porque añadir «huelgo» cambia la
+lectura de una regla existente. La versión del esquema documental sigue en
+0.1.5; cambian el extractor y sus reglas, no la forma del documento.
+
 #### 3.3.1 Vetos: la cláusula que afirma lo contrario
 
 El patrón de una regla es una palabra y el analista escribe frases. Desde
@@ -524,6 +539,14 @@ Las tres reglas versionadas en 0.4.0 (`GT001v2`, `GT011v2`, `GT021v2`) son las
 lecturas que la lectura completa del corpus desmintió y que el reparto
 contextual de pesos sólo pudo paliar (workplan 11). El sufijo `vN` versiona la
 **lectura**: un finding ya emitido sigue diciendo qué regla lo produjo.
+
+Desde 0.5.0 también se reconocen como estado inequívoco «se establece su buen
+estado», «estable», «sin evolución», «niveles aptos para operación», «no se
+aprecian trazas de fallo» y una línea
+de producción declarada parada. La decisión sigue siendo por cláusula: estas
+fórmulas no silencian un fallo escrito en otra cláusula. Las peticiones de
+informar, comentar o revisar no se convierten en estado ni fallo y permanecen
+`unmapped`.
 
 #### Textos de estado, no de fallo
 
