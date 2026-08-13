@@ -1,5 +1,5 @@
 ---
-status: in-progress
+status: completed
 created: 2026-08-13
 updated: 2026-08-13
 ---
@@ -154,12 +154,22 @@ como artefacto de auditoría no normativo si el contrato aún no está listo.
   consolidadas y 2.281 findings; valida con 0 errores, 731 avisos y 5
   informativos. El aviso adicional declara honestamente obsoleta la capa
   `diaggt-contrast` por el nuevo hash de entrada.
-- **Sigue abierta sólo la evidencia rica**: el bloque `ACTUALIZACIÓN` de
-  `TC.1523A2` continúa refluyendo por las páginas 134–136 y las
-  intervenciones/medidas/peticiones no tienen aún proyección normativa. Se
-  preservan en el texto/PDF fuente; no se inventa `record_kind` ni tabla hasta
-  coordinar el contrato en `vibsynth-contracts`. Este punto mantiene el plan
-  `in-progress`.
+- **Evidencia rica cerrada como auditoría no normativa**:
+  `scripts/audit_informes_rich_evidence.py` conserva cuatro fragmentos crudos
+  del bloque `ACTUALIZACIÓN` de `TC.1523A2` en las páginas 134–136, por
+  página/columna y sin deduplicar el reflujo. Censa además 212 filas candidatas:
+  52 intervenciones, 63 medidas numéricas y 97 peticiones/contextos (52, 91 y
+  117 ocurrencias respectivamente). Son candidatos regex revisables, no
+  eventos ni muestras. El JSON completo se publica junto a los PDF; una forma
+  normativa futura se coordinará en `vibsynth-contracts` como trabajo nuevo.
+
+### Cierre
+
+El plan queda **completed**: desbordes, reglas, adenda, matriz, evidencia rica,
+reemisión y despliegue tienen una salida reproducible y honesta. Matriz,
+figuras, intervenciones y medidas no se fuerzan dentro de DiagGT 0.1.5; esa
+extensión normativa queda fuera de alcance y requerirá su propio work plan de
+contrato.
 
 ### 0. Auditoría reproducible y fixtures
 

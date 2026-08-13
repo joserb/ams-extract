@@ -1590,3 +1590,8 @@ ese bloque perdió evidencia en cinco TAG/modos del corpus de 921 páginas.
   semántica temporal ni la deduplicación de una celda sin texto. Se publica
   como artefacto de auditoría no normativo hasta coordinar esa extensión en
   `vibsynth-contracts`.
+- La misma política se aplica a evidencia rica. `ACTUALIZACIÓN` se conserva
+  como fragmentos crudos por página/columna —incluido el reflujo repetido— y
+  las intervenciones, medidas y peticiones se censan como candidatos regex.
+  No se emite `record_kind="intervention"`, tabla `evidence` ni muestra
+  VibFrame sin una fuente y un contrato que definan su semántica.

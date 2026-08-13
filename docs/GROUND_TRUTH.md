@@ -818,6 +818,15 @@ No se emiten `observations.csv`, `findings.csv`,
   decidir que la evidencia gráfica no es asunto de DiagGT— es una decisión de
   una versión futura, porque añadir un campo al modelo normativo sí es un
   cambio de esquema.
+- **Evidencia rica de informe**: el bloque ad hoc `ACTUALIZACIÓN` de
+  `TC.1523A2` refluye entre columnas y páginas 134–136; medidas como
+  `GMF3 = 12,46 Hz`, relaciones de dientes y acciones propuestas son evidencia
+  citada, no muestras VibFrame. Desde el 2026-08-13 se preserva por
+  página/columna, sin deduplicación heurística, en el artefacto no normativo
+  `audit-rich-evidence-2026-08-13.json`. El mismo auditor enumera candidatos de
+  intervención, medida y petición/contexto mediante regex declaradas. No se
+  proyectan hasta decidir sujeto, procedencia, temporalidad y deduplicación en
+  una versión futura del contrato.
 - **Política de evaluación**: cómo puntuar un `DiagnosisResult` contra DiagGT
   (¿ventana de acierto?, ¿multi-etiqueta parcial?) es análogo a
   `EvaluationPolicy` de BenchmarkCase y queda para cuando exista el primer
@@ -843,7 +852,8 @@ No se emiten `observations.csv`, `findings.csv`,
   informes de analista, que son el otro productor, sí son genuinamente
   diarios y no ganan nada con ello.
 - **Eventos de mantenimiento**: las intervenciones se infieren del texto
-  («tras su intervención…»). Un `record_kind="intervention"` sería la
+  («tras su intervención…»). El censo reproducible conserva candidatos, pero
+  no los convierte en hechos. Un `record_kind="intervention"` sería la
   extensión natural cuando haya fuente estructurada (CMMS).
 
 ## 7. Compatibilidad

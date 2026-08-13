@@ -73,7 +73,9 @@ el `source_sha256` del PDF son los mismos, sólo cambia el reparto de `weight`.
 inequívocos y añade `GT004v2`/`GT026`–`GT029`. La adenda 0.1.2 del overlay
 re-juzga sólo los 13 textos afectados y ya no necesita remapeos manuales. La
 matriz de estado está censada como artefacto no normativo (354 máquinas, 1.660
-celdas históricas únicas); no entra en DiagGT hasta cerrar su contrato.
+celdas históricas únicas). `ACTUALIZACIÓN` e indicios de intervenciones,
+medidas y peticiones se preservan en un segundo artefacto no normativo. Ninguno
+entra en DiagGT hasta cerrar su contrato; el workplan 16 está completado.
 
 **Corpus desplegado (auditoría 2026-08-12).** RESONINS contiene 32 raíces
 VibFrame 0.2 y ninguna conserva `metrics.parquet`. Bunge/AMS y los 29 datasets

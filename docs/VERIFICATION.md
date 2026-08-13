@@ -125,6 +125,17 @@ discrepancia entre informes. El JSON completo no normativo está desplegado
 como `ground-truth/audit-status-matrix-2026-08-13.json` junto a los PDF
 (SHA-256 `5b937aaef2f4cb699d7a25e4425bdf8de50cb7da4cfeeb6608f217fd1e817a81`).
 
+El auditor complementario `scripts/audit_informes_rich_evidence.py` conserva
+sin deduplicar cuatro fragmentos por página/columna del bloque
+`ACTUALIZACIÓN` de `TC.1523A2`: cubren las páginas 134–136 e incluyen la
+relación de dientes, el cálculo `GMF3 = 12,46 Hz` y la hipótesis de desgaste.
+También enumera **212 filas candidatas** en los campos textuales: 52 de
+intervención, 63 de medida numérica y 97 de petición/contexto (52, 91 y 117
+ocurrencias). Son coincidencias regex para revisión, no eventos ni muestras
+emitidos. Artefacto desplegado:
+`ground-truth/audit-rich-evidence-2026-08-13.json` (SHA-256
+`9586ffdc83cc493f240ff1eca62546dffb22438244d425edb6a1d887bbcbad1f`).
+
 ### Empaquetado VibFrame real (2026-08-13)
 
 `rbm package` leyó el Bunge desplegado directamente desde RESONINS y escribió

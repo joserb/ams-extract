@@ -91,6 +91,16 @@ def _matrix_audit_module():
     return module
 
 
+def _rich_evidence_audit_module():
+    path = Path("scripts/audit_informes_rich_evidence.py")
+    spec = importlib.util.spec_from_file_location("audit_informes_rich_evidence", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def test_the_matrix_audit_uses_a_closed_icon_catalog() -> None:
     module = _matrix_audit_module()
 
@@ -117,6 +127,25 @@ def test_the_matrix_audit_uses_a_closed_icon_catalog() -> None:
     )
 
 
+def test_the_rich_evidence_audit_keeps_candidates_non_normative() -> None:
+    module = _rich_evidence_audit_module()
+
+    assert module.EVIDENCE_PATTERNS["intervention_candidate"].search(
+        "Tras la intervención se ha sustituido el rodamiento."
+    )
+    assert module.EVIDENCE_PATTERNS["numeric_measure"].findall(
+        "Máximo de 12,46 Hz y 3.2 mm/s."
+    ) == ["12,46 Hz", "3.2 mm/s"]
+    assert module.EVIDENCE_PATTERNS["client_request_or_context"].search(
+        "Informar a Preditec si se ha intervenido."
+    )
+    assert module._bounded(
+        "texto ACTUALIZACIÓN evidencia DIAGNÓSTICOS PREVIOS: viejo",
+        start="ACTUALIZACIÓN",
+        end="DIAGNÓSTICOS PREVIOS:",
+    ) == "ACTUALIZACIÓN evidencia"
+
+
 @pytest.mark.integration
 def test_the_status_matrix_corpus_has_no_unknown_icons(tmp_path: Path) -> None:
     import os
@@ -139,3 +168,22 @@ def test_the_status_matrix_corpus_has_no_unknown_icons(tmp_path: Path) -> None:
     report = json.loads(result.stdout)
     assert report["documents"] == 6
     assert report["unknown_icon_signatures"] == []
+
+
+@pytest.mark.integration
+def test_the_update_reflow_is_preserved_across_its_three_pages() -> None:
+    import os
+
+    source = os.environ.get("INFORMES_TEST_DIR")
+    if not source:
+        pytest.skip("INFORMES_TEST_DIR not set; integration test skipped")
+    module = _rich_evidence_audit_module()
+    fragments = module.extract_update_fragments(
+        Path(source) / "Informe Bunge Cartagena Abril 2026.pdf"
+    )
+
+    assert {fragment.source_page for fragment in fragments} == {134, 135, 136}
+    assert {fragment.external_tag for fragment in fragments} == {"TC.1523A2"}
+    combined = " ".join(fragment.text for fragment in fragments)
+    assert "GMF3 = 0,89 * 14 = 12,46 Hz" in combined
+    assert "posible desgaste en dientes" in combined
